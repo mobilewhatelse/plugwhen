@@ -128,3 +128,10 @@ Eingänge: Haus-Prognose, Grenze (erlaubter Bezug), **Verfügbarkeit von Strom**
 - Zuteilung: Hohe Erzeugung des Nachbarn heißt nicht, dass man den Strom bekommt. Bei Tullnerfeld wird die Einspeisung voll zugeteilt; dann zählt nur der eigene Anteil. `kw` muss den **eigenen** Anteil meinen.
 - Datenschutz: Daten einzelner Nachbarn nur mit Einwilligung; besser nur Summen oder eigene Anteile.
 
+## 14. Namensprüfung ReadyBy (05.11.2026, Stichproben, keine Rechtsberatung)
+- **HACS und Home Assistant:** In der HACS-Standardliste (4944 Einträge) und unter den Home-Assistant-Integrationen gibt es nichts mit `readyby`/`ready_by`; auf GitHub keine Integration mit dem Ordner `custom_components/ready_by`. Domain `ready_by` ist damit frei.
+- **Internet-Domains (nur DNS-Abfrage, kein Registrar-Test):** `readyby.com` und `readyby.eu` sind belegt (Seiten nicht lesbar); `readyby.app` gehört einer App „ReadyBy“ (ReadyBy Ltd, Rückwärtsplanung von Terminen, nichts mit Auto oder Energie); `getreadyby.com` ist belegt, die Seite leer. Ohne DNS-Eintrag: `.at`, `.io`, `.dev`, `.energy` (das heißt nicht, dass sie frei sind).
+- **Marke:** In den Suchtreffern keine Eintragung gefunden. TMview, EUIPO und das Österreichische Patentamt sind damit **nicht** geprüft (Suchmaschinen indizieren sie kaum); das muss direkt dort geschehen, bevor es kommerziell wird.
+- **Risiken:** (1) „Ready-by“ ist im Ladebereich ein beschreibender Begriff (Wallbox nennt eine Planungsfunktion seiner App „Ready-By“), als Marke schwach und mit einem Hersteller-Begriff verwechselbar. (2) Eine Software mit gleichem Namen („ReadyBy“, Terminplanung) existiert; bei Software (Klasse 9) kann das kollidieren, auch wenn der Zweck verschieden ist.
+- **Empfehlung:** Als Projektname im Open-Source-Betrieb unkritisch. Vor kommerzieller Nutzung TMview prüfen; ein Zusatz hilft (z. B. „ReadyBy Charge“) und die Domain mit Zusatz sichern.
+

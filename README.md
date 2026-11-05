@@ -2,7 +2,7 @@
 
 # ReadyBy
 
-> **Status: idea and design, nothing built yet. Private repository.**
+> **Status: design phase, first module built (`learning`, with tests). Private repository.**
 
 *ReadyBy*: your car is **ready by** the time you leave.
 
