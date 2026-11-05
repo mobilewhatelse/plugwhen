@@ -74,7 +74,7 @@ Einstellung im Planer: „Wallbox wird vom Viertelstunden-Wächter geregelt" (ja
 - **Lizenz:** wie der Wächter (AGPL-3.0 und Handelslizenz, `LICENSING.md` mit Abschnitt zu Name und Logo).
 - **Sprache:** Englisch zuerst, Deutsch als Übersetzung. Tests, hassfest, HACS-Prüfung und Installationstest im Docker wie beim Wächter.
 - **Code teilen:** Anfangs `forecast.py` und `plan.py` kopieren; erst wenn sie stabil sind, eine gemeinsame Bibliothek (PyPI) prüfen.
-- **Name:** **ReadyBy** (entschieden 05.11.2026; Integrations-Domain `ready_by`; Marke, Domain und HACS-Liste noch nicht geprüft).
+- **Name:** **Plugwhen** (entschieden 05.11.2026 nach Recherche, siehe 14 und 15; Integrations-Domain `plugwhen`; Marke in TMview/EUIPO noch nicht geprüft). Arbeitsname war ReadyBy, verworfen wegen Wallbox-Begriff „Ready-By" und gleichnamiger Software.
 
 ## 10. Entscheidungen und offene Punkte
 **Entschieden 05.11.2026:**
@@ -82,7 +82,7 @@ Einstellung im Planer: „Wallbox wird vom Viertelstunden-Wächter geregelt" (ja
 - Der Planer bekommt ein **eigenes Repository** (Konto `mobilewhatelse`, zunächst privat).
 
 **Offen:**
-1. ~~Name~~ entschieden: ReadyBy (Icon B: Auto mit Blitz und Planstufen). Offen: Prüfung von Marke, Domain und Namenskonflikten vor der Veröffentlichung.
+1. ~~Name~~ entschieden: Plugwhen (Icon B: Auto mit Blitz und Planstufen). Offen: Marke in TMview/EUIPO/Patentamt prüfen und Domain sichern (plugwhen.com, .io, .app, .eu, .dev hatten per DNS keinen Eintrag), vor der Veröffentlichung.
 2. evcc als Ausführer in 0.2 prüfen (evcc kennt Lastpunkt-Pläne; Übergabe per API/MQTT nicht geprüft).
 3. Wann wird das Repository öffentlich?
 4. Soll der Wächter später den Planer als Ladeplan **ersetzen** oder dauerhaft beide Wege anbieten?
@@ -128,7 +128,7 @@ Eingänge: Haus-Prognose, Grenze (erlaubter Bezug), **Verfügbarkeit von Strom**
 - Zuteilung: Hohe Erzeugung des Nachbarn heißt nicht, dass man den Strom bekommt. Bei Tullnerfeld wird die Einspeisung voll zugeteilt; dann zählt nur der eigene Anteil. `kw` muss den **eigenen** Anteil meinen.
 - Datenschutz: Daten einzelner Nachbarn nur mit Einwilligung; besser nur Summen oder eigene Anteile.
 
-## 14. Namensprüfung ReadyBy (05.11.2026, Stichproben, keine Rechtsberatung)
+## 14. Namensprüfung ReadyBy (verworfen, 05.11.2026, Stichproben, keine Rechtsberatung)
 - **HACS und Home Assistant:** In der HACS-Standardliste (4944 Einträge) und unter den Home-Assistant-Integrationen gibt es nichts mit `readyby`/`ready_by`; auf GitHub keine Integration mit dem Ordner `custom_components/ready_by`. Domain `ready_by` ist damit frei.
 - **Internet-Domains (nur DNS-Abfrage, kein Registrar-Test):** `readyby.com` und `readyby.eu` sind belegt (Seiten nicht lesbar); `readyby.app` gehört einer App „ReadyBy“ (ReadyBy Ltd, Rückwärtsplanung von Terminen, nichts mit Auto oder Energie); `getreadyby.com` ist belegt, die Seite leer. Ohne DNS-Eintrag: `.at`, `.io`, `.dev`, `.energy` (das heißt nicht, dass sie frei sind).
 - **Marke:** In den Suchtreffern keine Eintragung gefunden. TMview, EUIPO und das Österreichische Patentamt sind damit **nicht** geprüft (Suchmaschinen indizieren sie kaum); das muss direkt dort geschehen, bevor es kommerziell wird.

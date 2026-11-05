@@ -1,6 +1,6 @@
 # Licensing
 
-ReadyBy is **dual-licensed**.
+Plugwhen is **dual-licensed**.
 
 ## 1. GNU Affero General Public License v3.0 (free)
 

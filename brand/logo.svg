@@ -15,6 +15,6 @@
   <!-- bolt -->
   <path d="M132 40 L108 84 H128 L118 116 L158 66 H136 L148 40 Z" fill="#ffd23f" stroke="#14508f" stroke-width="3" stroke-linejoin="round"/>
   </g>
-  <text x="170" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="68" font-weight="700" fill="#14508f">Ready<tspan fill="#1fae6a">By</tspan></text>
+  <text x="170" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="68" font-weight="700" fill="#14508f">Plug<tspan fill="#1fae6a">when</tspan></text>
   <text x="172" y="128" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#5b6b7b">charging plan for your EV</text>
 </svg>

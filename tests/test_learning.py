@@ -8,7 +8,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "ready_by"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from learning import (  # noqa: E402
     DEFAULT_CONSUMPTION, MAX_DAYS, DayRecord, MobilityModel, backtest, quantile_high,

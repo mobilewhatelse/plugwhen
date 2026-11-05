@@ -1,10 +1,10 @@
-<p align="center"><img src="brand/logo.png" alt="ReadyBy" width="420"></p>
+<p align="center"><img src="brand/logo.png" alt="Plugwhen" width="420"></p>
 
-# ReadyBy
+# Plugwhen
 
 > **Status: design phase, first module built (`learning`, with tests). Private repository.**
 
-*ReadyBy*: your car is **ready by** the time you leave.
+*Plugwhen*: it works out **when to plug in**, so the car is ready when you leave.
 
 ## What is this for?
 
