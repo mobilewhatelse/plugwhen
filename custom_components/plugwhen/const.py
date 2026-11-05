@@ -37,5 +37,5 @@ DEFAULT_CHARGE_MAX = 11.0
 DEFAULT_CHARGE_MIN = 1.4
 DEFAULT_NOTIFY_HOUR = 19
 
-PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure"]
-READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable"]
+PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure", "unknown_soc"]
+READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable", "unknown"]

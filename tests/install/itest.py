@@ -269,6 +269,21 @@ def main():
     svc("switch", "turn_on", {"entity_id": nid})
     svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": "07:00:00"})
 
+    # the state of charge is not known (at the start of Home Assistant): no need, no plan, no warning
+    n_unknown = num("counter.meldungen") or 0
+    svc("input_boolean", "turn_off", {"entity_id": "input_boolean.auto_angesteckt"})
+    svc("input_boolean", "turn_on", {"entity_id": "input_boolean.soc_ausfall"})
+    ok = wait_for(lambda: state(rdid)["state"] == "unknown", 30)
+    log(bool(ok), "state of charge unknown: readiness is unknown", state(rdid)["state"])
+    log(state(cid)["state"] in ("unknown", "unavailable") and state(pid)["state"] == "unknown_soc",
+        "state of charge unknown: no energy to charge, no plan", f"{state(cid)['state']} / {state(pid)['state']}")
+    time.sleep(8)
+    log((num("counter.meldungen") or 0) == n_unknown, "state of charge unknown: no warning is sent", f"counter {num('counter.meldungen')}")
+    svc("input_boolean", "turn_off", {"entity_id": "input_boolean.soc_ausfall"})
+    svc("input_boolean", "turn_on", {"entity_id": "input_boolean.auto_angesteckt"})
+    ok = wait_for(lambda: state(rdid)["state"] != "unknown", 30)
+    log(bool(ok), "state of charge back: normal again", state(rdid)["state"])
+
     # connections: load forecast and availability as options
     svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})   # (33.3 - 25) % of 60 kWh / 0.9 = 5.5 kWh
     svc("number", "set_value", {"entity_id": resid, "value": 100})

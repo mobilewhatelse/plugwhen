@@ -255,6 +255,11 @@ class Plugwhen:
             v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption, learn_km=v.learn_km)
 
         max_kw = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
+        if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
+            v.charge_plan = {"status": "unknown_soc", "windows": [], "needed_kwh": None, "planned_kwh": None}
+            v.notice = None
+            v.load_used = v.availability_used = False
+            return
         load, target_kw = self._load_inputs(now)
         avail = self._availability(now)
         v.load_used, v.availability_used = load is not None, avail is not None

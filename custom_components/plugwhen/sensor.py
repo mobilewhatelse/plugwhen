@@ -43,7 +43,7 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
     @property
     def native_value(self) -> float | None:
         n = self.vehicle.need
-        return n.charge_kwh if n is not None else None
+        return n.charge_kwh if n is not None and self.vehicle.soc is not None else None  # unknown state of charge: unknown
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -149,6 +149,8 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
 
     @property
     def native_value(self) -> str:
+        if self.vehicle.soc is None:
+            return "unknown"
         n = self.vehicle.notice
         return n.kind if n is not None else "ready"
 

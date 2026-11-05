@@ -138,7 +138,8 @@
           "planned": "Planned",
           "not_needed": "Not needed",
           "infeasible": "Target not reachable",
-          "no_departure": "No departure"
+          "no_departure": "No departure",
+          "unknown_soc": "State of charge unknown"
         }
       },
       "readiness": {
@@ -148,7 +149,8 @@
           "plug_in": "Plug in",
           "low": "Too low",
           "too_late": "Too late",
-          "not_reachable": "Not reachable"
+          "not_reachable": "Not reachable",
+          "unknown": "Unknown"
         }
       }
     },

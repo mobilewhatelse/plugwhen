@@ -138,7 +138,8 @@
           "planned": "Geplant",
           "not_needed": "Nicht nötig",
           "infeasible": "Ziel nicht erreichbar",
-          "no_departure": "Keine Abfahrt"
+          "no_departure": "Keine Abfahrt",
+          "unknown_soc": "Ladestand unbekannt"
         }
       },
       "readiness": {
@@ -148,7 +149,8 @@
           "plug_in": "Bitte anstecken",
           "low": "Zu niedrig",
           "too_late": "Zu spät",
-          "not_reachable": "Nicht erreichbar"
+          "not_reachable": "Nicht erreichbar",
+          "unknown": "Unbekannt"
         }
       }
     },

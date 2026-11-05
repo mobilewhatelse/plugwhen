@@ -32,8 +32,8 @@ EN = dict(
     od_avail="A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast.",
     s_charge="Energy to charge", s_range="Range needed", s_soc2="Target state of charge", s_dep2="Expected departure", s_week="Learned days",
     s_plan="Charge plan", s_ready="Ready for departure",
-    plan_planned="Planned", plan_not_needed="Not needed", plan_infeasible="Target not reachable", plan_no_departure="No departure",
-    r_ready="Ready", r_plug="Plug in", r_low="Too low", r_late="Too late", r_unreach="Not reachable",
+    plan_planned="Planned", plan_not_needed="Not needed", plan_infeasible="Target not reachable", plan_no_departure="No departure", plan_unknown="State of charge unknown",
+    r_ready="Ready", r_plug="Plug in", r_low="Too low", r_late="Too late", r_unreach="Not reachable", r_unknown="Unknown",
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
 DE = dict(
@@ -64,8 +64,8 @@ DE = dict(
     od_avail="Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose.",
     s_charge="Zu ladende Energie", s_range="Nötige Reichweite", s_soc2="Ziel-Ladestand", s_dep2="Erwartete Abfahrt", s_week="Gelernte Tage",
     s_plan="Ladeplan", s_ready="Bereit zur Abfahrt",
-    plan_planned="Geplant", plan_not_needed="Nicht nötig", plan_infeasible="Ziel nicht erreichbar", plan_no_departure="Keine Abfahrt",
-    r_ready="Bereit", r_plug="Bitte anstecken", r_low="Zu niedrig", r_late="Zu spät", r_unreach="Nicht erreichbar",
+    plan_planned="Geplant", plan_not_needed="Nicht nötig", plan_infeasible="Ziel nicht erreichbar", plan_no_departure="Keine Abfahrt", plan_unknown="Ladestand unbekannt",
+    r_ready="Bereit", r_plug="Bitte anstecken", r_low="Zu niedrig", r_late="Zu spät", r_unreach="Nicht erreichbar", r_unknown="Unbekannt",
     sw_learn="Kilometer je Wochentag lernen", sw_notice="Warnen, wenn das Auto nicht bereit sein wird", n_res="Reserve",
 )
 
@@ -98,9 +98,10 @@ def build(L):
                 "need_charge": {"name": L["s_charge"]}, "need_range": {"name": L["s_range"]}, "target_soc": {"name": L["s_soc2"]},
                 "departure": {"name": L["s_dep2"]}, "week_plan": {"name": L["s_week"]},
                 "charge_plan": {"name": L["s_plan"], "state": {"planned": L["plan_planned"], "not_needed": L["plan_not_needed"],
-                                                               "infeasible": L["plan_infeasible"], "no_departure": L["plan_no_departure"]}},
+                                                               "infeasible": L["plan_infeasible"], "no_departure": L["plan_no_departure"],
+                                                               "unknown_soc": L["plan_unknown"]}},
                 "readiness": {"name": L["s_ready"], "state": {"ready": L["r_ready"], "plug_in": L["r_plug"], "low": L["r_low"],
-                                                              "too_late": L["r_late"], "not_reachable": L["r_unreach"]}},
+                                                              "too_late": L["r_late"], "not_reachable": L["r_unreach"], "unknown": L["r_unknown"]}},
             },
             "switch": {"learn_km": {"name": L["sw_learn"]}, "notice_enabled": {"name": L["sw_notice"]}},
             "number": {"reserve_km": {"name": L["n_res"]}},

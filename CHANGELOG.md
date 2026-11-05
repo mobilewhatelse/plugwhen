@@ -13,7 +13,10 @@
   (found automatically and suggested) and a sensor of the *availability interface* (`schema`, `valid_until`, `forecast`).
 - **Departure from an entity** (time or date-time) replaces the learned one; wallbox power (max/min), a *charging* entity.
 - Reacts at once when the car is plugged in, starts charging or a watched entity changes, not only every five minutes.
-- Installation test extended to 43 checks (plan, warning once, worse warning, switch off, connections, restart).
+- **Unknown state of charge** (for example while Home Assistant is starting): no energy to charge, no plan and no warning;
+  the sensors say *unknown*.
+- Several notify services can be named, separated by commas (one warning to every phone).
+- Installation test extended to 48 checks (plan, warning once, worse warning, switch off, connections, restart).
 
 ## 0.1.0 (unreleased) - show only
 
