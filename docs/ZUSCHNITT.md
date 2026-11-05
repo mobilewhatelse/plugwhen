@@ -135,3 +135,18 @@ Eingänge: Haus-Prognose, Grenze (erlaubter Bezug), **Verfügbarkeit von Strom**
 - **Risiken:** (1) „Ready-by“ ist im Ladebereich ein beschreibender Begriff (Wallbox nennt eine Planungsfunktion seiner App „Ready-By“), als Marke schwach und mit einem Hersteller-Begriff verwechselbar. (2) Eine Software mit gleichem Namen („ReadyBy“, Terminplanung) existiert; bei Software (Klasse 9) kann das kollidieren, auch wenn der Zweck verschieden ist.
 - **Empfehlung:** Als Projektname im Open-Source-Betrieb unkritisch. Vor kommerzieller Nutzung TMview prüfen; ein Zusatz hilft (z. B. „ReadyBy Charge“) und die Domain mit Zusatz sichern.
 
+
+## 15. Alternativnamen (Recherche 05.11.2026, Stichproben)
+Geprüft: Namen auf GitHub, in der HACS-Standardliste (4944) und bei Home-Assistant-Integrationen, DNS von .com/.io/.app/.eu/.dev (belegt/„frei?" ohne Registrar-Test), Websuche nach Produkt oder Marke.
+Marken wurden **nicht** in TMview/EUIPO geprüft.
+
+| Name | GitHub/HACS/HA | Domains (DNS) | Websuche | Anmerkung |
+|---|---|---|---|---|
+| **Plugwhen** | kein Treffer | alle frei?, auch .com | nichts gefunden | sagt, wann man ansteckt; selbsterklärend, leicht beschreibend |
+| **Dawnplug** | kein Treffer | alle frei?, auch .com | nichts; ähnlich: Wallbox „Charge Amps Dawn" | Bezug auf Morgen/Abfahrt; „Dawn" ist ein Wallbox-Produktname eines Herstellers |
+| Plugcast | kein Treffer | .com belegt | nichts gefunden | gut, aber .com weg |
+| Chargewhen, Chargeby, Plugready | kein Treffer | .com belegt | nicht einzeln geprüft | |
+| Departly, Wattwhen, Fullby | wenige kleine Treffer | .com belegt | nicht einzeln geprüft | |
+| Wakeful, Amply, Topup, Kwhen, Carplan | viele oder bekannte Treffer | belegt | | **nicht verwenden** |
+
+Empfehlung: **Plugwhen** (frei auf allen geprüften Wegen, kein Treffer in Websuche und Listen), zweite Wahl **Dawnplug**. ReadyBy bleibt Arbeitsname, bis entschieden ist.
