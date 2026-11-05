@@ -74,7 +74,7 @@ Einstellung im Planer: „Wallbox wird vom Viertelstunden-Wächter geregelt" (ja
 - **Lizenz:** wie der Wächter (AGPL-3.0 und Handelslizenz, `LICENSING.md` mit Abschnitt zu Name und Logo).
 - **Sprache:** Englisch zuerst, Deutsch als Übersetzung. Tests, hassfest, HACS-Prüfung und Installationstest im Docker wie beim Wächter.
 - **Code teilen:** Anfangs `forecast.py` und `plan.py` kopieren; erst wenn sie stabil sind, eine gemeinsame Bibliothek (PyPI) prüfen.
-- **Name:** offen (Arbeitstitel „Ev Planner").
+- **Name:** **ReadyBy** (entschieden 05.11.2026; Integrations-Domain `ready_by`; Marke, Domain und HACS-Liste noch nicht geprüft).
 
 ## 10. Entscheidungen und offene Punkte
 **Entschieden 05.11.2026:**
@@ -82,7 +82,7 @@ Einstellung im Planer: „Wallbox wird vom Viertelstunden-Wächter geregelt" (ja
 - Der Planer bekommt ein **eigenes Repository** (Konto `mobilewhatelse`, zunächst privat).
 
 **Offen:**
-1. Name und Domain der Integration.
+1. ~~Name~~ entschieden: ReadyBy (Icon B: Auto mit Blitz und Planstufen). Offen: Prüfung von Marke, Domain und Namenskonflikten vor der Veröffentlichung.
 2. evcc als Ausführer in 0.2 prüfen (evcc kennt Lastpunkt-Pläne; Übergabe per API/MQTT nicht geprüft).
 3. Wann wird das Repository öffentlich?
 4. Soll der Wächter später den Planer als Ladeplan **ersetzen** oder dauerhaft beide Wege anbieten?

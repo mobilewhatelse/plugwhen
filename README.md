@@ -1,6 +1,10 @@
-# EV Planner (working title)
+<p align="center"><img src="brand/logo.png" alt="ReadyBy" width="420"></p>
 
-> **Status: idea and design, nothing built yet. Private repository.** The name is a placeholder.
+# ReadyBy
+
+> **Status: idea and design, nothing built yet. Private repository.**
+
+*ReadyBy*: your car is **ready by** the time you leave.
 
 ## What is this for?
 

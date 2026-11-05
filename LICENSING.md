@@ -1,6 +1,6 @@
 # Licensing
 
-EV Planner (working title) is **dual-licensed**.
+ReadyBy is **dual-licensed**.
 
 ## 1. GNU Affero General Public License v3.0 (free)
 
