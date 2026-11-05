@@ -38,6 +38,7 @@ class Vehicle:
     model: MobilityModel = field(default_factory=MobilityModel)
     plan: WeekdayPlan | None = None
     need: Need | None = None
+    consumption: float = DEFAULT_CONSUMPTION_100 / 100.0   # kWh per km used for the need
     departure: datetime | None = None
     soc: float | None = None
     plugged: bool | None = None
@@ -174,7 +175,7 @@ class Plugwhen:
         v.departure = self._next_departure(v, now)
         weekday = (v.departure or (now + timedelta(days=1))).weekday()  # without a learned departure: tomorrow
         v.plan = v.model.plan(weekday)
-        consumption = (v.model.consumption_kwh_per_km() if v.model.consumption_known
-                       else float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
+        v.consumption = (v.model.consumption_kwh_per_km() if v.model.consumption_known
+                         else float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
         v.need = compute_need(
-            v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), consumption, learn_km=v.learn_km)
+            v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption, learn_km=v.learn_km)

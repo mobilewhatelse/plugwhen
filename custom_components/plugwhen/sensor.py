@@ -127,5 +127,6 @@ class WeekPlanSensor(PlugwhenEntity, SensorEntity):
             "history_days": v.history_days,
             "history_read": v.history_at.isoformat() if v.history_at else None,
             "history_error": v.history_error,
-            "consumption_kwh_per_km": v.model.consumption_kwh_per_km(),
+            "consumption_kwh_per_km": round(v.consumption, 3),
+            "consumption_learned": v.model.consumption_known,
         }
