@@ -28,6 +28,39 @@ input_boolean:
     name: Auto angesteckt
     initial: false
 
+input_datetime:
+  abfahrt:
+    name: Abfahrt
+    has_date: false
+    has_time: true
+    initial: "07:00:00"
+
+input_text:
+  meldung:
+    name: Letzte Meldung
+    max: 255
+
+counter:
+  meldungen:
+    name: Meldungen
+
+# the warning goes through this script (stands in for a notify service)
+script:
+  notify_sink:
+    alias: Notify sink
+    fields:
+      title: {}
+      message: {}
+    sequence:
+      - action: counter.increment
+        target:
+          entity_id: counter.meldungen
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.meldung
+        data:
+          value: "{{ message | truncate(250) }}"
+
 template:
   - sensor:
       - name: Auto Kilometerstand
@@ -52,3 +85,25 @@ template:
       - name: Auto Stecker
         unique_id: auto_stecker
         state: "{{ is_state('input_boolean.auto_angesteckt', 'on') }}"
+  - sensor:
+      - name: Test Last
+        unique_id: test_last
+        state: "1"
+        attributes:
+          target_kw: 9.5
+          hours: >
+            {% set ns = namespace(l=[]) %}
+            {% for i in range(0, 30) %}
+              {% set t = (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=i)).isoformat() %}
+              {% set ns.l = ns.l + [{'t': t, 'typical': 0.4, 'high': 1.0}] %}
+            {% endfor %}
+            {{ ns.l }}
+      - name: Test Verfuegbar
+        unique_id: test_avail
+        state: "1"
+        attributes:
+          schema: 1
+          valid_until: "{{ (now() + timedelta(hours=6)).isoformat() }}"
+          forecast: >
+            {% set s = now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=2) %}
+            {{ [{'start': s.isoformat(), 'end': (s + timedelta(hours=3)).isoformat(), 'kw': 5.0}] }}

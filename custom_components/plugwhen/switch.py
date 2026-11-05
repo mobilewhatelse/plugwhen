@@ -14,7 +14,7 @@ from .entity import PlugwhenEntity
 async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddConfigEntryEntitiesCallback) -> None:
     plug = entry.runtime_data
     for sub_id, v in plug.vehicles.items():
-        add([LearnKmSwitch(plug, v)], config_subentry_id=sub_id)
+        add([LearnKmSwitch(plug, v), NoticeSwitch(plug, v)], config_subentry_id=sub_id)
 
 
 class LearnKmSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
@@ -41,5 +41,33 @@ class LearnKmSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         self.vehicle.learn_km = False
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
+
+
+class NoticeSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
+    """Off: no warning is sent that the car will not be ready (the readiness sensor still shows it)."""
+
+    _attr_icon = "mdi:bell-ring-outline"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "notice_enabled")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        self.vehicle.notice_enabled = last is None or last.state != "off"  # default on
+
+    @property
+    def is_on(self) -> bool:
+        return self.vehicle.notice_enabled
+
+    async def async_turn_on(self, **kwargs) -> None:
+        self.vehicle.notice_enabled = True
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        self.vehicle.notice_enabled = False
         self.async_write_ha_state()
         await self.plug.async_recompute(self.vehicle)

@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import PlugwhenEntry
+from .const import PLAN_STATES, READINESS_STATES
 from .entity import PlugwhenEntity
 
 
@@ -22,6 +23,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             NeedRangeSensor(plug, v),
             TargetSocSensor(plug, v),
             DepartureSensor(plug, v),
+            ChargePlanSensor(plug, v),
+            ReadinessSensor(plug, v),
             WeekPlanSensor(plug, v),
         ], config_subentry_id=sub_id)
 
@@ -99,6 +102,60 @@ class DepartureSensor(PlugwhenEntity, SensorEntity):
     @property
     def native_value(self) -> datetime | None:
         return self.vehicle.departure
+
+
+class ChargePlanSensor(PlugwhenEntity, SensorEntity):
+    """The charging plan until the next departure. The attributes are the interface other integrations read
+    (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`."""
+
+    _unrecorded_attributes = frozenset({"windows"})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = PLAN_STATES
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "charge_plan")
+
+    @property
+    def native_value(self) -> str | None:
+        p = self.vehicle.charge_plan
+        return p["status"] if p else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        v, p = self.vehicle, self.vehicle.charge_plan or {}
+        iso = lambda t: t.isoformat() if t else None  # noqa: E731
+        return {
+            "windows": [{"start": iso(w["start"]), "end": iso(w["end"]), "energy_kwh": w["energy_kwh"],
+                         "available_kwh": w["available_kwh"], "peak_kw": w["peak_kw"]} for w in p.get("windows", [])],
+            "needed_kwh": p.get("needed_kwh"), "planned_kwh": p.get("planned_kwh"),
+            "available_kwh": p.get("available_kwh"), "grid_kwh": p.get("grid_kwh"), "shortfall_kwh": p.get("shortfall_kwh"),
+            "departure": iso(v.departure), "departure_source": v.departure_source,
+            "target_soc": v.need.target_soc if v.need else None,
+            "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
+            "load_forecast_used": v.load_used, "availability_used": v.availability_used,
+        }
+
+
+class ReadinessSensor(PlugwhenEntity, SensorEntity):
+    """Will the car be ready at the next departure? `ready`, or what to do: `plug_in`, `low`, `too_late`, `not_reachable`."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = READINESS_STATES
+    _attr_icon = "mdi:car-electric"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "readiness")
+
+    @property
+    def native_value(self) -> str:
+        n = self.vehicle.notice
+        return n.kind if n is not None else "ready"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        n = self.vehicle.notice
+        return {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None}
 
 
 class WeekPlanSensor(PlugwhenEntity, SensorEntity):

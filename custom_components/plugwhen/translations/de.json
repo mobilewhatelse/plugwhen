@@ -10,6 +10,22 @@
       "single_instance_allowed": "Plugwhen ist schon eingerichtet."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Verbindungen",
+        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
+        "data": {
+          "load_entity": "Last-Prognose",
+          "availability_entity": "Verfügbarkeit von Strom"
+        },
+        "data_description": {
+          "load_entity": "Ein Sensor mit den Attributen hours (t, typical, high) und target_kw, zum Beispiel der Prognose-Sensor des Viertelstunden-Wächters. Wird automatisch vorgeschlagen, wenn er installiert ist.",
+          "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose."
+        }
+      }
+    }
+  },
   "config_subentries": {
     "vehicle": {
       "entry_type": "Fahrzeug",
@@ -28,8 +44,14 @@
             "capacity_kwh": "Batteriekapazität",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
+            "charge_kw_max": "Wallbox-Leistung (höchstens)",
+            "charge_kw_min": "Wallbox-Leistung (mindestens)",
             "plugged_entity": "Angesteckt (optional)",
-            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)"
+            "charging_entity": "Lädt (optional)",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+            "departure_entity": "Abfahrt (optional)",
+            "notify_service": "Benachrichtigungsdienst (optional)",
+            "notify_hour": "Warnen ab Uhrzeit"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -37,8 +59,14 @@
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
+            "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
+            "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
-            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs."
+            "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+            "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
+            "notify_service": "Zum Beispiel notify.mobile_app_handy. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
+            "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt."
           }
         },
         "reconfigure": {
@@ -51,8 +79,14 @@
             "capacity_kwh": "Batteriekapazität",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
+            "charge_kw_max": "Wallbox-Leistung (höchstens)",
+            "charge_kw_min": "Wallbox-Leistung (mindestens)",
             "plugged_entity": "Angesteckt (optional)",
-            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)"
+            "charging_entity": "Lädt (optional)",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+            "departure_entity": "Abfahrt (optional)",
+            "notify_service": "Benachrichtigungsdienst (optional)",
+            "notify_hour": "Warnen ab Uhrzeit"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -60,13 +94,21 @@
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
+            "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
+            "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
-            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs."
+            "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+            "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
+            "notify_service": "Zum Beispiel notify.mobile_app_handy. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
+            "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt."
           }
         }
       },
       "error": {
-        "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein."
+        "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein.",
+        "min_above_max": "Die kleinste Leistung liegt über der größten.",
+        "notify_format": "Den Dienst als domain.name angeben, zum Beispiel notify.mobile_app_handy."
       },
       "abort": {
         "reconfigure_successful": "Das Fahrzeug wurde aktualisiert."
@@ -89,11 +131,33 @@
       },
       "week_plan": {
         "name": "Gelernte Tage"
+      },
+      "charge_plan": {
+        "name": "Ladeplan",
+        "state": {
+          "planned": "Geplant",
+          "not_needed": "Nicht nötig",
+          "infeasible": "Ziel nicht erreichbar",
+          "no_departure": "Keine Abfahrt"
+        }
+      },
+      "readiness": {
+        "name": "Bereit zur Abfahrt",
+        "state": {
+          "ready": "Bereit",
+          "plug_in": "Bitte anstecken",
+          "low": "Zu niedrig",
+          "too_late": "Zu spät",
+          "not_reachable": "Nicht erreichbar"
+        }
       }
     },
     "switch": {
       "learn_km": {
         "name": "Kilometer je Wochentag lernen"
+      },
+      "notice_enabled": {
+        "name": "Warnen, wenn das Auto nicht bereit sein wird"
       }
     },
     "number": {

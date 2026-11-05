@@ -165,7 +165,9 @@ def main():
 
     car = {"name": "Testauto", "odometer_entity": "sensor.auto_kilometerstand", "soc_entity": "sensor.auto_ladestand",
            "capacity_kwh": 60, "reserve_km": 100, "consumption_kwh_100": 20,
-           "plugged_entity": "binary_sensor.auto_stecker", "wallbox_energy_entity": "sensor.wallbox_zaehler"}
+           "plugged_entity": "binary_sensor.auto_stecker", "wallbox_energy_entity": "sensor.wallbox_zaehler",
+           "departure_entity": "input_datetime.abfahrt", "charge_kw_max": 11, "charge_kw_min": 1.4,
+           "notify_service": "script.notify_sink", "notify_hour": 0}
     s, d = api("POST", "/api/config/config_entries/subentries/flow", {"handler": [entry_id, "vehicle"]})
     s2, d2 = api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", dict(car, soc_entity="sensor.auto_kilometerstand"))
     log(s2 == 200 and (d2.get("errors") or {}).get("soc_entity") == "same_entity", "the same sensor twice is refused", str(d2.get("errors")))
@@ -175,16 +177,21 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 7, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 10, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
     reserve = find("number", "reserve")
     learn = find("switch", "learn_kilometres")
     week = find("sensor", "learned_days")
-    log(all([charge, rng, soc_t, reserve, learn, week]), "all kinds of entities are there")
-    if not all([charge, rng, soc_t, reserve, learn, week]):
+    plan_s = find("sensor", "charge_plan")
+    ready_s = find("sensor", "ready_for_departure")
+    notice_sw = find("switch", "warn_when")
+    everything = [charge, rng, soc_t, reserve, learn, week, plan_s, ready_s, notice_sw]
+    log(all(everything), "all kinds of entities are there")
+    if not all(everything):
         return
+    pid, rdid, nid = plan_s["entity_id"], ready_s["entity_id"], notice_sw["entity_id"]
     cid, rid, tid, lid, resid = (e["entity_id"] for e in (charge, rng, soc_t, learn, reserve))
 
     ok = wait_for(lambda: num(cid) is not None, 60)
@@ -217,6 +224,69 @@ def main():
     ok = wait_for(lambda: state(cid)["attributes"].get("plugged") is True, 30)
     log(bool(ok), "plug state is followed")
 
+    # ---------- plan and warning (0.2) ----------
+    log(state(nid)["state"] == "on", "warning switch is on by default")
+    log(state(pid)["state"] == "planned" and state(pid)["attributes"].get("departure_source") == "entity",
+        "charge plan exists, departure from the entity", str(state(pid)["state"]))
+    pa = state(pid)["attributes"]
+    log(abs(pa["needed_kwh"] - 26.7) < 0.3 and abs(pa["planned_kwh"] - pa["needed_kwh"]) < 0.3 and len(pa["windows"]) >= 1,
+        "plan covers the need with at least one window", f"needed {pa['needed_kwh']} planned {pa['planned_kwh']} windows {len(pa['windows'])}")
+    log(pa["load_forecast_used"] is False and pa["availability_used"] is False, "without connections no load forecast and no availability is used")
+
+    # plugged in and a plan: ready; unplug: the warning to plug in
+    ok = wait_for(lambda: state(rdid)["state"] == "ready", 30)
+    log(bool(ok), "plugged in with a plan: ready for departure", state(rdid)["state"])
+    # the first plug-in warning went out earlier, while the battery was low and the car not plugged in
+    log((num("counter.meldungen") or 0) == 1, "the warning went out once while the car was unplugged and short", f"counter {num('counter.meldungen')}")
+    svc("input_boolean", "turn_off", {"entity_id": "input_boolean.auto_angesteckt"})
+    ok = wait_for(lambda: state(rdid)["state"] == "plug_in", 30)
+    log(bool(ok), "unplugged: readiness says plug in", state(rdid)["state"])
+    text = state("input_text.meldung")["state"].lower()
+    log("anstecken" in text or "plug in" in text, "text of the warning", text[:90])
+    svc("number", "set_value", {"entity_id": resid, "value": 150})
+    time.sleep(6)
+    log((num("counter.meldungen") or 0) == 1, "the same warning is not sent twice (same day, same kind)", f"counter {num('counter.meldungen')}")
+
+    # departure in half an hour, plugged in, 26.7 kWh to charge at 11 kW: too late
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    tzv = ZoneInfo("Europe/Vienna")
+    svc("input_boolean", "turn_on", {"entity_id": "input_boolean.auto_angesteckt"})
+    soon = (datetime.now(tzv) + timedelta(minutes=30)).strftime("%H:%M:00")
+    svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": soon})
+    ok = wait_for(lambda: state(rdid)["state"] == "too_late", 30)
+    log(bool(ok), "departure in 30 minutes: too late", state(rdid)["state"])
+    ok = wait_for(lambda: (num("counter.meldungen") or 0) == 2, 30)
+    log(bool(ok), "a worse warning is a new one", f"counter {num('counter.meldungen')}")
+    svc("switch", "turn_off", {"entity_id": nid})
+    later = (datetime.now(tzv) + timedelta(minutes=20)).strftime("%H:%M:00")
+    svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": later})
+    time.sleep(8)
+    log((num("counter.meldungen") or 0) == 2 and state(rdid)["state"] == "too_late", "warning switched off: nothing sent, sensor still shows it",
+        f"counter {num('counter.meldungen')}, {state(rdid)['state']}")
+    svc("switch", "turn_on", {"entity_id": nid})
+    svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": "07:00:00"})
+
+    # connections: load forecast and availability as options
+    svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})   # (33.3 - 25) % of 60 kWh / 0.9 = 5.5 kWh
+    svc("number", "set_value", {"entity_id": resid, "value": 100})
+    s, d = api("POST", "/api/config/config_entries/options/flow", {"handler": entry_id})
+    s2, d2 = api("POST", f"/api/config/config_entries/options/flow/{d['flow_id']}",
+                 {"load_entity": "sensor.test_last", "availability_entity": "sensor.test_verfuegbar"})
+    log(s == 200 and d.get("type") == "form" and d2.get("type") == "create_entry", "connections can be set in the options", f"{d.get('type')} / {d2.get('type')}")
+    ok = wait_for(lambda: ((state(pid) or {}).get("attributes") or {}).get("availability_used") is True, 90)
+    pa = (state(pid) or {}).get("attributes") or {}
+    log(bool(ok) and pa.get("load_forecast_used") is True, "load forecast and availability are used",
+        json.dumps({k: pa.get(k) for k in ("load_forecast_used", "availability_used")}))
+    if ok:
+        log(abs(pa["available_kwh"] - pa["needed_kwh"]) < 0.3 and pa["grid_kwh"] < 0.3, "the plan uses the available power first",
+            f"needed {pa['needed_kwh']} available {pa['available_kwh']} grid {pa['grid_kwh']}")
+        starts = [datetime.fromisoformat(w["start"]).astimezone(tzv) for w in pa["windows"]]
+        ends = [datetime.fromisoformat(w["end"]).astimezone(tzv) for w in pa["windows"]]
+        a0 = datetime.now(tzv).replace(minute=0, second=0, microsecond=0) + timedelta(hours=2)
+        log(all(a0 <= s0 and e0 <= a0 + timedelta(hours=3) for s0, e0 in zip(starts, ends)), "all windows lie inside the availability window",
+            str([x.strftime("%H:%M") for x in starts]))
+
     wk = state(week["entity_id"])
     log(isinstance(wk["attributes"].get("week"), list) and len(wk["attributes"]["week"]) == 7, "weekly plan has seven days", str(wk["state"]))
     log("history_error" in wk["attributes"], "history state is reported", str(wk["attributes"].get("history_error")))
@@ -228,8 +298,11 @@ def main():
     time.sleep(20)
     log(bool(wait_api(300)), "Home Assistant is back after the restart")
     ok = wait_for(lambda: num(resid) is not None, 120)
-    log(bool(ok) and num(resid) == 150.0, "reserve is restored", str(num(resid)))
+    log(bool(ok) and num(resid) == 100.0, "reserve is restored (the value set last)", str(num(resid)))
     log(state(lid)["state"] == "off", "learning switch state is restored (off)")
+    n_before = num("counter.meldungen") or 0
+    time.sleep(70)
+    log((num("counter.meldungen") or 0) == n_before, "after the restart the same warning is not repeated", f"counter {num('counter.meldungen')} (before {n_before})")
 
     # ---------- remove ----------
     s, d = api("DELETE", f"/api/config/config_entries/entry/{entry_id}")

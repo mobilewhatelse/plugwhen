@@ -10,6 +10,22 @@
       "single_instance_allowed": "Plugwhen is already set up."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Connections",
+        "description": "Optional. Plugwhen also works alone. Connect it to what you have: the load forecast of the quarter-hour peak guard (keeps the car's charging under the peak target) and a sensor of the availability interface (when power is cheap or free).",
+        "data": {
+          "load_entity": "Load forecast",
+          "availability_entity": "Availability of power"
+        },
+        "data_description": {
+          "load_entity": "A sensor with the attributes hours (t, typical, high) and target_kw, for example the forecast sensor of the quarter-hour peak guard. Suggested automatically if it is installed.",
+          "availability_entity": "A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast."
+        }
+      }
+    }
+  },
   "config_subentries": {
     "vehicle": {
       "entry_type": "Vehicle",
@@ -28,8 +44,14 @@
             "capacity_kwh": "Battery capacity",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Consumption (until learned)",
+            "charge_kw_max": "Wallbox power (maximum)",
+            "charge_kw_min": "Wallbox power (minimum)",
             "plugged_entity": "Plugged in (optional)",
-            "wallbox_energy_entity": "Wallbox energy counter (optional)"
+            "charging_entity": "Charging (optional)",
+            "wallbox_energy_entity": "Wallbox energy counter (optional)",
+            "departure_entity": "Departure (optional)",
+            "notify_service": "Notify service (optional)",
+            "notify_hour": "Warn from this hour"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -37,8 +59,14 @@
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
+            "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
+            "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
-            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away."
+            "charging_entity": "On while the car is charging. No warning is sent while it charges.",
+            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
+            "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
+            "notify_service": "For example notify.mobile_app_phone. Used for the warning that the car will not be ready. Leave empty for none.",
+            "notify_hour": "The warning is sent from this hour of the evening on, once per departure."
           }
         },
         "reconfigure": {
@@ -51,8 +79,14 @@
             "capacity_kwh": "Battery capacity",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Consumption (until learned)",
+            "charge_kw_max": "Wallbox power (maximum)",
+            "charge_kw_min": "Wallbox power (minimum)",
             "plugged_entity": "Plugged in (optional)",
-            "wallbox_energy_entity": "Wallbox energy counter (optional)"
+            "charging_entity": "Charging (optional)",
+            "wallbox_energy_entity": "Wallbox energy counter (optional)",
+            "departure_entity": "Departure (optional)",
+            "notify_service": "Notify service (optional)",
+            "notify_hour": "Warn from this hour"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -60,13 +94,21 @@
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
+            "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
+            "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
-            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away."
+            "charging_entity": "On while the car is charging. No warning is sent while it charges.",
+            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
+            "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
+            "notify_service": "For example notify.mobile_app_phone. Used for the warning that the car will not be ready. Leave empty for none.",
+            "notify_hour": "The warning is sent from this hour of the evening on, once per departure."
           }
         }
       },
       "error": {
-        "same_entity": "Odometer and state of charge must be different sensors."
+        "same_entity": "Odometer and state of charge must be different sensors.",
+        "min_above_max": "The minimum power is above the maximum.",
+        "notify_format": "Enter the service as domain.name, for example notify.mobile_app_phone."
       },
       "abort": {
         "reconfigure_successful": "The vehicle was updated."
@@ -89,11 +131,33 @@
       },
       "week_plan": {
         "name": "Learned days"
+      },
+      "charge_plan": {
+        "name": "Charge plan",
+        "state": {
+          "planned": "Planned",
+          "not_needed": "Not needed",
+          "infeasible": "Target not reachable",
+          "no_departure": "No departure"
+        }
+      },
+      "readiness": {
+        "name": "Ready for departure",
+        "state": {
+          "ready": "Ready",
+          "plug_in": "Plug in",
+          "low": "Too low",
+          "too_late": "Too late",
+          "not_reachable": "Not reachable"
+        }
       }
     },
     "switch": {
       "learn_km": {
         "name": "Learn kilometres per weekday"
+      },
+      "notice_enabled": {
+        "name": "Warn when the car will not be ready"
       }
     },
     "number": {
