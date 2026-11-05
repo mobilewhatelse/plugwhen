@@ -157,3 +157,25 @@ Modul `notice.py` (rein Python, 12 Tests): vergleicht den Bedarf von `need.py` m
   `low` (Zustand des Steckers unbekannt, nichts geplant). Keine Meldung bei kleinem Fehlbetrag (< 0,5 kWh), laufender Ladung oder einem Plan, der den Fehlbetrag deckt.
 - **Zeitpunkt:** ab einer einstellbaren Abendstunde bis zur Abfahrt (`should_check`); einmal je Abfahrtstag und Art (`dedupe_key`, eine schlimmere Art ist eine neue Meldung).
 - **Noch zu bauen (Home-Assistant-Schicht):** Wahl des Notify-Dienstes, Meldungstexte Deutsch/Englisch, Schalter (Standard an), Abendstunde als Einstellung, Eingänge „angesteckt" und „lädt" aus den Auto-/Wallbox-Entitäten.
+
+## 17. Bauart: eigenständig, mit dem Wächter verbindbar, HACS-tauglich (Vorgabe des Nutzers 05.11.2026)
+**Drei Forderungen, ein Aufbau:**
+1. **Eigenständig installierbar.** Keine Abhängigkeit vom Wächter (`dependencies` leer, höchstens `after_dependencies` für `recorder`, `energy`). Alle Eingänge sind **Entitäten-Auswahlfelder** mit drei Quellen
+   (Entität / von Hand / selbst lernen, siehe 13). Ohne Wächter lernt der Planer die Hauslast selbst (`load_forecast.py`, noch nicht gebaut) oder arbeitet ganz ohne Last-Prognose
+   (`plan.py` kennt auch „keine Last, keine Spitzengrenze").
+2. **Mit dem Wächter verbindbar, nur über Entitäten.** Der Planer *erkennt* Entitäten des Wächters in der Registry (Plattform `viertelstunden_waechter`) und schlägt sie im Einrichtungsdialog vor
+   (Prognose, erlaubter Bezug, „greift ein"); der Wächter bekommt den Plan als Sensor *Ladeplan* (Attribute `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`) und die
+   Meldung. Dazu kommt die Verfügbarkeits-Schnittstelle (13). Regel „genau ein Schreiber je Wallbox": Einstellung „Wallbox wird vom Viertelstunden-Wächter geregelt" (ja/nein); bei „ja" gibt der Planer nur den Wunschstrom vor.
+3. **HACS-Integration, die wir in die Standardliste einreichen.** Anforderungen (vom Wächter bekannt):
+   - ein Repo = eine Integration, Ordner `custom_components/plugwhen/`, `manifest.json` (Domain, Version, Codeowner, `documentation`, `issue_tracker`, `integration_type: service`, `iot_class: calculated`), `hacs.json` (liegt schon), Icons in `brand/` (liegen schon),
+   - Repo öffentlich, Beschreibung und Themen (Topics) gesetzt, README mit „What is this for?", Releases mit Tags,
+   - Workflows `hassfest` und `hacs/action` grün (Vorlage `docs/validate.yml.vorlage`; das GitHub-Token braucht dafür das Recht `workflow`: `gh auth refresh -s workflow` durch den Nutzer),
+   - Aufnahme per Pull Request in `hacs/default`; Prüfung dort dauert und verlangt, dass die Integration schon läuft (Installationstest wie `tests/install` beim Wächter, im Docker mit hassfest).
+
+**Schichten (nur die oberste kennt Home Assistant):**
+`learning.py`, `need.py`, `plan.py`, `notice.py` (fertig, rein Python, getestet) → `coordinator.py` (liest Entitäten, ruft die Module, hält Zustand und Speicher) → Plattformen `sensor`, `switch`, `number`, `select`, `button` → `config_flow.py` mit Untereinträgen (Fahrzeug, Wallbox).
+
+**Reihenfolge der HA-Schicht (jede Stufe lauffähig und testbar):**
+1. 0.1.0 *nur anzeigen*: Einrichtung (ein Eintrag, Untereintrag Fahrzeug mit Kilometerstand, Ladestand, Kapazität, Reserve, optional angesteckt/lädt), Lernen aus den Langzeitstatistiken, Sensoren Wochenplan, Bedarf morgen, Abfahrt; Schalter „Kilometer je Wochentag lernen" (Standard an).
+2. 0.2.0 Ladeplan als Sensor, Verfügbarkeits-Eingang, Verbindung zum Wächter (Vorschläge, Wallbox-Regel), Benachrichtigung „Auto morgen nicht bereit" (Notify-Dienst, Schalter, Abendstunde).
+3. 0.3.0 Steuerung der Wallbox (eigener Schalter, nach Neustart aus), danach Veröffentlichung und Antrag bei HACS.

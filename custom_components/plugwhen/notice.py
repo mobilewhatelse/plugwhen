@@ -8,10 +8,11 @@ Kinds, most urgent first:
 
 * `not_reachable`: the target needs more than the battery or the allowed maximum can give, charging does not help.
 * `too_late`: even charging at full power from now until departure is not enough.
-* `plug_in`: the car is known not to be plugged in and is short of the target: plug it in.
+* `plug_in`: the car is known not to be plugged in and is short of the target: plug it in (even if a plan exists:
+  it cannot run without the car).
 * `low`: short of the target, plug state unknown and nothing planned that covers it.
 
-Nothing is sent if the shortfall is small, if the car is charging or a plan covers the shortfall.
+Nothing is sent if the shortfall is small, if the car is charging or (plugged in or unknown) a plan covers the shortfall.
 """
 
 from __future__ import annotations
@@ -62,10 +63,10 @@ def check_ready(
         possible = max(0.0, hours_to_departure) * charge_kw_max
         if shortfall > possible + 1e-9:
             return notice("too_late", possible)
+    if plugged is False:
+        return notice("plug_in")  # a plan means nothing while the car is not plugged in
     if charging or (planned_kwh is not None and planned_kwh >= PLAN_COVERS * shortfall):
         return None
-    if plugged is False:
-        return notice("plug_in")
     if plugged is None:
         return notice("low")
     return None  # plugged in, nothing charging yet and no plan: the charging itself is the plan's job, not a warning

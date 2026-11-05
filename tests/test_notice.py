@@ -37,9 +37,13 @@ class NoticeTest(unittest.TestCase):
         self.assertIsNone(check(plugged=True, charging=True))
 
     def test_a_plan_that_covers_it_is_fine(self):
-        self.assertIsNone(check(planned_kwh=10.0))
-        self.assertIsNone(check(planned_kwh=9.6))      # 96 % of the shortfall
-        self.assertEqual(check(planned_kwh=5.0).kind, "plug_in")
+        self.assertIsNone(check(plugged=True, planned_kwh=10.0))
+        self.assertIsNone(check(plugged=True, planned_kwh=9.6))      # 96 % of the shortfall
+        self.assertIsNone(check(plugged=None, planned_kwh=10.0))
+        self.assertEqual(check(plugged=None, planned_kwh=5.0).kind, "low")
+
+    def test_a_plan_does_not_help_an_unplugged_car(self):
+        self.assertEqual(check(plugged=False, planned_kwh=10.0).kind, "plug_in")
 
     def test_too_late_even_at_full_power(self):
         n = check(need(charge=30.0), hours_to_departure=2.0)   # 11 kW * 2 h = 22 kWh
@@ -53,7 +57,7 @@ class NoticeTest(unittest.TestCase):
 
     def test_unknown_plug_state(self):
         self.assertEqual(check(plugged=None).kind, "low")
-        self.assertIsNone(check(plugged=None, planned_kwh=12.0))
+        self.assertIsNone(check(plugged=None, planned_kwh=12.0))  # unknown plug state, covered by a plan
 
     def test_plugged_in_but_idle_without_plan_is_no_warning(self):
         self.assertIsNone(check(plugged=True))
