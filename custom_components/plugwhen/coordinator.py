@@ -16,11 +16,12 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DOMAIN,
+    DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
-    V_RESERVE, V_SOC, V_WALLBOX_ENERGY,
+    V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
+from .freshness import soc_is_stale
 from .history import records_from_hourly, to_km, to_kwh
 from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours
@@ -54,6 +55,8 @@ class Vehicle:
     departure: datetime | None = None
     departure_source: str | None = None                    # "entity" or "learned"
     soc: float | None = None
+    soc_age_s: float | None = None   # seconds since the state of charge was written
+    soc_stale: bool = False          # too old: counts as unknown
     plugged: bool | None = None
     charging: bool = False
     history_days: int = 0
@@ -143,6 +146,14 @@ class Plugwhen:
             return float(st.state)
         except ValueError:
             return None
+
+    def _age_s(self, eid: str | None, now: datetime) -> float | None:
+        """Seconds since the entity's state was last written (also when the value did not change)."""
+        st = self._state(eid)
+        if st is None:
+            return None
+        stamp = max(st.last_updated, getattr(st, "last_reported", st.last_updated))
+        return max(0.0, (now - stamp).total_seconds())
 
     def _is_on(self, eid: str | None) -> bool | None:
         st = self._state(eid)
@@ -257,9 +268,13 @@ class Plugwhen:
         return availability_from_attributes(dict(st.attributes), now)
 
     def _compute(self, v: Vehicle, now: datetime) -> None:
-        v.soc = self._float(v.cfg.get(V_SOC))
         v.plugged = self._is_on(v.cfg.get(V_PLUGGED))
         v.charging = self._is_on(v.cfg.get(V_CHARGING)) is True
+        v.soc = self._float(v.cfg.get(V_SOC))
+        v.soc_age_s = self._age_s(v.cfg.get(V_SOC), now) if v.soc is not None else None
+        v.soc_stale = soc_is_stale(v.soc_age_s, float(v.cfg.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)), v.charging)
+        if v.soc_stale:  # too old to be believed: like an unknown state of charge (no plan, no warning)
+            v.soc = None
         v.departure, v.departure_source = self._departure(v, now)
         weekday = (v.departure or (now + timedelta(days=1))).weekday()  # without a departure: tomorrow
         v.plan = v.model.plan(weekday)

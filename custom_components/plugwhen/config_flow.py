@@ -15,8 +15,8 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
-    DEFAULT_RESERVE_KM, DOMAIN, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
-    V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_WALLBOX_ENERGY,
+    DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
+    V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
 
 WAECHTER_DOMAIN = "viertelstunden_waechter"
@@ -47,6 +47,7 @@ def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
         vol.Required(V_NAME, default=d.get(V_NAME, vol.UNDEFINED)): TextSelector(),
         vol.Required(V_ODOMETER, default=d.get(V_ODOMETER, vol.UNDEFINED)): _ent("sensor", "distance"),
         vol.Required(V_SOC, default=d.get(V_SOC, vol.UNDEFINED)): _ent("sensor", "battery"),
+        vol.Required(V_SOC_MAX_AGE, default=d.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)): _num(0, 168, 0.01, "h"),
         vol.Required(V_CAPACITY, default=d.get(V_CAPACITY, DEFAULT_CAPACITY_KWH)): _num(5, 250, 0.5, "kWh"),
         vol.Required(V_RESERVE, default=d.get(V_RESERVE, DEFAULT_RESERVE_KM)): _num(0, 600, 5, "km"),
         vol.Required(V_CONSUMPTION, default=d.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)): _num(5, 60, 0.5, "kWh/100 km"),

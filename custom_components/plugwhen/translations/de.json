@@ -43,6 +43,7 @@
             "name": "Name",
             "odometer_entity": "Kilometerstand",
             "soc_entity": "Ladestand",
+            "soc_max_age_h": "Höchstalter des Ladestands",
             "capacity_kwh": "Batteriekapazität",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
@@ -58,6 +59,7 @@
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
             "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
+            "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
@@ -78,6 +80,7 @@
             "name": "Name",
             "odometer_entity": "Kilometerstand",
             "soc_entity": "Ladestand",
+            "soc_max_age_h": "Höchstalter des Ladestands",
             "capacity_kwh": "Batteriekapazität",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
@@ -93,6 +96,7 @@
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
             "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
+            "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",

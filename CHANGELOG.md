@@ -19,7 +19,10 @@
 - **Connect by choosing the other integration:** in the options you choose the quarter-hour peak guard (a config entry), no entities
   by hand; its load forecast is found automatically. Suggested if exactly one is installed. The guard can do the same with Plugwhen.
   Tested with both integrations in one Home Assistant (16 checks, `tests/install/itest_both.py`).
-- Installation test extended to 48 checks (plan, warning once, worse warning, switch off, connections, restart).
+- **Maximum age of the state of charge** (per vehicle, default 12 h, 0 = no limit; while the car is charging 90 minutes without a new
+  value already count): a stale state of charge counts as unknown (no plan, no warning), for cars that send nothing while charging.
+  Attributes `soc_stale`, `soc_age_h`.
+- Installation test extended to 54 checks (plan, warning once, worse warning, switch off, connections, restart).
 
 ## 0.1.0 (unreleased) - show only
 

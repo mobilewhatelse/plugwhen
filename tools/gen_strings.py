@@ -5,11 +5,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"
 
 EN = dict(
-    f_name="Name", f_odo="Odometer", f_soc="State of charge", f_cap="Battery capacity", f_res="Reserve", f_cons="Consumption (until learned)",
+    f_name="Name", f_odo="Odometer", f_soc="State of charge", f_age="Maximum age of the state of charge", f_cap="Battery capacity", f_res="Reserve", f_cons="Consumption (until learned)",
     f_max="Wallbox power (maximum)", f_min="Wallbox power (minimum)", f_plug="Plugged in (optional)", f_chg="Charging (optional)",
     f_wb="Wallbox energy counter (optional)", f_dep="Departure (optional)", f_notify="Notify service (optional)", f_hour="Warn from this hour",
     d_odo="Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
     d_soc="Sensor with the state of charge of the battery in percent.",
+    d_age="If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
     d_cap="Usable battery capacity.",
     d_res="The car should leave with at least this range. You can change it later with the Reserve entity.",
     d_cons="Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
@@ -38,11 +39,12 @@ EN = dict(
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
 DE = dict(
-    f_name="Name", f_odo="Kilometerstand", f_soc="Ladestand", f_cap="Batteriekapazität", f_res="Reserve", f_cons="Verbrauch (bis gelernt)",
+    f_name="Name", f_odo="Kilometerstand", f_soc="Ladestand", f_age="Höchstalter des Ladestands", f_cap="Batteriekapazität", f_res="Reserve", f_cons="Verbrauch (bis gelernt)",
     f_max="Wallbox-Leistung (höchstens)", f_min="Wallbox-Leistung (mindestens)", f_plug="Angesteckt (optional)", f_chg="Lädt (optional)",
     f_wb="Energiezähler der Wallbox (optional)", f_dep="Abfahrt (optional)", f_notify="Benachrichtigungsdienst (optional)", f_hour="Warnen ab Uhrzeit",
     d_odo="Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
     d_soc="Sensor mit dem Ladestand der Batterie in Prozent.",
+    d_age="Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
     d_cap="Nutzbare Batteriekapazität.",
     d_res="Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
     d_cons="Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
@@ -73,11 +75,11 @@ DE = dict(
 
 
 def build(L):
-    data = {"name": L["f_name"], "odometer_entity": L["f_odo"], "soc_entity": L["f_soc"], "capacity_kwh": L["f_cap"],
+    data = {"name": L["f_name"], "odometer_entity": L["f_odo"], "soc_entity": L["f_soc"], "soc_max_age_h": L["f_age"], "capacity_kwh": L["f_cap"],
             "reserve_km": L["f_res"], "consumption_kwh_100": L["f_cons"], "charge_kw_max": L["f_max"], "charge_kw_min": L["f_min"],
             "plugged_entity": L["f_plug"], "charging_entity": L["f_chg"], "wallbox_energy_entity": L["f_wb"],
             "departure_entity": L["f_dep"], "notify_service": L["f_notify"], "notify_hour": L["f_hour"]}
-    desc = {"odometer_entity": L["d_odo"], "soc_entity": L["d_soc"], "capacity_kwh": L["d_cap"], "reserve_km": L["d_res"],
+    desc = {"odometer_entity": L["d_odo"], "soc_entity": L["d_soc"], "soc_max_age_h": L["d_age"], "capacity_kwh": L["d_cap"], "reserve_km": L["d_res"],
             "consumption_kwh_100": L["d_cons"], "charge_kw_max": L["d_max"], "charge_kw_min": L["d_min"], "plugged_entity": L["d_plug"],
             "charging_entity": L["d_chg"], "wallbox_energy_entity": L["d_wb"], "departure_entity": L["d_dep"],
             "notify_service": L["d_notify"], "notify_hour": L["d_hour"]}

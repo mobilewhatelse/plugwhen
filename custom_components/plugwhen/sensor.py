@@ -55,6 +55,8 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "energy_kwh": n.kwh if n else None,
             "target_soc": n.target_soc if n else None,
             "soc": v.soc,
+            "soc_stale": v.soc_stale,
+            "soc_age_h": round(v.soc_age_s / 3600.0, 2) if v.soc_age_s is not None else None,
             "plugged": v.plugged,
             "reserve_km": v.reserve_km,
             "learn_km": v.learn_km,
@@ -157,7 +159,8 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         n = self.vehicle.notice
-        return {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None}
+        return {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None,
+                "soc_stale": self.vehicle.soc_stale}
 
 
 class WeekPlanSensor(PlugwhenEntity, SensorEntity):

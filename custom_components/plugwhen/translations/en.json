@@ -43,6 +43,7 @@
             "name": "Name",
             "odometer_entity": "Odometer",
             "soc_entity": "State of charge",
+            "soc_max_age_h": "Maximum age of the state of charge",
             "capacity_kwh": "Battery capacity",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Consumption (until learned)",
@@ -58,6 +59,7 @@
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
             "soc_entity": "Sensor with the state of charge of the battery in percent.",
+            "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
@@ -78,6 +80,7 @@
             "name": "Name",
             "odometer_entity": "Odometer",
             "soc_entity": "State of charge",
+            "soc_max_age_h": "Maximum age of the state of charge",
             "capacity_kwh": "Battery capacity",
             "reserve_km": "Reserve",
             "consumption_kwh_100": "Consumption (until learned)",
@@ -93,6 +96,7 @@
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
             "soc_entity": "Sensor with the state of charge of the battery in percent.",
+            "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",

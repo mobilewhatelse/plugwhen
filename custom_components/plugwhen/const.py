@@ -22,6 +22,7 @@ V_SOC = "soc_entity"                      # sensor, state of charge in percent
 V_CAPACITY = "capacity_kwh"
 V_RESERVE = "reserve_km"                  # start value of the reserve (the number entity can change it later)
 V_CONSUMPTION = "consumption_kwh_100"     # kWh per 100 km until the car's own values are known
+V_SOC_MAX_AGE = "soc_max_age_h"             # a state of charge older than this (hours) counts as unknown, 0 = no limit
 V_PLUGGED = "plugged_entity"              # optional: on = car is plugged in
 V_CHARGING = "charging_entity"            # optional: on = car is charging
 V_WALLBOX_ENERGY = "wallbox_energy_entity"  # optional: wallbox energy counter (tells home from away charging)
@@ -31,6 +32,7 @@ V_CHARGE_MIN = "charge_kw_min"            # lowest charging power (1 phase, 6 A 
 V_NOTIFY = "notify_service"               # optional: e.g. notify.mobile_app_phone
 V_NOTIFY_HOUR = "notify_hour"             # the warning is sent from this hour of the evening on
 
+DEFAULT_SOC_MAX_AGE_H = 12.0
 DEFAULT_RESERVE_KM = 100
 DEFAULT_CONSUMPTION_100 = 20.0
 DEFAULT_CAPACITY_KWH = 60.0
