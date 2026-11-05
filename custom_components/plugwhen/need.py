@@ -10,7 +10,7 @@ Rules (decided after testing with real data, see the design notes):
   Mode `plus` instead adds the reserve to the learned value (more energy, the safest).
 * A weekday on which the car is mostly charged **away from home** only gets the reserve at home: the trip is
   covered somewhere else.
-* Without enough learned days the reserve alone counts.
+* Without enough learned days, or with the switch *learn kilometres per weekday* off, the reserve alone counts.
 * The energy follows from the consumption (kWh per km, learned or default) and a winter factor; charging losses
   are added for the energy that has to come from the wallbox.
 """
@@ -50,9 +50,11 @@ def compute_need(
     min_soc: float = 20.0,
     winter_factor: float = 1.0,
     mode: str = MODE_FLOOR,
+    learn_km: bool = True,
 ) -> Need:
-    """Need for the departure the `plan` describes. `soc` None = unknown (the whole target is charged)."""
-    learned = plan.km_high if plan.samples >= MIN_SAMPLES and plan.km_high is not None else None
+    """Need for the departure the `plan` describes. `soc` None = unknown (the whole target is charged).
+    `learn_km` False ignores what was learned about the kilometres: the reserve alone counts (switch in the settings)."""
+    learned = plan.km_high if learn_km and plan.samples >= MIN_SAMPLES and plan.km_high is not None else None
     if learned is None:
         km, source = reserve_km, "reserve"
     elif plan.home_charge_share is not None and plan.home_charge_share < AWAY_SHARE:

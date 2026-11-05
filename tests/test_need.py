@@ -68,6 +68,11 @@ class NeedTest(unittest.TestCase):
         self.assertEqual(n.target_soc, 80.0)
         self.assertFalse(n.reachable)
 
+    def test_learning_switched_off_uses_the_reserve_only(self):
+        n = compute_need(plan(high=136), 100, 50, learn_km=False, **CAR)
+        self.assertEqual((n.km, n.source), (100.0, "reserve"))
+        self.assertEqual(compute_need(plan(high=136), 100, 50, learn_km=False, mode=MODE_PLUS, **CAR).km, 100.0)
+
     def test_winter_factor(self):
         n = compute_need(plan(high=60), 100, 50, winter_factor=1.25, **CAR)
         self.assertEqual(n.kwh, 25.0)
