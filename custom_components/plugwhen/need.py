@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from learning import WeekdayPlan
+try:  # inside Home Assistant the module lives in a package, the tests import it flat
+    from .learning import WeekdayPlan
+except ImportError:  # pragma: no cover
+    from learning import WeekdayPlan
 
 MIN_SAMPLES = 3          # days needed before the learned value is trusted
 AWAY_SHARE = 0.3         # below this share of home charging a weekday is an "away" day

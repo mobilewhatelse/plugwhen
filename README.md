@@ -2,7 +2,7 @@
 
 # Plugwhen
 
-> **Status: design phase, first module built (`learning`, with tests). Private repository.**
+> **Status: version 0.1.0 in development (shows the learned week and the need for the next departure, controls nothing). Private repository.**
 
 *Plugwhen*: it works out **when to plug in**, so the car is ready when you leave.
 

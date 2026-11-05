@@ -1,0 +1,105 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Plugwhen",
+        "description": "Works out when to plug in so that the car is ready when you leave. Vehicles are added afterwards on the integration page."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Plugwhen is already set up."
+    }
+  },
+  "config_subentries": {
+    "vehicle": {
+      "entry_type": "Vehicle",
+      "initiate_flow": {
+        "user": "Add vehicle",
+        "reconfigure": "Reconfigure vehicle"
+      },
+      "step": {
+        "user": {
+          "title": "Vehicle",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.",
+          "data": {
+            "name": "Name",
+            "odometer_entity": "Odometer",
+            "soc_entity": "State of charge",
+            "capacity_kwh": "Battery capacity",
+            "reserve_km": "Reserve",
+            "consumption_kwh_100": "Consumption (until learned)",
+            "plugged_entity": "Plugged in (optional)",
+            "wallbox_energy_entity": "Wallbox energy counter (optional)"
+          },
+          "data_description": {
+            "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
+            "soc_entity": "Sensor with the state of charge of the battery in percent.",
+            "capacity_kwh": "Usable battery capacity.",
+            "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
+            "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
+            "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
+            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away."
+          }
+        },
+        "reconfigure": {
+          "title": "Vehicle",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.",
+          "data": {
+            "name": "Name",
+            "odometer_entity": "Odometer",
+            "soc_entity": "State of charge",
+            "capacity_kwh": "Battery capacity",
+            "reserve_km": "Reserve",
+            "consumption_kwh_100": "Consumption (until learned)",
+            "plugged_entity": "Plugged in (optional)",
+            "wallbox_energy_entity": "Wallbox energy counter (optional)"
+          },
+          "data_description": {
+            "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
+            "soc_entity": "Sensor with the state of charge of the battery in percent.",
+            "capacity_kwh": "Usable battery capacity.",
+            "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
+            "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
+            "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
+            "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away."
+          }
+        }
+      },
+      "error": {
+        "same_entity": "Odometer and state of charge must be different sensors."
+      },
+      "abort": {
+        "reconfigure_successful": "The vehicle was updated."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "need_charge": {
+        "name": "Energy to charge"
+      },
+      "need_range": {
+        "name": "Range needed"
+      },
+      "target_soc": {
+        "name": "Target state of charge"
+      },
+      "departure": {
+        "name": "Expected departure"
+      },
+      "week_plan": {
+        "name": "Learned days"
+      }
+    },
+    "switch": {
+      "learn_km": {
+        "name": "Learn kilometres per weekday"
+      }
+    },
+    "number": {
+      "reserve_km": {
+        "name": "Reserve"
+      }
+    }
+  }
+}

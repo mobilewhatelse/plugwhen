@@ -1,0 +1,54 @@
+homeassistant:
+  name: Testhaus
+  unit_system: metric
+  time_zone: Europe/Vienna
+  currency: EUR
+  country: AT
+  language: en
+
+default_config:
+
+logger:
+  default: warning
+  logs:
+    custom_components.plugwhen: debug
+
+# simulated car: odometer, state of charge, plug, wallbox counter
+input_number:
+  auto_soc:
+    name: Auto SoC
+    min: 0
+    max: 100
+    step: 1
+    initial: 40
+    mode: box
+
+input_boolean:
+  auto_angesteckt:
+    name: Auto angesteckt
+    initial: false
+
+template:
+  - sensor:
+      - name: Auto Kilometerstand
+        unique_id: auto_km
+        unit_of_measurement: km
+        device_class: distance
+        state_class: total_increasing
+        state: "12345"
+      - name: Auto Ladestand
+        unique_id: auto_ladestand
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        state: "{{ states('input_number.auto_soc') | float(0) }}"
+      - name: Wallbox Zaehler
+        unique_id: wb_zaehler
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "100"
+  - binary_sensor:
+      - name: Auto Stecker
+        unique_id: auto_stecker
+        state: "{{ is_state('input_boolean.auto_angesteckt', 'on') }}"

@@ -1,0 +1,87 @@
+"""Set-up dialog (one entry) and the vehicles as config subentries."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import voluptuous as vol
+from homeassistant.config_entries import (
+    ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, SubentryFlowResult,
+)
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode, TextSelector,
+)
+
+from .const import (
+    DEFAULT_CAPACITY_KWH, DEFAULT_CONSUMPTION_100, DEFAULT_RESERVE_KM, DOMAIN, SUBENTRY_VEHICLE, V_CAPACITY,
+    V_CONSUMPTION, V_NAME, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_WALLBOX_ENERGY,
+)
+
+
+def _num(lo: float, hi: float, step: float, unit: str) -> NumberSelector:
+    return NumberSelector(NumberSelectorConfig(min=lo, max=hi, step=step, mode=NumberSelectorMode.BOX, unit_of_measurement=unit))
+
+
+def _ent(domain: str | list[str], device_class: str | None = None) -> EntitySelector:
+    if device_class:
+        return EntitySelector(EntitySelectorConfig(domain=domain, device_class=device_class))
+    return EntitySelector(EntitySelectorConfig(domain=domain))
+
+
+def _opt(key: str, d: dict[str, Any]) -> vol.Optional:
+    return vol.Optional(key, description={"suggested_value": d.get(key)})
+
+
+def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
+    return vol.Schema({
+        vol.Required(V_NAME, default=d.get(V_NAME, vol.UNDEFINED)): TextSelector(),
+        vol.Required(V_ODOMETER, default=d.get(V_ODOMETER, vol.UNDEFINED)): _ent("sensor", "distance"),
+        vol.Required(V_SOC, default=d.get(V_SOC, vol.UNDEFINED)): _ent("sensor", "battery"),
+        vol.Required(V_CAPACITY, default=d.get(V_CAPACITY, DEFAULT_CAPACITY_KWH)): _num(5, 250, 0.5, "kWh"),
+        vol.Required(V_RESERVE, default=d.get(V_RESERVE, DEFAULT_RESERVE_KM)): _num(0, 600, 5, "km"),
+        vol.Required(V_CONSUMPTION, default=d.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)): _num(5, 60, 0.5, "kWh/100 km"),
+        _opt(V_PLUGGED, d): _ent(["binary_sensor", "switch", "input_boolean"]),
+        _opt(V_WALLBOX_ENERGY, d): _ent("sensor", "energy"),
+    })
+
+
+def vehicle_title(d: dict[str, Any]) -> str:
+    return f"{d.get(V_NAME, '?')} · {d.get(V_CAPACITY, DEFAULT_CAPACITY_KWH):g} kWh · {int(d.get(V_RESERVE, DEFAULT_RESERVE_KM))} km"
+
+
+class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
+    VERSION = 1
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title="Plugwhen", data={})
+        return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_VEHICLE: VehicleFlow}
+
+
+class VehicleFlow(ConfigSubentryFlow):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        return await self._form(user_input, {})
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        return await self._form(user_input, dict(self._get_reconfigure_subentry().data))
+
+    async def _form(self, user_input: dict[str, Any] | None, current: dict[str, Any]) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if user_input[V_ODOMETER] == user_input[V_SOC]:
+                errors[V_SOC] = "same_entity"
+            else:
+                data = {k: v for k, v in user_input.items() if v not in (None, "")}
+                title = vehicle_title(data)
+                if self.source == "user":
+                    return self.async_create_entry(title=title, data=data)
+                return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=title, data=data)
+            current = user_input
+        step = "user" if self.source == "user" else "reconfigure"
+        return self.async_show_form(step_id=step, data_schema=_vehicle_schema(current), errors=errors)

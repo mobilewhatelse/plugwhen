@@ -20,7 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from need import Need
+try:  # inside Home Assistant the module lives in a package, the tests import it flat
+    from .need import Need
+except ImportError:  # pragma: no cover
+    from need import Need
 
 MIN_SHORTFALL_KWH = 0.5      # below this the car counts as ready
 PLAN_COVERS = 0.95           # a plan that delivers this share of the shortfall is enough

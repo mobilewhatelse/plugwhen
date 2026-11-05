@@ -1,0 +1,105 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Plugwhen",
+        "description": "Berechnet, wann man anstecken soll, damit das Auto bei der Abfahrt bereit ist. Fahrzeuge fügen Sie danach auf der Integrationsseite hinzu."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Plugwhen ist schon eingerichtet."
+    }
+  },
+  "config_subentries": {
+    "vehicle": {
+      "entry_type": "Fahrzeug",
+      "initiate_flow": {
+        "user": "Fahrzeug hinzufügen",
+        "reconfigure": "Fahrzeug ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Fahrzeug",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.",
+          "data": {
+            "name": "Name",
+            "odometer_entity": "Kilometerstand",
+            "soc_entity": "Ladestand",
+            "capacity_kwh": "Batteriekapazität",
+            "reserve_km": "Reserve",
+            "consumption_kwh_100": "Verbrauch (bis gelernt)",
+            "plugged_entity": "Angesteckt (optional)",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)"
+          },
+          "data_description": {
+            "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
+            "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
+            "capacity_kwh": "Nutzbare Batteriekapazität.",
+            "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
+            "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
+            "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs."
+          }
+        },
+        "reconfigure": {
+          "title": "Fahrzeug",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.",
+          "data": {
+            "name": "Name",
+            "odometer_entity": "Kilometerstand",
+            "soc_entity": "Ladestand",
+            "capacity_kwh": "Batteriekapazität",
+            "reserve_km": "Reserve",
+            "consumption_kwh_100": "Verbrauch (bis gelernt)",
+            "plugged_entity": "Angesteckt (optional)",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (optional)"
+          },
+          "data_description": {
+            "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
+            "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
+            "capacity_kwh": "Nutzbare Batteriekapazität.",
+            "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
+            "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
+            "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
+            "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs."
+          }
+        }
+      },
+      "error": {
+        "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein."
+      },
+      "abort": {
+        "reconfigure_successful": "Das Fahrzeug wurde aktualisiert."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "need_charge": {
+        "name": "Zu ladende Energie"
+      },
+      "need_range": {
+        "name": "Nötige Reichweite"
+      },
+      "target_soc": {
+        "name": "Ziel-Ladestand"
+      },
+      "departure": {
+        "name": "Erwartete Abfahrt"
+      },
+      "week_plan": {
+        "name": "Gelernte Tage"
+      }
+    },
+    "switch": {
+      "learn_km": {
+        "name": "Kilometer je Wochentag lernen"
+      }
+    },
+    "number": {
+      "reserve_km": {
+        "name": "Reserve"
+      }
+    }
+  }
+}

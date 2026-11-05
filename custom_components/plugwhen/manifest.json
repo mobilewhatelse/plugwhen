@@ -1,0 +1,19 @@
+{
+  "domain": "plugwhen",
+  "name": "Plugwhen",
+  "after_dependencies": [
+    "recorder"
+  ],
+  "codeowners": [
+    "@mobilewhatelse"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/mobilewhatelse/plugwhen",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/mobilewhatelse/plugwhen/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}
