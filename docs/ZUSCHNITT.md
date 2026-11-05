@@ -150,3 +150,10 @@ Marken wurden **nicht** in TMview/EUIPO geprüft.
 | Wakeful, Amply, Topup, Kwhen, Carplan | viele oder bekannte Treffer | belegt | | **nicht verwenden** |
 
 Empfehlung: **Plugwhen** (frei auf allen geprüften Wegen, kein Treffer in Websuche und Listen), zweite Wahl **Dawnplug**. ReadyBy bleibt Arbeitsname, bis entschieden ist.
+
+## 16. Benachrichtigung „Auto morgen nicht bereit" (Idee des Nutzers 05.11.2026, Entscheidungsteil gebaut)
+Modul `notice.py` (rein Python, 12 Tests): vergleicht den Bedarf von `need.py` mit dem, was geschieht, und liefert eine Meldung oder nichts.
+- **Arten:** `not_reachable` (Ziel größer als Akku oder erlaubtes Maximum), `too_late` (auch mit voller Ladeleistung bis zur Abfahrt nicht zu schaffen), `plug_in` (Auto bekannt nicht angesteckt und unter dem Ziel),
+  `low` (Zustand des Steckers unbekannt, nichts geplant). Keine Meldung bei kleinem Fehlbetrag (< 0,5 kWh), laufender Ladung oder einem Plan, der den Fehlbetrag deckt.
+- **Zeitpunkt:** ab einer einstellbaren Abendstunde bis zur Abfahrt (`should_check`); einmal je Abfahrtstag und Art (`dedupe_key`, eine schlimmere Art ist eine neue Meldung).
+- **Noch zu bauen (Home-Assistant-Schicht):** Wahl des Notify-Dienstes, Meldungstexte Deutsch/Englisch, Schalter (Standard an), Abendstunde als Einstellung, Eingänge „angesteckt" und „lädt" aus den Auto-/Wallbox-Entitäten.
