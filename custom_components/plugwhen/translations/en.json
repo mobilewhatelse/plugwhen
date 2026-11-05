@@ -65,7 +65,7 @@
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
-            "notify_service": "For example notify.mobile_app_phone. Used for the warning that the car will not be ready. Leave empty for none.",
+            "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure."
           }
         },
@@ -100,7 +100,7 @@
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
-            "notify_service": "For example notify.mobile_app_phone. Used for the warning that the car will not be ready. Leave empty for none.",
+            "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure."
           }
         }
@@ -108,7 +108,7 @@
       "error": {
         "same_entity": "Odometer and state of charge must be different sensors.",
         "min_above_max": "The minimum power is above the maximum.",
-        "notify_format": "Enter the service as domain.name, for example notify.mobile_app_phone."
+        "notify_format": "Enter each service as domain.name, separated by commas, for example notify.mobile_app_phone."
       },
       "abort": {
         "reconfigure_successful": "The vehicle was updated."

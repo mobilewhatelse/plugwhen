@@ -65,7 +65,7 @@
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
-            "notify_service": "Zum Beispiel notify.mobile_app_handy. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
+            "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt."
           }
         },
@@ -100,7 +100,7 @@
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
-            "notify_service": "Zum Beispiel notify.mobile_app_handy. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
+            "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt."
           }
         }
@@ -108,7 +108,7 @@
       "error": {
         "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein.",
         "min_above_max": "Die kleinste Leistung liegt über der größten.",
-        "notify_format": "Den Dienst als domain.name angeben, zum Beispiel notify.mobile_app_handy."
+        "notify_format": "Jeden Dienst als domain.name angeben, durch Komma getrennt, zum Beispiel notify.mobile_app_handy."
       },
       "abort": {
         "reconfigure_successful": "Das Fahrzeug wurde aktualisiert."

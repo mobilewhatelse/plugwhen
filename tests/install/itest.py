@@ -167,7 +167,7 @@ def main():
            "capacity_kwh": 60, "reserve_km": 100, "consumption_kwh_100": 20,
            "plugged_entity": "binary_sensor.auto_stecker", "wallbox_energy_entity": "sensor.wallbox_zaehler",
            "departure_entity": "input_datetime.abfahrt", "charge_kw_max": 11, "charge_kw_min": 1.4,
-           "notify_service": "script.notify_sink", "notify_hour": 0}
+           "notify_service": "script.notify_sink, script.notify_sink_2", "notify_hour": 0}
     s, d = api("POST", "/api/config/config_entries/subentries/flow", {"handler": [entry_id, "vehicle"]})
     s2, d2 = api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", dict(car, soc_entity="sensor.auto_kilometerstand"))
     log(s2 == 200 and (d2.get("errors") or {}).get("soc_entity") == "same_entity", "the same sensor twice is refused", str(d2.get("errors")))
@@ -258,6 +258,8 @@ def main():
     log(bool(ok), "departure in 30 minutes: too late", state(rdid)["state"])
     ok = wait_for(lambda: (num("counter.meldungen") or 0) == 2, 30)
     log(bool(ok), "a worse warning is a new one", f"counter {num('counter.meldungen')}")
+    log(num("counter.meldungen_2") == num("counter.meldungen"), "both services get every warning (two phones)",
+        f"{num('counter.meldungen')} / {num('counter.meldungen_2')}")
     svc("switch", "turn_off", {"entity_id": nid})
     later = (datetime.now(tzv) + timedelta(minutes=20)).strftime("%H:%M:00")
     svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": later})

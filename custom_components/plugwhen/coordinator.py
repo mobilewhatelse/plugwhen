@@ -273,8 +273,8 @@ class Plugwhen:
 
     async def _maybe_send(self, v: Vehicle, now: datetime) -> None:
         n = v.notice
-        service = str(v.cfg.get(V_NOTIFY) or "").strip()
-        if n is None or not v.notice_enabled or v.departure is None or "." not in service:
+        services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
+        if n is None or not v.notice_enabled or v.departure is None or not services:
             return
         hours = (v.departure - now).total_seconds() / 3600.0
         if not should_check(now.hour + now.minute / 60.0, float(v.cfg.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)), hours):
@@ -284,11 +284,15 @@ class Plugwhen:
         if key in sent:
             return
         title, message = notice_text(self.hass.config.language, n, v.name, v.departure)
-        domain, name = service.split(".", 1)
-        try:
-            await self.hass.services.async_call(domain, name, {"title": title, "message": message}, blocking=False)
-        except Exception as err:  # noqa: BLE001 - a wrong service name must not stop the planner
-            _LOGGER.warning("Plugwhen: the warning for %s could not be sent through %s: %s", v.name, service, err)
+        delivered = 0
+        for service in services:
+            domain, name = service.split(".", 1)
+            try:
+                await self.hass.services.async_call(domain, name, {"title": title, "message": message}, blocking=False)
+                delivered += 1
+            except Exception as err:  # noqa: BLE001 - a wrong service name must not stop the planner or the other phones
+                _LOGGER.warning("Plugwhen: the warning for %s could not be sent through %s: %s", v.name, service, err)
+        if not delivered:
             return
         sent.append(key)
         del sent[:-SENT_KEEP]

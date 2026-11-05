@@ -118,7 +118,7 @@ class VehicleFlow(ConfigSubentryFlow):
                 errors[V_SOC] = "same_entity"
             elif float(user_input[V_CHARGE_MIN]) > float(user_input[V_CHARGE_MAX]):
                 errors[V_CHARGE_MIN] = "min_above_max"
-            elif (user_input.get(V_NOTIFY) or "").strip() and "." not in user_input[V_NOTIFY].strip():
+            elif any("." not in x.strip() for x in (user_input.get(V_NOTIFY) or "").split(",") if x.strip()):
                 errors[V_NOTIFY] = "notify_format"
             else:
                 data = {k: (v.strip() if isinstance(v, str) else v) for k, v in user_input.items() if v not in (None, "")}
