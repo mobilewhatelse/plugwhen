@@ -16,11 +16,13 @@
         "title": "Verbindungen",
         "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
         "data": {
-          "load_entity": "Last-Prognose",
+          "waechter_entry": "Viertelstunden-Wächter",
+          "load_entity": "Andere Last-Prognose",
           "availability_entity": "Verfügbarkeit von Strom"
         },
         "data_description": {
-          "load_entity": "Ein Sensor mit den Attributen hours (t, typical, high) und target_kw, zum Beispiel der Prognose-Sensor des Viertelstunden-Wächters. Wird automatisch vorgeschlagen, wenn er installiert ist.",
+          "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
+          "load_entity": "Nur für eine andere Quelle: ein Sensor mit den Attributen hours (t, typical, high) und target_kw. Nicht nötig, wenn Sie den Wächter gewählt haben.",
           "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose."
         }
       }

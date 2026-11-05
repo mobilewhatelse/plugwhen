@@ -16,6 +16,9 @@
 - **Unknown state of charge** (for example while Home Assistant is starting): no energy to charge, no plan and no warning;
   the sensors say *unknown*.
 - Several notify services can be named, separated by commas (one warning to every phone).
+- **Connect by choosing the other integration:** in the options you choose the quarter-hour peak guard (a config entry), no entities
+  by hand; its load forecast is found automatically. Suggested if exactly one is installed. The guard can do the same with Plugwhen.
+  Tested with both integrations in one Home Assistant (16 checks, `tests/install/itest_both.py`).
 - Installation test extended to 48 checks (plan, warning once, worse warning, switch off, connections, restart).
 
 ## 0.1.0 (unreleased) - show only

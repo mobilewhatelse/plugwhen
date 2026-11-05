@@ -11,6 +11,7 @@ HISTORY_DAYS = 120
 SUBENTRY_VEHICLE = "vehicle"
 
 # general options (entry.options): optional connections to other integrations, by entity
+O_WAECHTER = "waechter_entry"             # the quarter-hour peak guard (a config entry): its load forecast is found automatically
 O_LOAD = "load_entity"                    # sensor with the expected house load (attributes `hours`, `target_kw`), e.g. of the peak guard
 O_AVAIL = "availability_entity"           # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
 

@@ -17,11 +17,12 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DOMAIN,
-    HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_LOAD, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_WALLBOX_ENERGY,
 )
 from .history import records_from_hourly, to_km, to_kwh
+from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours
 from .learning import MobilityModel, WeekdayPlan
 from .messages import notice_text
@@ -84,7 +85,7 @@ class Plugwhen:
     async def async_start(self) -> None:
         self._sent = (await self._store.async_load() or {}).get("sent", {})
         self._unsub = async_track_time_interval(self.hass, self._tick, UPDATE_INTERVAL)
-        watched = {self.entry.options.get(O_LOAD), self.entry.options.get(O_AVAIL)}
+        watched = {self._load_entity(), self.entry.options.get(O_AVAIL)}
         for v in self.vehicles.values():
             watched |= {v.cfg.get(k) for k in (V_SOC, V_PLUGGED, V_CHARGING, V_DEPARTURE)}
         watched.discard(None)
@@ -225,8 +226,21 @@ class Plugwhen:
         dep = self._learned_departure(v, now)
         return dep, ("learned" if dep is not None else None)
 
+    def _load_entity(self) -> str | None:
+        """The load forecast sensor: an entity named in the settings, else the one of the chosen quarter-hour peak guard."""
+        explicit = self.entry.options.get(O_LOAD)
+        if explicit:
+            return explicit
+        entry_id = self.entry.options.get(O_WAECHTER)
+        if not entry_id:
+            return None
+        from homeassistant.helpers import entity_registry as er
+
+        return pick(((e.entity_id, e.domain, e.unique_id) for e in er.async_entries_for_config_entry(er.async_get(self.hass), entry_id)),
+                    "sensor", "_forecast_peak")
+
     def _load_inputs(self, now: datetime) -> tuple[list[dict[str, Any]] | None, float | None]:
-        st = self._state(self.entry.options.get(O_LOAD))
+        st = self._state(self._load_entity())
         if st is None or st.state in _BAD:
             return None, None
         quarters = load_from_hours(st.attributes.get("hours"), now.tzinfo)

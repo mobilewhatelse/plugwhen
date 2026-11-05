@@ -133,7 +133,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "departure": iso(v.departure), "departure_source": v.departure_source,
             "target_soc": v.need.target_soc if v.need else None,
             "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
-            "load_forecast_used": v.load_used, "availability_used": v.availability_used,
+            "load_forecast_used": v.load_used, "load_entity": self.plug._load_entity(), "availability_used": v.availability_used,
         }
 
 

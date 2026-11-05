@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 tests/install/run/
 tests/install/report.txt
+tests/install/report_both.txt

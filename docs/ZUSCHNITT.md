@@ -179,3 +179,20 @@ Modul `notice.py` (rein Python, 12 Tests): vergleicht den Bedarf von `need.py` m
 1. 0.1.0 *nur anzeigen*: Einrichtung (ein Eintrag, Untereintrag Fahrzeug mit Kilometerstand, Ladestand, Kapazität, Reserve, optional angesteckt/lädt), Lernen aus den Langzeitstatistiken, Sensoren Wochenplan, Bedarf morgen, Abfahrt; Schalter „Kilometer je Wochentag lernen" (Standard an).
 2. 0.2.0 Ladeplan als Sensor, Verfügbarkeits-Eingang, Verbindung zum Wächter (Vorschläge, Wallbox-Regel), Benachrichtigung „Auto morgen nicht bereit" (Notify-Dienst, Schalter, Abendstunde).
 3. 0.3.0 Steuerung der Wallbox (eigener Schalter, nach Neustart aus), danach Veröffentlichung und Antrag bei HACS.
+
+## 18. Prognosebetrieb ohne Echtzeitdaten (Idee des Nutzers 05.11.2026, für Stufe 0.3, nichts gebaut)
+**Anlass:** Haushalte ohne schnellen Zähler (zum Beispiel nur das Portal des Netzbetreibers, Werte alle 15 Minuten bis am nächsten Tag) können den Viertelstunden-Wächter
+nicht zum Regeln nutzen: Er braucht alle paar Sekunden einen Messwert. Das Auto ist aber der größte Verbraucher und die Spitzen kommen oft vom Laden am Abend oder frühmorgens.
+Plugwhen kann auch mit Stundenwerten arbeiten (Lernen aus der Langzeitstatistik, Plan, Warnung).
+
+**Modus „Prognosebetrieb" (Schalter, später mit der Wallbox-Steuerung der Stufe 0.3):**
+- Plugwhen legt das Laden in die ruhigen Stunden (wie der Plan heute) **und begrenzt den Ladestrom** auf das, was unter die Grenze passt:
+  `Strom = Grenze − erwarteter hoher Hausbezug (Prognose „hoch") − Sicherheitsabstand`, aufgerundet auf die kleinste Wallbox-Stufe, nie unter dem Minimum der Wallbox.
+- **Sicherheitsabstand einstellbar**, Vorschlag 2 bis 3 kW, weil ein Stundenmittel nur eine Untergrenze seiner vier Viertelstunden ist. Mit echten 15-Minuten-Werten (zum Beispiel aus dem Portal als
+  importierte Statistik) kann der Abstand kleiner sein.
+- Ohne Echtzeitdaten gibt es **keine Rückmeldung**: Eine unvorhergesehene Last (Backrohr, Trockner) in derselben Viertelstunde sieht niemand. Der Modus senkt die typischen Spitzen, garantiert aber nichts.
+- Läuft der Wächter mit Echtzeitdaten, ist er die genauere Lösung; beide schließen sich nicht aus (Regel „genau ein Schreiber je Wallbox", siehe 4 und 17).
+
+**Ehrliche Aussage in der Anleitung:** was der Modus kann (Laden in ruhige Zeiten, Strom begrenzen, Warnung) und was nicht (kurzfristige Spitzen, Echtzeit-Schutz).
+**Voraussetzung:** mindestens Stundenwerte des Netzbezugs als Statistik; bessere Prognose mit 15-Minuten-Werten.
+

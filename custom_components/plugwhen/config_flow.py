@@ -9,14 +9,13 @@ from homeassistant.config_entries import (
     ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow, SubentryFlowResult,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
-    EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode, TextSelector,
+    ConfigEntrySelector, ConfigEntrySelectorConfig, EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode, TextSelector,
 )
 
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
-    DEFAULT_RESERVE_KM, DOMAIN, O_AVAIL, O_LOAD, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
+    DEFAULT_RESERVE_KM, DOMAIN, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_WALLBOX_ENERGY,
 )
 
@@ -37,12 +36,10 @@ def _opt(key: str, d: dict[str, Any]) -> vol.Optional:
     return vol.Optional(key, description={"suggested_value": d.get(key)})
 
 
-def find_waechter_forecast(hass: HomeAssistant) -> str | None:
-    """The forecast sensor of the quarter-hour peak guard, if it is installed (found in the entity registry, nothing is imported)."""
-    for entry in er.async_get(hass).entities.values():
-        if entry.platform == WAECHTER_DOMAIN and entry.domain == "sensor" and str(entry.unique_id).endswith("_forecast_peak"):
-            return entry.entity_id
-    return None
+def find_waechter_entry(hass: HomeAssistant) -> str | None:
+    """The config entry of the quarter-hour peak guard if there is exactly one (offered in the settings, nothing is imported)."""
+    entries = hass.config_entries.async_entries(WAECHTER_DOMAIN)
+    return entries[0].entry_id if len(entries) == 1 else None
 
 
 def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
@@ -94,11 +91,12 @@ class PlugwhenOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(data={k: v for k, v in user_input.items() if v not in (None, "")})
         current = dict(self.config_entry.options)
-        if not current.get(O_LOAD):
-            found = find_waechter_forecast(self.hass)  # offered, not forced
+        if not current.get(O_WAECHTER) and not current.get(O_LOAD):
+            found = find_waechter_entry(self.hass)  # offered, not forced
             if found:
-                current[O_LOAD] = found
+                current[O_WAECHTER] = found
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
+            _opt(O_WAECHTER, current): ConfigEntrySelector(ConfigEntrySelectorConfig(integration=WAECHTER_DOMAIN)),
             _opt(O_LOAD, current): _ent("sensor"),
             _opt(O_AVAIL, current): _ent("sensor"),
         }))
