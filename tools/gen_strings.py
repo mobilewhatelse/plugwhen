@@ -48,6 +48,7 @@ EN = dict(
     od_pthr="kW from which the higher price applies. 0 = one price.",
     sv_name="Calculate the potential", sv_desc="Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
     sv_days="Days", sv_days_d="How far back (14 to 365 days, default 90).",
+    sd_name="Create the dashboard", sd_desc="Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only.",
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
 DE = dict(
@@ -94,6 +95,7 @@ DE = dict(
     od_pthr="kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
     sv_name="Potenzial berechnen", sv_desc="Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
     sv_days="Tage", sv_days_d="Wie weit zurück (14 bis 365 Tage, Standard 90).",
+    sd_name="Dashboard erstellen", sd_desc="Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation (alle Fahrzeuge) und gibt es als YAML zurück, auch als Benachrichtigung, zum Einfügen in ein neues Dashboard (Bearbeiten, Raw-Konfigurationseditor). Nur Standardkarten. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren.",
     sw_learn="Kilometer je Wochentag lernen", sw_notice="Warnen, wenn das Auto nicht bereit sein wird", n_res="Reserve",
 )
 
@@ -109,7 +111,8 @@ def build(L):
             "notify_service": L["d_notify"], "notify_hour": L["d_hour"]}
     step = {"title": L["v_title"], "description": L["v_desc"], "data": data, "data_description": desc}
     services = {"calculate_potential": {"name": L["sv_name"], "description": L["sv_desc"],
-                                         "fields": {"days": {"name": L["sv_days"], "description": L["sv_days_d"]}}}}
+                                         "fields": {"days": {"name": L["sv_days"], "description": L["sv_days_d"]}}},
+                "create_dashboard": {"name": L["sd_name"], "description": L["sd_desc"]}}
     return {
         "services": services,
         "config": {"step": {"user": {"title": "Plugwhen", "description": L["c_desc"]}}, "abort": {"single_instance_allowed": L["c_single"]}},

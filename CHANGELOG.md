@@ -16,6 +16,14 @@
   plugs in every day: the warning *plug in* only comes when the reserve would not last.
 - **Potential calculator with real parking windows:** with recorded plug-in times the window starts at plugging in and ends
   at unplugging instead of assuming "plugged in from arrival" (`sessions_with_plug_times`).
+- **The dashboard comes with the integration:** service `plugwhen.create_dashboard` (administrators) builds it with the
+  entities of this installation, all vehicles (headings with the vehicle name when there are several), in German or English
+  and in the currency of Home Assistant: next departure, charge plan with where the power comes from, potential with the
+  comparison table, plug-in times, settings, learned week. Returned as YAML and shown as a notification; it never writes into
+  an existing dashboard. Weekday names follow the language.
+- Documentation: detailed README (what it needs, how it plans, plug-in times, warning, potential calculator and how the prices
+  are calculated with and without the peak guard, cooperation with the guard, dashboard, entities, limits) and a German guide
+  `docs/ANLEITUNG.md`.
 
 ## 0.3.0 (unreleased) - potential calculator
 

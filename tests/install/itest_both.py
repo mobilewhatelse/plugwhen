@@ -108,6 +108,16 @@ def main():
     log(bool(ok), "the guard counts both vehicles (found automatically, nothing set)",
         str((it.state(fc_entity) or {}).get("attributes", {}).get("car_plan", {})))
 
+    # ---------- dashboards: the guard shows the planner's plans, Plugwhen delivers its own dashboard ----------
+    s_w, d_w = it.api("POST", "/api/services/viertelstunden_waechter/create_dashboard?return_response", {})
+    wtext = json.dumps(((d_w or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_w, dict) else ""
+    ready = (it.find("sensor", "testauto_ready_for_departure") or {}).get("entity_id", "?")
+    log(s_w == 200 and pid in wtext and ready in wtext and "car_plan" in wtext,
+        "the guard's dashboard shows the charge plan and readiness of Plugwhen", f"{s_w} {len(wtext)} chars, readiness {ready}")
+    s_p, d_p = it.api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
+    ptext = json.dumps(((d_p or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_p, dict) else ""
+    log(s_p == 200 and pid in ptext and "zweitauto" in ptext.lower(), "Plugwhen's dashboard has both vehicles", f"{s_p} {len(ptext)} chars")
+
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if ("plugwhen" in ln.lower() or "viertelstunden" in ln.lower()) and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of either integration in the log", "; ".join(errs[:3]))

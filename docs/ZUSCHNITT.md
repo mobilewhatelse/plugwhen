@@ -248,3 +248,26 @@ Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
   mehrmals mit Sonne. Die Annahme „angesteckt ab Ankunft" stimmte für die Nächte mit Ladung. Für Nutzer heißt das: **nichts ändern, normal anstecken**;
   „Bitte anstecken" kommt nur, wenn die Reserve nicht reicht.
 - Plugwhen steuert weiterhin **nicht** (Stufe 0.5); der Plan ist Anzeige und Schnittstelle (`windows`).
+
+## 22. Modus „Automatisch“ (Idee des Nutzers 06.11.2026, geplant für 0.5, noch nicht gebaut)
+- **Wunsch:** „Ich stecke einfach an“, Plugwhen überlässt das Laden den Prognosen: erkennt z. B. viel Sonne am Wochenende und lädt dann nur mit Sonne,
+  oder sofort, wenn es egal ist. **Allgemeingültig:** auch für Wallboxen ohne PV-Anbindung und Haushalte ohne PV. Damit bekommt jede schaltbare Wallbox einen
+  PV-Modus mit „fertig bis“, auch wenn sie das selbst nicht kann.
+- **Entscheidung über mehrere Tage** (reines Python, Tests): (1) Pflicht = was bis zur nächsten Abfahrt fehlt (Reserve), notfalls aus dem Netz, verteilt;
+  (2) Rest darf warten, wenn die Reserve bis zu einem Tag mit erwartetem Überschuss reicht (Solarprognose so weit sie reicht, Energie-Dashboard);
+  (3) sonst Wahl „sofort“ oder „verteilt“; (4) Sicherheitsnetz: wird es für eine Abfahrt knapp, rechtzeitig laden. Wächter behält das letzte Wort.
+- **Drei Wallbox-Arten:** eigener PV-Modus (Modus umschalten, z. B. Eco/Standard); Strom in A ohne PV-Anbindung (Plugwhen folgt der Einspeisung selbst und
+  regelt den Strom, Mindeststrom, Glättung über einige Minuten); nur ein/aus (ein, wenn Überschuss einige Minuten über Mindestleistung).
+- **Absicherung wie beim Wächter:** Schalter „Ausführen“ nach Neustart aus; bei Unsicherheit freigeben, nie blockieren; nicht angesteckt oder Daten
+  veraltet = nichts schalten; höchstens ein Befehl alle paar Minuten; jede Entscheidung mit Begründung im Protokoll („Warte auf Sonne Sa 10–15 Uhr, Reserve
+  reicht bis Mo“).
+- **Vorgehen:** zuerst Entscheidungsteil mit Tests, dann beim Autor nur anzeigen lassen, was Plugwhen täte, erst danach wirklich schalten.
+- **Betriebsart je Fahrzeug (Nutzer 06.11.): Aus / Lernen / Schalten**, Standard Lernen. *Lernen* plant und protokolliert, was geschaltet würde, schaltet nichts und
+  vergleicht mit dem, was wirklich passiert ist (Wallbox, Ladestand, Zähler: „hätte nicht geladen, stattdessen 10 kW, Spitze 9,8 statt 6 kW"). Zusätzlich gelernt:
+  Eigenheiten von Wallbox und Auto (tatsächlicher Mindest-/Höchststrom, Anlaufzeit, Reaktion auf Befehle) und die Treffsicherheit der Solarprognose
+  (erwartet gegen gemessen, damit „warte auf Sonne" nicht auf einer zu optimistischen Prognose beruht). *Schalten* nach Neustart wieder *Lernen*.
+  Zum Schalten freigeben schlägt Plugwhen erst vor, wenn genug Tage gesehen wurden und der Plan die Abfahrt nie verpasst hätte; der Nutzer entscheidet.
+- **Quellen nach Güte** (Nutzer 06.11., „ohne Smart Meter / ohne PV / ohne Netzbezug"): Netzzähler live (genau) > nur Wechselrichter (PV minus geschätzter Hausverbrauch) >
+  nur Solarprognose (fester kleiner Strom in erwarteten Sonnenstunden) > keine PV (nur Pflicht verteilt oder sofort). Plugwhen nimmt automatisch die beste eingetragene
+  Quelle und zeigt, womit es arbeitet. Ohne Netzbezug: kein Spitzenschutz, Potenzialrechner „Daten fehlen". Einstellung „kein Netz" (Inselanlage): nur Sonne und Akku,
+  Warnung rechtzeitig, wenn beides nicht bis zur Abfahrt reicht.

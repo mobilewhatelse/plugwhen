@@ -58,6 +58,49 @@ def _register_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
 
+    async def handle_dashboard(call: ServiceCall) -> dict[str, Any]:
+        return await _create_dashboard(hass)
+
+    async_register_admin_service(
+        hass, DOMAIN, "create_dashboard", handle_dashboard, schema=vol.Schema({}), supports_response=SupportsResponse.OPTIONAL,
+    )
+
+
+async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
+    """Build the dashboard with this installation's entity ids (all vehicles) and return it as YAML, also shown as a
+    persistent notification, to paste into the raw configuration editor of a new dashboard. It never writes into a dashboard."""
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.util import yaml as ha_yaml
+
+    from .dashboard import ENTITY_KEYS, build_views
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        raise ServiceValidationError("Plugwhen is not set up")
+    entry = entries[0]
+    registry = er.async_get(hass)
+    vehicles = []
+    for sub in entry.subentries.values():
+        ids: dict[str, str] = {}
+        for key, domain in ENTITY_KEYS.items():
+            entity_id = registry.async_get_entity_id(domain, DOMAIN, f"{sub.subentry_id}_{key}")
+            if entity_id is None:
+                raise ServiceValidationError(f"Entity '{key}' of {sub.title} not found - restart Home Assistant after the update")
+            ids[key] = entity_id
+        vehicles.append({"name": sub.data.get("name", sub.title), "ids": ids})
+    if not vehicles:
+        raise ServiceValidationError("Add a vehicle first (integration page: Add vehicle)")
+    config = {"views": build_views(vehicles, hass.config.language, hass.config.currency)}
+    text = ha_yaml.dump(config)
+    de = (hass.config.language or "").lower().startswith("de")
+    hint = ("In ein neues Dashboard einfügen (drei Punkte > Bearbeiten > Raw-Konfigurationseditor):" if de
+            else "Paste this into a new dashboard (three dots > Edit > Raw configuration editor):")
+    await hass.services.async_call(
+        "persistent_notification", "create",
+        {"title": "Plugwhen", "notification_id": f"{DOMAIN}_dashboard", "message": f"{hint}\n\n```yaml\n{text}```"},
+    )
+    return {"yaml": text, "config": config}
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:
     await entry.runtime_data.async_stop()

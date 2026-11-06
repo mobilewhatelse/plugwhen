@@ -1,0 +1,119 @@
+# Plugwhen – Anleitung (Deutsch)
+
+Stand: Version 0.4.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+
+## Wofür?
+
+Plugwhen sorgt dafür, dass das E-Auto **zur Abfahrt bereit** ist, mit möglichst wenig Netzstrom und **ohne Lastspitzen**. Es lernt aus
+dem Auto selbst: wie viele Kilometer es je Wochentag fährt, wann es losfährt und wo es geladen wird (zu Hause oder unterwegs). Daraus plant
+es das Laden bis zur nächsten Abfahrt.
+
+- **Für wen:** alle mit E-Auto und Home Assistant, mit oder ohne Photovoltaik, mit jeder Wallbox und jedem Auto, das Home Assistant lesen kann.
+- **Was es nicht ist:** kein Ersatz für evcc, keine Treiber für Wallboxen oder Autos (es liest nur Entitäten), kein Tarifvergleich, keine
+  Planung von Schnellladen unterwegs.
+
+## Was es braucht
+
+| Entität | nötig | wofür |
+|---|---|---|
+| Kilometerstand (mit Langzeitstatistik) | ja | Fahrten je Wochentag, Abfahrtszeiten |
+| Ladestand (%) | ja | was noch fehlt |
+| Stecker-Sensor (Auto angesteckt) | empfohlen | Warnung „Bitte anstecken“, Steckzeiten |
+| Energiezähler der Wallbox | empfohlen | zu Hause oder unterwegs geladen, Potenzialrechner |
+| „Lädt gerade“-Sensor | optional | beim Laden gilt ein Ladestand, der älter als 90 Minuten ist, als unbekannt |
+| Abfahrt (Zeit- oder Datum/Zeit-Entität) | optional | ersetzt die gelernte Abfahrt |
+| Benachrichtigungsdienste (durch Komma getrennt) | optional | die Warnung, z. B. an zwei Handys |
+
+Je Auto stellen Sie Akkugröße, Reserve (km), Verbrauch (bis der echte Wert gelernt ist) und die **Wallbox-Leistung** ein (höchste und kleinste,
+z. B. 11 oder 22 kW und 1,4 kW für einphasig 6 A). Eine bestimmte Marke wird nirgends vorausgesetzt.
+
+## Einrichten
+
+1. Integration hinzufügen: Einstellungen → Geräte & Dienste → Integration hinzufügen → **Plugwhen**.
+2. Auf der Integrationsseite **Fahrzeug hinzufügen** und die Entitäten oben eintragen.
+3. Optional über das Zahnrad: den **Viertelstunden-Wächter** wählen (wird vorgeschlagen, wenn er installiert ist), Solarprognose an/aus und Abzug,
+   Verfügbarkeits-Sensor, Energiezähler Netzbezug und Leistungspreise für den Potenzialrechner.
+4. Dashboard erstellen (siehe unten).
+
+## Wie geplant wird
+
+1. **Bedarf:** Die Reserve ist die Untergrenze der Reichweite bei der Abfahrt. Ist *Kilometer je Wochentag lernen* an, hebt der gelernte hohe Wert
+   eines Wochentags sie bei Bedarf an. Daraus folgen Ziel-Ladestand und Energie (mit Ladeverlusten).
+2. **Zuerst die Sonne:** Solange das Auto zu Hause steht, wird zuerst der erwartete Sonnenüberschuss genutzt. Er kommt aus der **Solarprognose des
+   Energie-Dashboards** (jede dort eingerichtete: Forecast.Solar, Solcast, Open-Meteo …) minus einem Abzug für Haus und Hausakku (Standard 0,5 kW).
+   Die Last-Prognose des Wächters wird dafür bewusst nicht abgezogen: Sie ist Netzbezug, tagsüber steckt die Sonne schon darin.
+   Ein *Verfügbarkeits*-Sensor (z. B. Energiegemeinschaft oder Tarifsignal) kann dazukommen; je Viertelstunde zählt der größere Wert.
+3. **Der Rest wird verteilt:** Was die Sonne nicht schafft, wird über die Standzeit mit dem **niedrigsten gleichmäßigen Netzbezug** verteilt: Haus und
+   Auto werden auf einen gemeinsamen Pegel aufgefüllt, ruhige Viertelstunden bekommen mehr, belebte weniger oder nichts, nie über dem Spitzenziel.
+   Viertelstunden unter dem Wallbox-Minimum fallen weg. Ohne Photovoltaik bleibt nur dieser Schritt.
+4. **Ehrlich:** Reicht die Zeit bis zur Abfahrt nicht, sagt der Plan, wie viel fehlt.
+
+Warum verteilen: Eine Wallbox mit „fertig bis“ und vollem Strom lädt spät und kräftig (z. B. 10 kW von 4 bis 6 Uhr) und bestimmt damit die
+Monatsspitze. Über die Nacht verteilt braucht dieselbe Energie 2–3 kW.
+
+## Steckzeiten
+
+Home Assistant hebt den Verlauf eines Stecker-Sensors nur wenige Tage auf, Binärsensoren haben keine Langzeitstatistik. Plugwhen schreibt An- und
+Abstecken deshalb selbst mit (etwa ein Jahr; beim ersten Start übernimmt es, was der Recorder noch hat). Der Sensor *Bereit zur Abfahrt* zeigt im
+Attribut `plugging`: wie oft und wie viele Nächte in vier Wochen angesteckt, typische Ansteck- und Abziehzeit.
+
+**Niemand muss täglich anstecken.** Stecken Sie an wie gewohnt; „Bitte anstecken“ kommt nur, wenn die Reserve bis zur nächsten Abfahrt nicht reicht.
+
+## Die Warnung
+
+*Bereit zur Abfahrt* ist `ready` oder sagt, was zu tun ist: `plug_in` (anstecken), `low` (Steckerzustand unbekannt, zu wenig), `too_late` (auch mit
+voller Leistung reicht die Zeit nicht), `not_reachable` (Ziel mit dem Akku nicht erreichbar), `unknown` (kein frischer Ladestand). Ab einer
+gewählten Abendstunde, einmal je Abfahrt und Art, an alle eingetragenen Dienste. Texte auf Deutsch und Englisch.
+
+## Potenzialrechner
+
+Sensor *Potenzial durch verteiltes Laden* und Dienst `plugwhen.calculate_potential` (nur Administratoren). Er spielt Ihren eigenen Verlauf nach
+(90 Tage Netzbezugszähler, Wallbox-Zähler, Kilometerstand) und vergleicht vier Ladeweisen: höchste Viertelstunde je Monat, Leistungspreis und wie
+oft das Auto nicht fertig gewesen wäre.
+
+| Ladeweise | Bedeutung |
+|---|---|
+| wie bisher | was wirklich passiert ist |
+| nur Spitzenwächter | wie bisher, aber jede Viertelstunde unter der Grenze des Wächters gehalten (nur wenn der Wächter gewählt ist) |
+| Wallbox fertig-bis, kleiner Strom | die eigene Fertig-bis-Funktion der Wallbox mit 4,1 kW |
+| verteilt (Plugwhen) | die Energie gleichmäßig über das Standzeit-Fenster |
+
+Das Standzeit-Fenster ist das echte, sobald Steckzeiten mitgeschrieben sind, sonst die Annahme „angesteckt ab Ankunft“.
+Urteil: *lohnt sich*, *Wallbox-Einstellung reicht* (die eigene Funktion der Wallbox schafft fast dasselbe, ohne die Abfahrt zu verpassen), *gering*
+(weniger als 1 kW Unterschied), *zu wenig Daten* (unter 14 Tagen oder 5 Ladungen) oder *Daten fehlen*.
+
+**So werden die Preise gerechnet:**
+
+- Monatskosten = (Spitze bis zur Schwelle × Preis bis zur Schwelle + Rest darüber × Preis darüber) / 12; im Jahr = Durchschnitt der Monate × 12.
+- Spitze eines Monats = höchste Stunde des Hauses + 0,7 kW (so weit liegt eine Viertelstunde über dem Stundenmittel) + das Auto in der jeweiligen Ladeweise.
+- **Woher die Preise kommen:** aus den Plugwhen-Einstellungen (Leistungspreis je kW und Jahr bis zur Schwelle, darüber, Schwelle; 0 = ein Preis) oder,
+  wenn dort nichts steht, vom gewählten Spitzenwächter.
+- **Ohne Wächter** tragen Sie die Preise und den Netzbezugszähler in Plugwhen ein; die Zeile „nur Spitzenwächter“ fehlt dann.
+- **Ganz ohne Preise** zeigt er nur kW; das Urteil funktioniert trotzdem, weil es an den kW hängt.
+- „Höchste Spitze“ ist der schlechteste Monat, die Kosten sind der Durchschnitt der Monate – deshalb passen die zwei Spalten nicht 1:1 zusammen.
+- Eine Schätzung aus Stundenwerten, keine Rechnung.
+
+## Zusammen mit dem Viertelstunden-Wächter
+
+Beide laufen auch allein. Es genügt, die andere Integration in den Einstellungen zu wählen, Entitäten müssen nicht ausgesucht werden:
+
+- Plugwhen liest die **Last-Prognose** des Wächters (erwarteter Bezug, Spitzenziel), seinen Zähler, die Preise und die Grenze.
+- Der Wächter liest die **Ladepläne** von Plugwhen (Attribut `windows`) in seine Prognose ein und zeigt sie ab Version 0.14 in seinem Dashboard
+  statt seines eigenen Plans. Den eigenen Ladeplan des Wächters dann ausschalten, damit nicht zwei Pläne nebeneinander stehen.
+- **Der Wächter hat immer das letzte Wort:** Käme trotzdem eine Spitze, drosselt er wie gewohnt. Plugwhen vergleicht, was wirklich angekommen
+  ist, mit dem Plan und verteilt den Rest neu.
+
+## Dashboard
+
+Der Dienst **Dashboard erstellen** (`plugwhen.create_dashboard`, nur Administratoren) baut das Dashboard mit den Entitäten **Ihrer** Installation,
+für alle Fahrzeuge, auf Deutsch oder Englisch und in Ihrer Währung: nächste Abfahrt, Ladeplan (woher der Strom kommt), Potenzial mit
+Vergleichstabelle, Steckzeiten, Einstellungen und gelernte Woche. Nur Standardkarten.
+
+**So geht's:** Entwicklerwerkzeuge → Aktionen → *Dashboard erstellen* ausführen, das YAML aus der Antwort oder der Benachrichtigung kopieren.
+Dann Einstellungen → Dashboards → Dashboard hinzufügen, öffnen, drei Punkte → Bearbeiten → drei Punkte → Roher Konfigurationseditor, einfügen,
+speichern. Der Dienst **schreibt nie in ein bestehendes Dashboard**. Nach dem Hinzufügen eines Fahrzeugs neu erstellen.
+
+## Grenzen
+
+Plugwhen plant und zeigt an; **das Ausführen (Wallbox steuern) ist noch nicht gebaut**. Der Plan beruht auf Gewohnheiten und Prognosen, er ist keine
+Garantie. Schnellladen unterwegs wird nicht geplant, nur erkannt (der Ladestand steigt, ohne dass der Wallbox-Zähler zählt).

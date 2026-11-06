@@ -284,6 +284,13 @@ def main():
     ok = wait_for(lambda: state(rdid)["state"] != "unknown", 30)
     log(bool(ok), "state of charge back: normal again", state(rdid)["state"])
 
+    # the dashboard comes with the integration: a service builds it with this installation's entity ids
+    s_d, d_d = api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
+    dash = ((d_d or {}).get("service_response") or {}) if isinstance(d_d, dict) else {}
+    text = json.dumps(dash.get("config") or {})
+    log(s_d == 200 and "views" in (dash.get("config") or {}) and rdid in text and pid in text and "yaml" in dash,
+        "the dashboard service builds the dashboard with this installation's entities", f"{s_d} {len(text)} chars")
+
     # plug-in times are written down (short flickers under 2 minutes are dropped, the open one counts)
     ok = wait_for(lambda: ((state(rdid)["attributes"].get("plugging") or {}).get("plugged_now") is True), 30)
     plg = state(rdid)["attributes"].get("plugging") or {}
@@ -301,7 +308,7 @@ def main():
     log(bool(old_ready), "its readiness sensor exists")
     if old_ready:
         oid = old_ready["entity_id"]
-        wait_for(lambda: (state(oid) or {}).get("attributes", {}).get("soc_stale") is not None, 30)  # first computation done
+        wait_for(lambda: (state(oid) or {}).get("state") not in (None, "unknown", "unavailable"), 60)  # first computation done
         fresh_attr = (state(oid) or {}).get("attributes", {})
         log(fresh_attr.get("soc_stale") is False and state(oid)["state"] != "unknown", "a fresh state of charge is believed", f"{state(oid)['state']} / {fresh_attr.get('soc_stale')}")
         ok = wait_for(lambda: (state(oid) or {}).get("attributes", {}).get("soc_stale") is True, 540)  # checked at every computation, at the latest every 5 minutes

@@ -8,3 +8,4 @@ calculate_potential:
           min: 14
           max: 365
           mode: box
+create_dashboard:

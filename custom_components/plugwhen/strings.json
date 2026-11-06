@@ -9,6 +9,10 @@
           "description": "How far back (14 to 365 days, default 90)."
         }
       }
+    },
+    "create_dashboard": {
+      "name": "Create the dashboard",
+      "description": "Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only."
     }
   },
   "config": {
