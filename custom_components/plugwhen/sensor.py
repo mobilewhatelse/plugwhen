@@ -9,6 +9,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfLength
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import PlugwhenEntry
 from .const import PLAN_STATES, POTENTIAL_STATES, READINESS_STATES
@@ -137,6 +138,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "target_soc": v.need.target_soc if v.need else None,
             "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
             "load_forecast_used": v.load_used, "load_entity": self.plug._load_entity(), "availability_used": v.availability_used,
+            "availability_source": v.availability_source,
         }
 
 
@@ -160,8 +162,12 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         n = self.vehicle.notice
-        return {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None,
-                "soc_stale": self.vehicle.soc_stale}
+        v = self.vehicle
+        out = {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None,
+               "soc_stale": v.soc_stale}
+        if v.cfg.get("plugged_entity"):   # how the car was actually plugged in over the last four weeks
+            out["plugging"] = v.plug_log.summary(dt_util.now())
+        return out
 
 
 class PotentialSensor(PlugwhenEntity, SensorEntity):
@@ -188,7 +194,7 @@ class PotentialSensor(PlugwhenEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         p = self.vehicle.potential or {}
         keys = ("saving_spread_per_year", "saving_spread_vs_guard_per_year", "peak_as_is_kw", "peak_spread_kw", "days", "sessions",
-                "session_kwh_median", "window_h_median", "model_error_kw", "computed_at", "history_days", "sources", "missing", "error",
+                "session_kwh_median", "window_h_median", "sessions_with_plug_times", "model_error_kw", "computed_at", "history_days", "sources", "missing", "error",
                 "strategies")
         return {k: p.get(k) for k in keys if k in p}
 

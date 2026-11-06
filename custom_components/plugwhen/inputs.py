@@ -89,6 +89,26 @@ def availability_from_attributes(attrs: dict[str, Any], now: datetime) -> dict[d
     return out or None
 
 
+def surplus_from_solar(solar_kw: dict[datetime, float] | None, deduct_kw: float, now: datetime) -> dict[datetime, float] | None:
+    """Usable power per quarter hour from a solar forecast (kW per quarter-hour start, e.g. of the Energy dashboard): the
+    forecast minus a fixed deduction for what the house and a home battery take first. Only quarter hours from now on;
+    None without a forecast (the plan then simply spreads)."""
+    if not solar_kw:
+        return None
+    first = floor_quarter(now)
+    out = {t: round(kw - deduct_kw, 3) for t, kw in solar_kw.items() if t >= first and kw - deduct_kw > 0}
+    return out or None
+
+
+def merge_available(*sources: dict[datetime, float] | None) -> dict[datetime, float] | None:
+    """Several sources of available power: per quarter hour the largest (they describe the same power, not extra power)."""
+    out: dict[datetime, float] = {}
+    for s in sources:
+        for t, kw in (s or {}).items():
+            out[t] = max(out.get(t, 0.0), kw)
+    return out or None
+
+
 def departure_from_state(value: Any, now: datetime) -> datetime | None:
     """The next departure from the state of a time or date-time entity (never in the past: a time already gone means tomorrow)."""
     text = str(value or "").strip()

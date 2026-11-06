@@ -284,6 +284,13 @@ def main():
     ok = wait_for(lambda: state(rdid)["state"] != "unknown", 30)
     log(bool(ok), "state of charge back: normal again", state(rdid)["state"])
 
+    # plug-in times are written down (short flickers under 2 minutes are dropped, the open one counts)
+    ok = wait_for(lambda: ((state(rdid)["attributes"].get("plugging") or {}).get("plugged_now") is True), 30)
+    plg = state(rdid)["attributes"].get("plugging") or {}
+    log(bool(ok) and plg.get("plug_ins", 0) >= 1 and plg.get("recorded_since"), "plug-in times are recorded", json.dumps(plg))
+    log(state(pid)["attributes"].get("availability_source") is None, "no solar forecast set up: nothing counts as available (the rest is spread)",
+        str(state(pid)["attributes"].get("availability_source")))
+
     # a state of charge that is too old counts as unknown: a second vehicle with a very short maximum age (about 100 s)
     old_car = {"name": "Altauto", "odometer_entity": "sensor.auto_kilometerstand", "soc_entity": "sensor.auto_ladestand",
                "soc_max_age_h": 0.03, "capacity_kwh": 60, "reserve_km": 100, "consumption_kwh_100": 20,
@@ -358,6 +365,10 @@ def main():
     ok = wait_for(lambda: num(resid) is not None, 120)
     log(bool(ok) and num(resid) == 100.0, "reserve is restored (the value set last)", str(num(resid)))
     log(state(lid)["state"] == "off", "learning switch state is restored (off)")
+    ok = wait_for(lambda: (state(rdid)["attributes"].get("plugging") or {}).get("recorded_since") is not None, 60)
+    plg2 = state(rdid)["attributes"].get("plugging") or {}
+    log(bool(ok) and plg2.get("recorded_since") == plg.get("recorded_since") and plg2.get("plug_ins", 0) >= plg.get("plug_ins", 0),
+        "the plug-in times survive the restart", f"{plg.get('recorded_since')} -> {plg2.get('recorded_since')}, {plg2.get('plug_ins')}")
     n_before = num("counter.meldungen") or 0
     time.sleep(70)
     log((num("counter.meldungen") or 0) == n_before, "after the restart the same warning is not repeated", f"counter {num('counter.meldungen')} (before {n_before})")

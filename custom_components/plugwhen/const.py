@@ -13,11 +13,15 @@ SUBENTRY_VEHICLE = "vehicle"
 # general options (entry.options): optional connections to other integrations, by entity
 O_WAECHTER = "waechter_entry"             # the quarter-hour peak guard (a config entry): its load forecast is found automatically
 O_LOAD = "load_entity"                    # sensor with the expected house load (attributes `hours`, `target_kw`), e.g. of the peak guard
-O_AVAIL = "availability_entity"
+O_AVAIL = "availability_entity"          # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
+O_SOLAR = "use_solar_forecast"            # take the solar forecast of the Energy dashboard as available power (default on)
+O_SOLAR_DEDUCT = "solar_deduct_kw"        # kW taken off the solar forecast first (house, home battery)
+DEFAULT_SOLAR_DEDUCT = 0.5
+SOLAR_REFRESH = timedelta(minutes=15)
 O_GRID_ENERGY = "grid_energy_entity"       # grid import energy counter (for the potential calculator); taken from the guard if chosen
 O_PRICE_LOW = "price_low"                  # demand charge per kW and year (up to the threshold); taken from the guard if empty
 O_PRICE_HIGH = "price_high"                # ... above the threshold
-O_PRICE_THRESHOLD = "price_threshold"      # kW, 0 = one price           # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
+O_PRICE_THRESHOLD = "price_threshold"      # kW, 0 = one price
 
 # vehicle settings (subentry data)
 V_NAME = "name"

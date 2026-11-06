@@ -11,17 +11,20 @@ wallbox can deliver and two optional curves per quarter hour:
 
 Order of choice:
 
-1. Quarter hours with available power come first (the one with most available power first).
-2. The rest goes to the quietest quarter hours (lowest expected import) that still stay under the peak target.
-   Without a peak target all quarter hours count equally, and among equals the later one wins (the battery waits
-   less time at a high state of charge before it is used).
-3. If the energy cannot be delivered by departure the plan says so and how much is missing; it never pretends.
+1. Quarter hours with available power come first (the one with most available power first): the sun, when there is any.
+2. The rest is spread over the parking time with the lowest even grid import: house and car are topped up to one common
+   level (quiet quarter hours get more, busy ones less or nothing), never above the peak target. Quarter hours where the
+   car would get less than the wallbox minimum are dropped and the rest filled again (among equals the later ones stay:
+   the battery waits less at a high state of charge). Households without solar get only this step.
+3. Tiny remainders below the wallbox minimum go to the quietest quarter hours, the later one first.
+4. If the energy cannot be delivered by departure the plan says so and how much is missing; it never pretends.
 
 The plan is advice. Carrying it out is a separate, optional step.
 """
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -87,7 +90,12 @@ def make_plan(
             continue
         put(q, max(min_kw, min(max_kw, q["avail"], remaining / (QUARTER_H * q["frac"]))))
 
-    # 2. the quietest quarter hours that stay under the peak target; among equals the later one
+    # 2. the rest spread over the parking time with the lowest even grid import (quiet quarter hours get more)
+    rest = [q for q in quarters if q["t"] not in plan]
+    for t, p in _spread(rest, remaining, max_kw, min_kw, target_kw).items():
+        put(next(q for q in rest if q["t"] == t), p)
+
+    # 3. what is still missing (tiny amounts below the wallbox minimum): the quietest quarter hours, the later one first
     for q in sorted(quarters, key=lambda x: (x["high"], -x["t"].timestamp())):
         if remaining < 0.05:
             break
@@ -127,6 +135,49 @@ def make_plan(
     if result["windows"]:
         result["ready_at"] = result["windows"][-1]["end"]
     return result
+
+
+def _spread(quarters: list[dict[str, Any]], energy: float, max_kw: float, min_kw: float,
+            target_kw: float | None) -> dict[datetime, float]:
+    """Fill the quarter hours like water: the car tops up the expected import of the house to one common level, so the
+    highest import (and with it the peak) stays as low as possible. Quarter hours where the car would get less than
+    the wallbox minimum are dropped (the busiest and earliest first) and the rest is filled again."""
+    if energy < 0.05:
+        return {}
+
+    def cap(q: dict[str, Any]) -> float:
+        room = max_kw if target_kw is None else target_kw - q["high"] + q["avail"]
+        return min(max_kw, room)
+
+    cand = [q for q in quarters if cap(q) >= min_kw]
+    while cand:
+        base = {q["t"]: q["high"] - q["avail"] for q in cand}
+        caps = {q["t"]: cap(q) for q in cand}
+
+        def power(q: dict[str, Any], level: float) -> float:
+            return min(caps[q["t"]], max(0.0, level - base[q["t"]]))
+
+        def energy_at(level: float) -> float:
+            return sum(power(q, level) * QUARTER_H * q["frac"] for q in cand)
+
+        lo, hi = min(base.values()), max(base[t] + caps[t] for t in base)
+        if energy_at(hi) <= energy:     # everything at its maximum and still not enough
+            return {q["t"]: caps[q["t"]] for q in cand}
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            if energy_at(mid) < energy:
+                lo = mid
+            else:
+                hi = mid
+        result = {q["t"]: power(q, hi) for q in cand}
+        low = [q for q in cand if result[q["t"]] < min_kw - 1e-6]
+        if not low:
+            return result
+        low.sort(key=lambda q: (-base[q["t"]], q["t"].timestamp()))      # busiest, then earliest go first
+        short = sum(min_kw - result[q["t"]] for q in low) / (min_kw * len(low))    # how far below the minimum, 0..1
+        drop = {q["t"] for q in low[: max(1, math.ceil(len(low) * short))]}
+        cand = [q for q in cand if q["t"] not in drop]
+    return {}
 
 
 def charging_allowed(plan: dict[str, Any], now: datetime) -> bool | None:

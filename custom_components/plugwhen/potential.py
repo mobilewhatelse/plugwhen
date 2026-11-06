@@ -59,6 +59,7 @@ class Session:
     window_start: datetime    # parking started (car stood still since then)
     grid_kwh: float = 0.0
     hours: list[datetime] = field(default_factory=list)
+    plug_known: bool = False  # the window comes from recorded plug-in times, not from the arrival
 
 
 def _house(grid: dict[datetime, float], car: dict[datetime, float], t: datetime) -> float | None:
@@ -108,7 +109,18 @@ def car_quarter_kw(car: dict[datetime, float], full_kw: float) -> dict[datetime,
     return out
 
 
-def find_sessions(grid: dict[datetime, float], car: dict[datetime, float], trips: list[datetime]) -> list[Session]:
+def _plug_interval(plugged: list[tuple[datetime, datetime | None]] | None, t: datetime):
+    """The recorded plug-in interval that contains the charging hour starting at `t` (or None)."""
+    for a, b in plugged or []:
+        if a < t + HOUR and (b is None or b > t):
+            return a, b
+    return None
+
+
+def find_sessions(grid: dict[datetime, float], car: dict[datetime, float], trips: list[datetime],
+                  plugged: list[tuple[datetime, datetime | None]] | None = None) -> list[Session]:
+    """Charging sessions with the window in which the car could have charged. With recorded plug-in times
+    (`plugged`, list of (in, out)) the window is the real one; without, the car counts as plugged in from arrival."""
     trips = sorted(trips)
     out: list[Session] = []
     for t in sorted(car):
@@ -131,6 +143,17 @@ def find_sessions(grid: dict[datetime, float], car: dict[datetime, float], trips
         if i > 0:
             earliest = max(earliest, out[i - 1].leave)
         s.window_start = min(s.start, earliest)
+        plug = _plug_interval(plugged, s.start)
+        if plug is not None:
+            a, b = plug
+            first_full = a.replace(minute=0, second=0, microsecond=0) + (HOUR if a.minute or a.second else timedelta(0))
+            s.window_start = min(s.start, max(first_full, out[i - 1].leave if i > 0 else first_full))
+            if b is not None:   # unplugged: the real end (never beyond the next session)
+                end = b.replace(minute=0, second=0, microsecond=0)
+                if i + 1 < len(out):
+                    end = min(end, out[i + 1].start)
+                s.leave = max(s.end + HOUR, end)
+            s.plug_known = True
         n = int((s.leave - s.window_start) / HOUR)
         s.hours = [s.window_start + k * HOUR for k in range(n)]
         s.grid_kwh = sum(_grid_part(grid, car, h) for h in s.hours)
@@ -182,12 +205,15 @@ def calculate(
     quarter_add_kw: float = 0.7,
     prices: Prices | None = None,
     measured_peaks: dict[str, float] | None = None,
+    plugged: list[tuple[datetime, datetime | None]] | None = None,
 ) -> dict[str, Any]:
-    """The comparison for the given history. `measured_peaks` (month -> kW, measured without a guard) checks the model."""
+    """The comparison for the given history. `measured_peaks` (month -> kW, measured without a guard) checks the model;
+    `plugged` (recorded plug-in times) makes the parking windows real instead of assumed."""
     hours = sorted(t for t in grid if t in car)
     days = len({t.date() for t in hours})
-    sessions = find_sessions(grid, car, trips)
-    result: dict[str, Any] = {"days": days, "sessions": len(sessions), "status": "ok", "strategies": {}, "months": []}
+    sessions = find_sessions(grid, car, trips, plugged)
+    result: dict[str, Any] = {"days": days, "sessions": len(sessions), "status": "ok", "strategies": {}, "months": [],
+                              "sessions_with_plug_times": sum(1 for s in sessions if s.plug_known)}
     if days < MIN_DAYS or len(sessions) < MIN_SESSIONS:
         result["status"] = "too_little_data"
         return result

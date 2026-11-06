@@ -18,14 +18,15 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
-    O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
 from .freshness import soc_is_stale
 from .history import records_from_hourly, to_km, to_kwh
 from .links import pick
-from .inputs import availability_from_attributes, departure_from_state, load_from_hours
+from .inputs import availability_from_attributes, departure_from_state, load_from_hours, merge_available, surplus_from_solar
+from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
 from .messages import notice_text
 from .need import MIN_SAMPLES, Need, compute_need
@@ -68,6 +69,9 @@ class Vehicle:
     load_used: bool = False
     potential: dict[str, Any] | None = None
     potential_at: datetime | None = None
+    plug_log: PlugLog = field(default_factory=PlugLog)
+    availability_source: str | None = None   # "entity", "solar", "entity+solar" or None
+    plug_seeding: bool = False               # the recorder history is being read: do not write meanwhile
 
 
 class Plugwhen:
@@ -81,6 +85,9 @@ class Plugwhen:
         self._pending = None
         self._store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.sent")
         self._sent: dict[str, list[str]] = {}
+        self._plug_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.plugs")
+        self._solar: dict[datetime, float] | None = None
+        self._solar_at: datetime | None = None
         for sub in entry.subentries.values():
             if sub.subentry_type == SUBENTRY_VEHICLE:
                 d = dict(sub.data)
@@ -91,6 +98,12 @@ class Plugwhen:
 
     async def async_start(self) -> None:
         self._sent = (await self._store.async_load() or {}).get("sent", {})
+        plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
+        for v in self.vehicles.values():
+            v.plug_log = PlugLog(plugs.get(v.sub_id))
+            if not v.plug_log.items and v.cfg.get(V_PLUGGED):   # first start: what the recorder still has (a few days)
+                v.plug_seeding = True
+                self.entry.async_create_background_task(self.hass, self._seed_plugs(v), f"{DOMAIN} plug history")
         self._unsub = async_track_time_interval(self.hass, self._tick, UPDATE_INTERVAL)
         watched = {self._load_entity(), self.entry.options.get(O_AVAIL)}
         for v in self.vehicles.values():
@@ -129,6 +142,9 @@ class Plugwhen:
 
     async def _tick(self, _now: datetime | None = None) -> None:
         now = dt_util.now()
+        if self.entry.options.get(O_SOLAR, True) and (self._solar_at is None or now - self._solar_at >= SOLAR_REFRESH):
+            self._solar_at = now
+            self._solar = await self._solar_kw()
         for v in self.vehicles.values():
             if v.history_at is None or now - v.history_at >= HISTORY_INTERVAL:
                 await self._load_history(v, now)
@@ -324,7 +340,7 @@ class Plugwhen:
         result = calculate_potential(
             grid, car, trips, full_kw=full, min_kw=float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
             fixed_kw=min(full, POTENTIAL_FIXED_KW), guard_kw=guard_kw, quarter_add_kw=POTENTIAL_QUARTER_ADD_KW,
-            prices=prices, measured_peaks=w.get("measured") or None,
+            prices=prices, measured_peaks=w.get("measured") or None, plugged=v.plug_log.intervals() or None,
         )
         result.update({
             "computed_at": now.isoformat(), "history_days": days,
@@ -359,14 +375,85 @@ class Plugwhen:
             target = None
         return (quarters or None), target
 
-    def _availability(self, now: datetime) -> dict[datetime, float] | None:
-        st = self._state(self.entry.options.get(O_AVAIL))
-        if st is None or st.state in _BAD:
+    async def _solar_kw(self) -> dict[datetime, float] | None:
+        """PV forecast per quarter hour from whatever solar forecast the Energy dashboard uses (Forecast.Solar, Solcast,
+        Open-Meteo ...). None without one: the plan then simply spreads (households without solar)."""
+        try:
+            from homeassistant.components.energy.data import async_get_manager
+            from homeassistant.components.energy.websocket_api import async_get_energy_platforms
+
+            manager = await async_get_manager(self.hass)
+            entries: list[str] = []
+            for source in (manager.data or {}).get("energy_sources", []):
+                if source.get("type") == "solar":
+                    entries += source.get("config_entry_solar_forecast") or []
+            if not entries:
+                return None
+            platforms = await async_get_energy_platforms(self.hass)
+            hourly: dict[datetime, float] = {}
+            for entry_id in entries:
+                ce = self.hass.config_entries.async_get_entry(entry_id)
+                if ce is None or ce.domain not in platforms:
+                    continue
+                forecast = await platforms[ce.domain](self.hass, entry_id)
+                for iso, wh in ((forecast or {}).get("wh_hours") or {}).items():
+                    t = dt_util.parse_datetime(iso)
+                    if t is not None:
+                        t = dt_util.as_local(t)
+                        hourly[t] = hourly.get(t, 0.0) + float(wh) / 1000.0
+            return {t.replace(minute=m): kw for t, kw in hourly.items() for m in (0, 15, 30, 45)} or None
+        except Exception as err:  # noqa: BLE001 - the sun is optional
+            _LOGGER.debug("Plugwhen: no solar forecast: %s", err)
             return None
-        return availability_from_attributes(dict(st.attributes), now)
+
+    def _availability(self, now: datetime) -> tuple[dict[datetime, float] | None, str | None]:
+        """Available power: the availability entity (if chosen) and the solar forecast (if on), the larger per quarter hour."""
+        from_entity = None
+        st = self._state(self.entry.options.get(O_AVAIL))
+        if st is not None and st.state not in _BAD:
+            from_entity = availability_from_attributes(dict(st.attributes), now)
+        from_sun = None
+        if self.entry.options.get(O_SOLAR, True):
+            from_sun = surplus_from_solar(self._solar, float(self.entry.options.get(O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT)), now)
+        source = "+".join(n for n, s in (("entity", from_entity), ("solar", from_sun)) if s) or None
+        return merge_available(from_entity, from_sun), source
+
+    # ---------- plug-in times ----------
+
+    async def _seed_plugs(self, v: Vehicle) -> None:
+        eid = v.cfg.get(V_PLUGGED)
+        now = dt_util.now()
+        try:
+            from homeassistant.components.recorder import get_instance, history
+
+            states = await get_instance(self.hass).async_add_executor_job(
+                lambda: history.get_significant_states(self.hass, now - timedelta(days=30), now, [eid],
+                                                       significant_changes_only=False, no_attributes=True))
+            seq = [(dt_util.as_local(s.last_changed), None if s.state in _BAD else s.state == "on") for s in states.get(eid, [])]
+            if v.plug_log.seed(seq):
+                self._save_plugs()
+                _LOGGER.debug("Plugwhen: %s plug-in times of %s taken from the recorder", len(v.plug_log.items), v.name)
+        except Exception as err:  # noqa: BLE001 - without the history the log simply starts now
+            _LOGGER.debug("Plugwhen: plug history of %s not readable: %s", v.name, err)
+        finally:
+            v.plug_seeding = False
+        self._compute(v, dt_util.now())   # catch up with the current state
+
+    def _track_plug(self, v: Vehicle, now: datetime) -> None:
+        st = self._state(v.cfg.get(V_PLUGGED))
+        if v.plug_seeding or st is None or v.plugged is None or v.plugged == v.plug_log.open:
+            return
+        when = dt_util.as_local(st.last_changed) if st.last_changed <= now else now
+        if v.plug_log.change(v.plugged, when):
+            v.plug_log.trim(now)
+            self._save_plugs()
+
+    def _save_plugs(self) -> None:
+        self._plug_store.async_delay_save(lambda: {"vehicles": {v.sub_id: v.plug_log.items for v in self.vehicles.values()}}, 10)
 
     def _compute(self, v: Vehicle, now: datetime) -> None:
         v.plugged = self._is_on(v.cfg.get(V_PLUGGED))
+        self._track_plug(v, now)
         v.charging = self._is_on(v.cfg.get(V_CHARGING)) is True
         v.soc = self._float(v.cfg.get(V_SOC))
         v.soc_age_s = self._age_s(v.cfg.get(V_SOC), now) if v.soc is not None else None
@@ -388,7 +475,7 @@ class Plugwhen:
             v.load_used = v.availability_used = False
             return
         load, target_kw = self._load_inputs(now)
-        avail = self._availability(now)
+        avail, v.availability_source = self._availability(now)
         v.load_used, v.availability_used = load is not None, avail is not None
         v.charge_plan = make_plan(
             now, v.departure or now, v.need.charge_kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),

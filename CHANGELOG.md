@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 (unreleased) - sun first, the rest spread, real plug-in times
+
+- **Sun first, the rest spread** (one logic for every household): the plan takes the expected solar surplus first while the
+  car is at home, and spreads what is left over the parking time with the lowest even grid import (house plus car topped
+  up to one level; quiet quarter hours get more). Before, the rest went into the quietest quarter hours at full power and,
+  without a load forecast, bunched at the end like a wallbox "ready by" at full current. Without solar the rest is simply
+  spread. Quarter hours below the wallbox minimum are dropped and the rest filled again.
+- **Solar forecast of the Energy dashboard** (option, default on): any forecast set up there (Forecast.Solar, Solcast,
+  Open-Meteo ...) counts as available power, minus a deduction for the house and a home battery (default 0.5 kW). An
+  availability entity, if chosen, is used as well (the larger value per quarter hour). Attribute `availability_source`.
+- **Plug-in times are written down** (when a plug entity is set): the recorder keeps them only for a few days, so Plugwhen
+  stores them itself (about a year; the first start takes what the recorder still has). The readiness sensor shows how the
+  car was plugged in over four weeks (`plugging`: plug-ins, nights plugged in, typical plug-in and unplug time). Nobody
+  plugs in every day: the warning *plug in* only comes when the reserve would not last.
+- **Potential calculator with real parking windows:** with recorded plug-in times the window starts at plugging in and ends
+  at unplugging instead of assuming "plugged in from arrival" (`sessions_with_plug_times`).
+
 ## 0.3.0 (unreleased) - potential calculator
 
 - **Potential calculator** (sensor *Potential of spreading the charging* per vehicle, service `plugwhen.calculate_potential`):

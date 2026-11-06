@@ -37,8 +37,11 @@ class PlanTest(unittest.TestCase):
         p = plan(load=load({**{h: 3.0 for h in range(17, 24)}, **{h: 3.0 for h in range(0, 8)}, **quiet}))
         self.assertEqual(p["status"], "planned")
         self.assertAlmostEqual(p["planned_kwh"], 24.0, places=1)
-        hours = {t.hour for t in p["quarters"]}
-        self.assertTrue(hours <= {1, 2, 3, 4, 5}, hours)    # the quiet 02-05 first, a little beyond
+        quiet_kw = [kw for t, kw in p["quarters"].items() if t.hour in quiet]
+        busy_kw = [kw for t, kw in p["quarters"].items() if t.hour not in quiet]
+        self.assertGreater(min(quiet_kw), max(busy_kw))     # the quiet 02-05 get the most
+        house = {t: (0.3 if t.hour in quiet else 3.0) for t in p["quarters"]}
+        self.assertLess(max(kw + house[t] for t, kw in p["quarters"].items()), 5.0)   # not 8 kW in three hours
         self.assertLessEqual(p["ready_at"], DEPART)
 
     def test_never_exceeds_the_peak_target(self):
@@ -63,10 +66,37 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(p["grid_kwh"], 0.0)
         self.assertTrue(all(t in avail for t in p["quarters"]))
 
-    def test_without_peak_target_and_equal_load_the_later_quarters_win(self):
-        p = plan(target_kw=None, load=load(default=1.0), need_kwh=5.5)   # 5.5 kWh at 11 kW = 2 quarters
-        self.assertEqual(len(p["quarters"]), 2)
+    def test_without_peak_target_the_rest_is_spread_not_bunched(self):
+        p = plan(target_kw=None, load=load(default=1.0), need_kwh=24.0)   # 24 kWh over ~14 h
+        self.assertAlmostEqual(p["planned_kwh"], 24.0, places=1)
+        self.assertLess(max(p["quarters"].values()), 2.5)                # not 11 kW at the end
+        self.assertGreater(len(p["quarters"]), 40)
+
+    def test_spread_tops_up_to_one_level(self):
+        busy = {h: 4.0 for h in (17, 18, 19, 20, 21)}                     # evening: the house uses a lot
+        p = plan(target_kw=None, load=load(busy, default=0.5), need_kwh=24.0)
+        totals = [kw + (4.0 if t.hour in busy else 0.5) for t, kw in p["quarters"].items()]
+        self.assertLess(max(totals) - min(totals), 0.05)                 # house plus car: one level everywhere
+        self.assertTrue(all(t.hour not in busy for t in p["quarters"]))
+
+    def test_small_need_uses_few_late_quarters_at_least_the_minimum(self):
+        p = plan(target_kw=None, load=load(default=1.0), need_kwh=5.5)
+        self.assertTrue(all(kw >= 1.4 for kw in p["quarters"].values()))
+        self.assertAlmostEqual(p["planned_kwh"], 5.5, places=1)
         self.assertEqual(p["ready_at"], DEPART)
+
+    def test_sun_first_then_spread_at_night(self):
+        avail = {datetime(2027, 1, 12, 18, 0, tzinfo=TZ) + timedelta(minutes=15 * i): 3.0 for i in range(4)}   # 18-19 h
+        p = plan(available_kw=avail, target_kw=None, load=load(default=0.5), need_kwh=20.0)
+        self.assertAlmostEqual(p["available_kwh"], 3.0, places=1)
+        self.assertAlmostEqual(p["planned_kwh"], 20.0, places=1)
+        night = [kw for t, kw in p["quarters"].items() if t not in avail]
+        self.assertLess(max(night), 2.5)
+
+    def test_without_sun_only_spread(self):
+        p = plan(available_kw=None, target_kw=None, load=None, need_kwh=20.0)
+        self.assertEqual(p["available_kwh"], 0.0)
+        self.assertLess(max(p["quarters"].values()), 2.0)
 
     def test_no_load_forecast_at_all_still_plans(self):
         p = plan(load=None, target_kw=None, need_kwh=11.0)

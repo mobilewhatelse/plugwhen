@@ -232,3 +232,19 @@ Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
   dessen Status-Sensor („greift ein", Attribut `interventions`, Sensor „Entlastung jetzt") als Erklärung und als Anstoß, sofort neu zu rechnen.
   Beide Integrationen bleiben einzeln voll lauffähig.
 
+
+## 21. Sonne zuerst, Rest verteilt, echte Steckzeiten (gebaut 06.11.2026, Version 0.4.0)
+- **Vorgaben des Nutzers 06.11.:** allgemeingültig (nicht jeder hat einen Fronius/Wattpilot, nicht jeder hat PV), **niemand steckt täglich an**,
+  lieber mit Sonne laden als nachts, aber beide Fälle müssen gehen (ohne PV wird nachts geladen).
+- **Eine Logik für alle:** (1) erwarteter Sonnenüberschuss zuerst, solange das Auto zu Hause steht; (2) der Rest über die Standzeit verteilt, mit dem
+  niedrigsten gleichmäßigen Netzbezug („Auffüllen wie Wasser": Haus plus Auto auf einen gemeinsamen Pegel, ruhige Viertelstunden bekommen mehr; Viertelstunden
+  unter dem Wallbox-Minimum fallen weg). Ohne PV entfällt (1). Vorher landete der Rest ohne Lastprognose mit voller Leistung am Ende – genau das Muster von
+  „Nächste Fahrt" beim Wattpilot, das die Spitzen verursacht.
+- **Sonne:** Solarprognose aus dem Energie-Dashboard (jede dort eingerichtete, Option Standard an) minus fester Abzug für Haus und Hausakku (Standard 0,5 kW).
+  Nicht die Lastprognose des Wächters abziehen: die ist Netzbezug, tagsüber ist die Sonne darin schon verrechnet (sonst doppelt).
+- **Steckzeiten:** Recorder hält den Stecker-Verlauf nur ~10 Tage, Binärsensoren haben keine Langzeitstatistik → Plugwhen schreibt An/Ab selbst mit (Store, ~1 Jahr,
+  Erststart aus dem Recorder), Zusammenfassung am Bereitschafts-Sensor (`plugging`). Der Potenzialrechner nimmt damit die echten Fenster statt „ab Ankunft".
+- **Befund beim Autor (27.10.–06.11.):** von 10 Nächten 5 angesteckt, dann jeweils gleich bei der Ankunft (19:15 nach Ankunft 19:12, 18:01 nach 18:00); tagsüber
+  mehrmals mit Sonne. Die Annahme „angesteckt ab Ankunft" stimmte für die Nächte mit Ladung. Für Nutzer heißt das: **nichts ändern, normal anstecken**;
+  „Bitte anstecken" kommt nur, wenn die Reserve nicht reicht.
+- Plugwhen steuert weiterhin **nicht** (Stufe 0.5); der Plan ist Anzeige und Schnittstelle (`windows`).

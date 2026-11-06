@@ -47,6 +47,25 @@ class SessionTest(unittest.TestCase):
         self.assertEqual(s[1].leave.hour, 7)
         self.assertAlmostEqual(s[1].grid_kwh, 20.0, places=3)
 
+    def test_recorded_plug_times_make_the_window_real(self):
+        grid, car, trips = household(days=3, charge_hours=(4, 5), kwh_per_hour=LATE)
+        day = D0 + timedelta(days=1)
+        plugged = [(day - timedelta(hours=1, minutes=40), day + timedelta(hours=6, minutes=50))]   # 22:20 to 06:50
+        s = find_sessions(grid, car, trips, plugged)
+        self.assertTrue(s[1].plug_known)
+        self.assertEqual(s[1].window_start.hour, 23)                     # first full hour after plugging in
+        self.assertEqual(s[1].leave.hour, 6)                             # unplugged at 06:50
+        self.assertFalse(s[0].plug_known)                                # no record: assumed from arrival
+        self.assertEqual(s[2].window_start.hour, 18)
+
+    def test_plugged_in_late_means_little_to_spread(self):
+        grid, car, trips = household(days=21, charge_hours=(4, 5), kwh_per_hour=LATE)
+        plugged = [(D0 + timedelta(days=d, hours=3, minutes=55), D0 + timedelta(days=d, hours=6, minutes=50)) for d in range(21)]
+        free = calculate(grid, car, trips, prices=AT)
+        late = calculate(grid, car, trips, prices=AT, plugged=plugged)
+        self.assertEqual(late["sessions_with_plug_times"], late["sessions"])
+        self.assertGreater(late["peak_spread_kw"], free["peak_spread_kw"] + 2)   # only 4-6 h to spread in
+
     def test_windows_never_overlap(self):
         grid, car, trips = household(days=5)
         s = find_sessions(grid, car, trips)
