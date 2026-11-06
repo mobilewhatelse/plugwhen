@@ -2,8 +2,8 @@
 
 # Plugwhen
 
-> **Status: version 0.4.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
-> recorded plug-in times, potential calculator, ready-made dashboard). It **plans and shows**, it does not control the
+> **Status: version 0.5.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
+> recorded plug-in times, potential calculator, ready-made dashboard, learn mode). It **plans and shows**, it does not control the
 > wallbox yet. Private repository. German guide: [docs/ANLEITUNG.md](docs/ANLEITUNG.md).
 
 *Plugwhen*: it works out **when to plug in**, so the car is ready when you leave.
@@ -113,6 +113,26 @@ potential with the comparison table, plug-in times, settings and the learned wee
 Settings → Dashboards → Add dashboard, open it, three dots → Edit → three dots → Raw configuration editor, paste, save. The service
 **never writes into an existing dashboard**. Create it again after adding a vehicle.
 
+## Learn mode
+
+Per car the select *Mode* has two settings today: **Off** and **Learn** (default; the last choice is kept over a restart). In **Learn**
+mode Plugwhen **switches nothing**. It only works out, for every moment, what it *would* do and writes it down:
+
+- the sensor **Would switch** says `charge`, `pause` or `none` (no decision), with the reason (in a planned window, waiting for the next
+  window, the plan is done, the target is tight so as much as possible at once, state of charge unknown, car not plugged in, nothing
+  needed), when it expects the decision to change, and the planned power;
+- a **journal** of the last decisions (only changes are written down);
+- a **comparison with reality** per day (kept for 60 days), if you set the *charging* entity and/or the *wallbox energy counter*: how long
+  the decision and the wallbox agreed, how many hours the wallbox charged although Plugwhen would have paused, and how much energy came in
+  those hours, and the other way round. Example: *would have paused 3 h, but 9 kWh came in*.
+
+Unknown things are never decisions: unknown state of charge, car not plugged in, nothing to charge, no departure give *no decision* and
+the wallbox keeps doing what it does. A target that cannot be reached by departure gives `charge` at once (never wait when time is short).
+
+This is the evidence on which switching can be offered later: only when the log shows that Plugwhen's decisions would have been right
+for several days. **Switching itself is not built yet.** The dashboard has a *Learn mode* card with the decision, the comparison of the
+last 7 days and the journal.
+
 ## Entities per vehicle
 
 | Entity | |
@@ -122,6 +142,8 @@ Settings → Dashboards → Add dashboard, open it, three dots → Edit → thre
 | `sensor` Ready for departure | see *The warning*; attribute `plugging` |
 | `sensor` Potential of spreading the charging | see *Potential calculator* |
 | `sensor` Learned days | attribute `week` |
+| `sensor` Would switch | learn mode: `charge`, `pause`, `none`, `off`; attributes `reason`, `planned_kw`, `until`, `summary`, `journal` |
+| `select` Mode | `off` or `learn` |
 | `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready | settings |
 
 ## Limits

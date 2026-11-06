@@ -176,6 +176,15 @@
           "unknown_soc": "Ladestand unbekannt"
         }
       },
+      "would_switch": {
+        "name": "Würde schalten",
+        "state": {
+          "charge": "laden",
+          "pause": "pausieren",
+          "none": "keine Entscheidung",
+          "off": "aus"
+        }
+      },
       "potential": {
         "name": "Potenzial durch verteiltes Laden",
         "state": {
@@ -209,6 +218,15 @@
     "number": {
       "reserve_km": {
         "name": "Reserve"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Betriebsart",
+        "state": {
+          "off": "Aus",
+          "learn": "Lernen"
+        }
       }
     }
   }

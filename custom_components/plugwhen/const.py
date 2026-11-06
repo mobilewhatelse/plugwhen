@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 DOMAIN = "plugwhen"
-PLATFORMS = ["number", "sensor", "switch"]
+PLATFORMS = ["number", "select", "sensor", "switch"]
 UPDATE_INTERVAL = timedelta(minutes=5)      # recompute the need from the current state of charge
 HISTORY_INTERVAL = timedelta(hours=1)       # read the long-term statistics again
 HISTORY_DAYS = 120
@@ -53,5 +53,8 @@ POTENTIAL_INTERVAL = timedelta(hours=24)
 POTENTIAL_FIXED_KW = 4.1                   # "ready by" of the wallbox with 6 A on three phases
 POTENTIAL_QUARTER_ADD_KW = 0.7             # how far the house goes above its hourly mean within an hour (measured 0.68 kW)
 POTENTIAL_STATES = ["worth_it", "setting_enough", "little", "too_little_data", "no_data"]
+MODES = ["off", "learn"]                       # "switch" follows when the wallbox can be switched (0.6)
+DEFAULT_MODE = "learn"
+WOULD_STATES = ["charge", "pause", "none", "off"]
 PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure", "unknown_soc"]
 READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable", "unknown"]

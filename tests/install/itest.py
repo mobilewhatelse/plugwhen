@@ -177,7 +177,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 11, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 13, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
@@ -236,11 +236,32 @@ def main():
     # plugged in and a plan: ready; unplug: the warning to plug in
     ok = wait_for(lambda: state(rdid)["state"] == "ready", 30)
     log(bool(ok), "plugged in with a plan: ready for departure", state(rdid)["state"])
+
+    # learn mode: default on, says what it would switch, switches nothing
+    mode_s = find("select", "mode")
+    would_s = find("sensor", "would_switch")
+    log(bool(mode_s) and bool(would_s), "mode select and the sensor 'would switch' exist")
+    if mode_s and would_s:
+        mid, wid = mode_s["entity_id"], would_s["entity_id"]
+        log(state(mid)["state"] == "learn", "the mode is learn by default", state(mid)["state"])
+        ok = wait_for(lambda: state(wid)["state"] in ("charge", "pause"), 30)
+        wa = state(wid)["attributes"]
+        log(bool(ok) and wa.get("reason") in ("in_window", "waiting_for_window", "plan_done", "cannot_reach_target") and "summary" in wa,
+            "plugged in with a plan: it says charge or pause with a reason and a summary", f"{state(wid)['state']} / {wa.get('reason')}")
     # the first plug-in warning went out earlier, while the battery was low and the car not plugged in
     log((num("counter.meldungen") or 0) == 1, "the warning went out once while the car was unplugged and short", f"counter {num('counter.meldungen')}")
     svc("input_boolean", "turn_off", {"entity_id": "input_boolean.auto_angesteckt"})
     ok = wait_for(lambda: state(rdid)["state"] == "plug_in", 30)
     log(bool(ok), "unplugged: readiness says plug in", state(rdid)["state"])
+    if mode_s and would_s:
+        ok = wait_for(lambda: state(wid)["state"] == "none" and state(wid)["attributes"].get("reason") == "not_plugged", 30)
+        log(bool(ok), "unplugged: no decision (the wallbox keeps doing what it does)", f"{state(wid)['state']} / {state(wid)['attributes'].get('reason')}")
+        svc("select", "select_option", {"entity_id": mid, "option": "off"})
+        ok = wait_for(lambda: state(wid)["state"] == "off", 30)
+        log(bool(ok), "mode off: the sensor says off", state(wid)["state"])
+        svc("select", "select_option", {"entity_id": mid, "option": "learn"})
+        ok = wait_for(lambda: state(wid)["state"] != "off", 30)
+        log(bool(ok), "mode learn again: it decides again", state(wid)["state"])
     text = state("input_text.meldung")["state"].lower()
     log("anstecken" in text or "plug in" in text, "text of the warning", text[:90])
     svc("number", "set_value", {"entity_id": resid, "value": 150})
@@ -365,6 +386,8 @@ def main():
 
     # ---------- restart: settings are restored ----------
     svc("switch", "turn_off", {"entity_id": lid})
+    if mode_s:
+        svc("select", "select_option", {"entity_id": mid, "option": "off"})
     time.sleep(2)
     subprocess.run(["docker", "restart", CONTAINER], check=False, capture_output=True)
     time.sleep(20)
@@ -372,6 +395,9 @@ def main():
     ok = wait_for(lambda: num(resid) is not None, 120)
     log(bool(ok) and num(resid) == 100.0, "reserve is restored (the value set last)", str(num(resid)))
     log(state(lid)["state"] == "off", "learning switch state is restored (off)")
+    if mode_s:
+        ok = wait_for(lambda: (state(mid) or {}).get("state") == "off", 30)
+        log(bool(ok), "the mode is restored after the restart (off, as chosen)", str((state(mid) or {}).get("state")))
     ok = wait_for(lambda: (state(rdid)["attributes"].get("plugging") or {}).get("recorded_since") is not None, 60)
     plg2 = state(rdid)["attributes"].get("plugging") or {}
     log(bool(ok) and plg2.get("recorded_since") == plg.get("recorded_since") and plg2.get("plug_ins", 0) >= plg.get("plug_ins", 0),

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 (unreleased) - learn mode
+
+- **Mode per car** (select, *Off* or *Learn*, default Learn, the last choice survives a restart) and the sensor **Would switch**:
+  in learn mode Plugwhen switches nothing, it works out what it *would* do (charge, pause, no decision, with the reason, until when,
+  planned power) and writes it down. Unknown state of charge, a car that is not plugged in, nothing to charge or no departure are never
+  decisions; a target that cannot be reached gives *charge* at once.
+- **Comparison with reality** (needs the charging entity and/or the wallbox energy counter): per day how long decision and wallbox
+  agreed, hours the wallbox charged although Plugwhen would have paused and the energy that came in, and the other way round; journal of
+  the last decisions; both kept in a small store (60 days). Gaps longer than 20 minutes (restart, outage) are not attributed.
+- Dashboard: card *Learn mode* (decision with reason, comparison of the last 7 days, journal, mode). Documentation: section *Learn mode*.
+- Preparation for switching (planned): the log is the evidence on which it can be offered; switching itself is not built yet.
+
 ## 0.4.0 (unreleased) - sun first, the rest spread, real plug-in times
 
 - **Sun first, the rest spread** (one logic for every household): the plan takes the expected solar surplus first while the

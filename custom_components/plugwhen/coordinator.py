@@ -16,7 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
+    DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_MODE, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
     O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
@@ -32,6 +32,7 @@ from .messages import notice_text
 from .need import MIN_SAMPLES, Need, compute_need
 from .notice import Notice, check_ready, dedupe_key, should_check
 from .plan import make_plan
+from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ class Vehicle:
     plug_log: PlugLog = field(default_factory=PlugLog)
     availability_source: str | None = None   # "entity", "solar", "entity+solar" or None
     plug_seeding: bool = False               # the recorder history is being read: do not write meanwhile
+    mode: str = DEFAULT_MODE                 # "off" or "learn" (nothing is switched in either)
+    decision: Decision | None = None         # what would be switched now (learn mode)
+    shadow: ShadowLog = field(default_factory=ShadowLog)
 
 
 class Plugwhen:
@@ -86,6 +90,7 @@ class Plugwhen:
         self._store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.sent")
         self._sent: dict[str, list[str]] = {}
         self._plug_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.plugs")
+        self._shadow_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.shadow")
         self._solar: dict[datetime, float] | None = None
         self._solar_at: datetime | None = None
         for sub in entry.subentries.values():
@@ -99,6 +104,9 @@ class Plugwhen:
     async def async_start(self) -> None:
         self._sent = (await self._store.async_load() or {}).get("sent", {})
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
+        shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
+        for v in self.vehicles.values():
+            v.shadow = ShadowLog(shadows.get(v.sub_id))
         for v in self.vehicles.values():
             v.plug_log = PlugLog(plugs.get(v.sub_id))
             if not v.plug_log.items and v.cfg.get(V_PLUGGED):   # first start: what the recorder still has (a few days)
@@ -452,6 +460,25 @@ class Plugwhen:
         self._plug_store.async_delay_save(lambda: {"vehicles": {v.sub_id: v.plug_log.items for v in self.vehicles.values()}}, 10)
 
     def _compute(self, v: Vehicle, now: datetime) -> None:
+        self._compute_plan(v, now)
+        self._shadow_step(v, now)
+
+    def _shadow_step(self, v: Vehicle, now: datetime) -> None:
+        """Learn mode: the decision Plugwhen would take now, written down and compared with the real wallbox. Nothing is switched."""
+        if v.mode != "learn":
+            v.decision = None
+            return
+        v.decision = decide(v.charge_plan, now, v.plugged, v.soc is not None)
+        charging = self._is_on(v.cfg.get(V_CHARGING)) if v.cfg.get(V_CHARGING) else None
+        energy = None
+        wb = v.cfg.get(V_WALLBOX_ENERGY)
+        if wb:
+            energy = to_kwh(self._float(wb), self._unit(wb))
+        if v.shadow.update(now, v.decision, charging, energy):
+            self._shadow_store.async_delay_save(
+                lambda: {"vehicles": {x.sub_id: x.shadow.to_dict() for x in self.vehicles.values()}}, 30)
+
+    def _compute_plan(self, v: Vehicle, now: datetime) -> None:
         v.plugged = self._is_on(v.cfg.get(V_PLUGGED))
         self._track_plug(v, now)
         v.charging = self._is_on(v.cfg.get(V_CHARGING)) is True

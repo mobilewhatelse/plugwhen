@@ -48,6 +48,7 @@ EN = dict(
     od_pthr="kW from which the higher price applies. 0 = one price.",
     sv_name="Calculate the potential", sv_desc="Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
     sv_days="Days", sv_days_d="How far back (14 to 365 days, default 90).",
+    m_mode="Mode", m_off="Off", m_learn="Learn", s_would="Would switch", w_charge="charge", w_pause="pause", w_none="no decision", w_off="off",
     sd_name="Create the dashboard", sd_desc="Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only.",
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
@@ -95,6 +96,7 @@ DE = dict(
     od_pthr="kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
     sv_name="Potenzial berechnen", sv_desc="Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
     sv_days="Tage", sv_days_d="Wie weit zurück (14 bis 365 Tage, Standard 90).",
+    m_mode="Betriebsart", m_off="Aus", m_learn="Lernen", s_would="Würde schalten", w_charge="laden", w_pause="pausieren", w_none="keine Entscheidung", w_off="aus",
     sd_name="Dashboard erstellen", sd_desc="Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation (alle Fahrzeuge) und gibt es als YAML zurück, auch als Benachrichtigung, zum Einfügen in ein neues Dashboard (Bearbeiten, Raw-Konfigurationseditor). Nur Standardkarten. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren.",
     sw_learn="Kilometer je Wochentag lernen", sw_notice="Warnen, wenn das Auto nicht bereit sein wird", n_res="Reserve",
 )
@@ -136,6 +138,7 @@ def build(L):
                 "charge_plan": {"name": L["s_plan"], "state": {"planned": L["plan_planned"], "not_needed": L["plan_not_needed"],
                                                                "infeasible": L["plan_infeasible"], "no_departure": L["plan_no_departure"],
                                                                "unknown_soc": L["plan_unknown"]}},
+                "would_switch": {"name": L["s_would"], "state": {"charge": L["w_charge"], "pause": L["w_pause"], "none": L["w_none"], "off": L["w_off"]}},
                 "potential": {"name": L["s_pot"], "state": {"worth_it": L["p_worth"], "setting_enough": L["p_setting"], "little": L["p_little"],
                                                            "too_little_data": L["p_few"], "no_data": L["p_nodata"]}},
                 "readiness": {"name": L["s_ready"], "state": {"ready": L["r_ready"], "plug_in": L["r_plug"], "low": L["r_low"],
@@ -143,6 +146,7 @@ def build(L):
             },
             "switch": {"learn_km": {"name": L["sw_learn"]}, "notice_enabled": {"name": L["sw_notice"]}},
             "number": {"reserve_km": {"name": L["n_res"]}},
+            "select": {"mode": {"name": L["m_mode"], "state": {"off": L["m_off"], "learn": L["m_learn"]}}},
         },
     }
 

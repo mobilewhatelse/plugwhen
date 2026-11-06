@@ -176,6 +176,15 @@
           "unknown_soc": "State of charge unknown"
         }
       },
+      "would_switch": {
+        "name": "Would switch",
+        "state": {
+          "charge": "charge",
+          "pause": "pause",
+          "none": "no decision",
+          "off": "off"
+        }
+      },
       "potential": {
         "name": "Potential of spreading the charging",
         "state": {
@@ -209,6 +218,15 @@
     "number": {
       "reserve_km": {
         "name": "Reserve"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "off": "Off",
+          "learn": "Learn"
+        }
       }
     }
   }

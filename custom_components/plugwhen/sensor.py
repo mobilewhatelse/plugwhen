@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import PlugwhenEntry
-from .const import PLAN_STATES, POTENTIAL_STATES, READINESS_STATES
+from .const import PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
 
 
@@ -27,6 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             ChargePlanSensor(plug, v),
             ReadinessSensor(plug, v),
             PotentialSensor(plug, v),
+            WouldSwitchSensor(plug, v),
             WeekPlanSensor(plug, v),
         ], config_subentry_id=sub_id)
 
@@ -227,4 +228,35 @@ class WeekPlanSensor(PlugwhenEntity, SensorEntity):
             "history_error": v.history_error,
             "consumption_kwh_per_km": round(v.consumption, 3),
             "consumption_learned": v.model.consumption_known,
+        }
+
+
+class WouldSwitchSensor(PlugwhenEntity, SensorEntity):
+    """Learn mode: what Plugwhen WOULD do right now (charge, pause, none = no decision, off = mode off). Nothing is switched.
+    The attributes give the reason, when it is expected to change, the journal of the last decisions and how they compare with
+    what the wallbox really did over the last days."""
+
+    _unrecorded_attributes = frozenset({"journal"})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = WOULD_STATES
+    _attr_icon = "mdi:eye-outline"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "would_switch")
+
+    @property
+    def native_value(self) -> str:
+        d = self.vehicle.decision
+        return "off" if self.vehicle.mode != "learn" or d is None else d.action
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        v = self.vehicle
+        d = v.decision
+        iso = lambda t: t.isoformat() if t else None  # noqa: E731
+        if v.mode != "learn" or d is None:
+            return {"mode": v.mode}
+        return {
+            "mode": v.mode, "reason": d.reason, "planned_kw": d.kw, "until": iso(d.until),
+            "summary": v.shadow.summary(dt_util.now()), "journal": v.shadow.journal[-12:][::-1],
         }

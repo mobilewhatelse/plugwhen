@@ -1,6 +1,6 @@
 # Plugwhen – Anleitung (Deutsch)
 
-Stand: Version 0.4.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+Stand: Version 0.5.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
 
 ## Wofür?
 
@@ -112,6 +112,26 @@ Vergleichstabelle, Steckzeiten, Einstellungen und gelernte Woche. Nur Standardka
 **So geht's:** Entwicklerwerkzeuge → Aktionen → *Dashboard erstellen* ausführen, das YAML aus der Antwort oder der Benachrichtigung kopieren.
 Dann Einstellungen → Dashboards → Dashboard hinzufügen, öffnen, drei Punkte → Bearbeiten → drei Punkte → Roher Konfigurationseditor, einfügen,
 speichern. Der Dienst **schreibt nie in ein bestehendes Dashboard**. Nach dem Hinzufügen eines Fahrzeugs neu erstellen.
+
+## Lernmodus
+
+Je Auto hat die Auswahl *Betriebsart* heute zwei Stellungen: **Aus** und **Lernen** (Standard; die letzte Wahl bleibt über einen Neustart
+erhalten). Im Lernmodus **schaltet Plugwhen nichts**. Es berechnet nur für jeden Moment, was es tun *würde*, und schreibt es auf:
+
+- der Sensor **Würde schalten** sagt `laden`, `pausieren` oder `keine Entscheidung`, mit Grund (im geplanten Fenster, wartet auf das nächste
+  Fenster, der Plan ist abgearbeitet, das Ziel ist knapp also so viel wie möglich sofort, Ladestand unbekannt, Auto nicht angesteckt, nichts
+  nötig), wann sich die Entscheidung voraussichtlich ändert und mit welcher Leistung;
+- ein **Protokoll** der letzten Entscheidungen (nur Änderungen werden notiert);
+- ein **Vergleich mit der Wirklichkeit** je Tag (60 Tage aufgehoben), wenn Sie die Entität *lädt gerade* und/oder den *Energiezähler der
+  Wallbox* eingetragen haben: wie lange Entscheidung und Wallbox übereinstimmten, wie viele Stunden die Wallbox lud, obwohl Plugwhen
+  pausiert hätte, und wie viel Energie in diesen Stunden kam, und umgekehrt. Beispiel: *hätte 3 h pausiert, aber 9 kWh kamen an*.
+
+Unbekanntes ist nie eine Entscheidung: unbekannter Ladestand, Auto nicht angesteckt, nichts zu laden, keine Abfahrt ergeben *keine Entscheidung*,
+die Wallbox macht weiter, was sie macht. Ein Ziel, das bis zur Abfahrt nicht erreichbar ist, ergibt `laden` sofort (nie warten, wenn die Zeit knapp ist).
+
+Das ist der Beleg, auf dem das Schalten später angeboten werden kann: erst wenn das Protokoll zeigt, dass die Entscheidungen von Plugwhen
+mehrere Tage lang richtig gewesen wären. **Das Schalten selbst ist noch nicht gebaut.** Das Dashboard hat eine Karte *Lernmodus* mit der
+Entscheidung, dem Vergleich der letzten 7 Tage und dem Protokoll.
 
 ## Grenzen
 
