@@ -196,3 +196,25 @@ Plugwhen kann auch mit Stundenwerten arbeiten (Lernen aus der Langzeitstatistik,
 **Ehrliche Aussage in der Anleitung:** was der Modus kann (Laden in ruhige Zeiten, Strom begrenzen, Warnung) und was nicht (kurzfristige Spitzen, Echtzeit-Schutz).
 **Voraussetzung:** mindestens Stundenwerte des Netzbezugs als Statistik; bessere Prognose mit 15-Minuten-Werten.
 
+
+## 19. Was bringt es wirklich? Ergebnis einer Auswertung mit echten Daten (06.11.2026)
+Simulation auf den Stundenwerten eines Haushalts (Netzbezug, Wallbox, Kilometerstand; zwei Monate), kalibriert mit Viertelstundenwerten; das Modell trifft die
+gemessenen Spitzen ohne Steuerung auf etwa ±0,7 kW. Verglichen wurden: ohne Steuerung, nur Wächter (verschiedene Grenzen), nur Planer (Laden gleichmäßig über
+die Standzeit verteilt, ohne Echtzeit), Planer + Wächter, nur Wallbox-Einstellung („fertig bis“ mit kleinem Strom).
+
+**Allgemeine Schlüsse (Mechanismen, nicht Zahlen):**
+1. Spitzen entstehen, wenn das Auto in einem kurzen Fenster mit voller Leistung lädt (spät vor der Abfahrt oder sofort beim Heimkommen).
+2. Der größte Hebel ist das **Verteilen der Ladeenergie über die Standzeit**. Es senkt die Spitze stärker als eine niedrige Wächter-Grenze und braucht keine
+   Echtzeitdaten. Ein Wächter allein kann einen späten Ladebeginn nur drosseln; mit niedriger Grenze wird das Auto dann nicht fertig.
+3. Der Wert hängt ab von: Tarif (€/kW, Schwellen), Energiebedarf im Verhältnis zur Standzeit, Hauslast, und ob die Wallbox selbst „fertig bis“ mit
+   einstellbarem Strom kann (dann holt man viel schon ohne Software).
+4. Warnung „nicht bereit“ und das Lernen der Kilometer bringen wenig; Abfahrtszeit und Standzeit zählen.
+5. Der Echtzeit-Wächter bleibt der Schutz vor ungeplanten Spitzen (Herd, Trockner) und lohnt sich zusätzlich.
+
+**Folgerung für Plugwhen:** Zuerst ein **Potenzialrechner** (jeder Nutzer bekommt diese Rechnung auf seinen eigenen Daten: Spitze und Kosten mit und ohne
+verteiltes Laden, wie oft das Auto fertig wird, ob eine Wallbox-Einstellung reicht). Danach die Steuerung (0.3): Bedarf gleichmäßig bis zur Abfahrt verteilen,
+mit Aufholregel; eine Last-Prognose ist dafür nicht nötig.
+
+**Für den Betrieb ohne Wächter fehlt:** Steuerung der Wallbox über Entitäten (Strom, Phasen, Start/Stopp) oder über deren „fertig bis“-Funktion, Aufholregel
+(liegt die Ladung hinter dem Plan → hochregeln; sehr niedriger Ladestand → sofort laden), Rückfallregeln (Auto lädt bei kleinem Strom nicht, Ladestand unbekannt),
+Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
