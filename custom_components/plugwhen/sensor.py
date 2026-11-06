@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import PlugwhenEntry
-from .const import PLAN_STATES, READINESS_STATES
+from .const import PLAN_STATES, POTENTIAL_STATES, READINESS_STATES
 from .entity import PlugwhenEntity
 
 
@@ -25,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             DepartureSensor(plug, v),
             ChargePlanSensor(plug, v),
             ReadinessSensor(plug, v),
+            PotentialSensor(plug, v),
             WeekPlanSensor(plug, v),
         ], config_subentry_id=sub_id)
 
@@ -161,6 +162,35 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
         n = self.vehicle.notice
         return {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None,
                 "soc_stale": self.vehicle.soc_stale}
+
+
+class PotentialSensor(PlugwhenEntity, SensorEntity):
+    """What spreading the charging would bring in this household, from its own history (an estimate, see potential.py).
+    State: worth_it, setting_enough (the wallbox's own "ready by" with a low current is about as good), little,
+    too_little_data, no_data (an entity is missing)."""
+
+    _unrecorded_attributes = frozenset({"strategies"})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = POTENTIAL_STATES
+    _attr_icon = "mdi:chart-bell-curve-cumulative"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "potential")
+
+    @property
+    def native_value(self) -> str | None:
+        p = self.vehicle.potential
+        if not p:
+            return None
+        return p.get("verdict") if p.get("status") == "ok" else p.get("status")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        p = self.vehicle.potential or {}
+        keys = ("saving_spread_per_year", "saving_spread_vs_guard_per_year", "peak_as_is_kw", "peak_spread_kw", "days", "sessions",
+                "session_kwh_median", "window_h_median", "model_error_kw", "computed_at", "history_days", "sources", "missing", "error",
+                "strategies")
+        return {k: p.get(k) for k in keys if k in p}
 
 
 class WeekPlanSensor(PlugwhenEntity, SensorEntity):

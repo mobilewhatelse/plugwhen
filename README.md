@@ -2,7 +2,7 @@
 
 # Plugwhen
 
-> **Status: version 0.2.0 in development (learned week, need, charge plan and the warning that the car will not be ready; it does not control the wallbox yet). Private repository.**
+> **Status: version 0.3.0 in development (learned week, need, charge plan, warning, and a potential calculator that shows from your own data what spreading the charging would bring; it does not control the wallbox yet). Private repository.**
 
 *Plugwhen*: it works out **when to plug in**, so the car is ready when you leave.
 

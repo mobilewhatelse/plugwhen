@@ -13,7 +13,11 @@ SUBENTRY_VEHICLE = "vehicle"
 # general options (entry.options): optional connections to other integrations, by entity
 O_WAECHTER = "waechter_entry"             # the quarter-hour peak guard (a config entry): its load forecast is found automatically
 O_LOAD = "load_entity"                    # sensor with the expected house load (attributes `hours`, `target_kw`), e.g. of the peak guard
-O_AVAIL = "availability_entity"           # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
+O_AVAIL = "availability_entity"
+O_GRID_ENERGY = "grid_energy_entity"       # grid import energy counter (for the potential calculator); taken from the guard if chosen
+O_PRICE_LOW = "price_low"                  # demand charge per kW and year (up to the threshold); taken from the guard if empty
+O_PRICE_HIGH = "price_high"                # ... above the threshold
+O_PRICE_THRESHOLD = "price_threshold"      # kW, 0 = one price           # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
 
 # vehicle settings (subentry data)
 V_NAME = "name"
@@ -40,5 +44,10 @@ DEFAULT_CHARGE_MAX = 11.0
 DEFAULT_CHARGE_MIN = 1.4
 DEFAULT_NOTIFY_HOUR = 19
 
+POTENTIAL_DAYS = 90
+POTENTIAL_INTERVAL = timedelta(hours=24)
+POTENTIAL_FIXED_KW = 4.1                   # "ready by" of the wallbox with 6 A on three phases
+POTENTIAL_QUARTER_ADD_KW = 0.7             # how far the house goes above its hourly mean within an hour (measured 0.68 kW)
+POTENTIAL_STATES = ["worth_it", "setting_enough", "little", "too_little_data", "no_data"]
 PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure", "unknown_soc"]
 READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable", "unknown"]

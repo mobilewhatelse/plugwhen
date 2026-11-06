@@ -15,7 +15,8 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
-    DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
+    DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
+    O_PRICE_THRESHOLD, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
 
@@ -100,6 +101,10 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_WAECHTER, current): ConfigEntrySelector(ConfigEntrySelectorConfig(integration=WAECHTER_DOMAIN)),
             _opt(O_LOAD, current): _ent("sensor"),
             _opt(O_AVAIL, current): _ent("sensor"),
+            _opt(O_GRID_ENERGY, current): _ent("sensor", "energy"),
+            _opt(O_PRICE_LOW, current): _num(0, 5000, 0.01, "/kW/a"),
+            _opt(O_PRICE_HIGH, current): _num(0, 5000, 0.01, "/kW/a"),
+            _opt(O_PRICE_THRESHOLD, current): _num(0, 100, 0.1, "kW"),
         }))
 
 

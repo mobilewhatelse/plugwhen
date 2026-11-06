@@ -218,3 +218,17 @@ mit Aufholregel; eine Last-Prognose ist dafür nicht nötig.
 **Für den Betrieb ohne Wächter fehlt:** Steuerung der Wallbox über Entitäten (Strom, Phasen, Start/Stopp) oder über deren „fertig bis“-Funktion, Aufholregel
 (liegt die Ladung hinter dem Plan → hochregeln; sehr niedriger Ladestand → sofort laden), Rückfallregeln (Auto lädt bei kleinem Strom nicht, Ladestand unbekannt),
 Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
+
+## 20. Potenzialrechner gebaut (06.11.2026) und Regel für die Steuerung (0.3)
+- `potential.py` (rein Python, Tests) + Sensor *Potenzial durch verteiltes Laden* + Dienst `plugwhen.calculate_potential`. Rechnet täglich und auf Abruf,
+  nur lesend, aus der Langzeitstatistik (Netzbezug, Wallbox-Zähler, Kilometerstand, 90 Tage). Übernimmt Zähler, Preise, Grenze und Monatsspitzen vom gewählten Wächter.
+  Am Wächter muss dafür **nichts** geändert werden.
+- Mit den Daten des Autors deckt sich das Modul mit der Auswertung (verteilt 212 €/Jahr, Wallbox-Einstellung 201, Wächter allein 321, wie bisher 492;
+  Ersparnis verteilt ≈ 280 €/Jahr gegen wie bisher, ≈ 109 €/Jahr gegen Wächter allein; Urteil „lohnt sich").
+- **Regel für 0.3 (Nutzer 06.11.):** Der Wächter steuert weiter in Echtzeit, sobald eine Spitze droht, und hat das letzte Wort (begrenzt nur nach unten, der kleinere
+  Wert gilt). Drosselt er, muss Plugwhen den Rest **neu verteilen** (Aufholen bis zur Abfahrt) und bei Bedarf „zu spät" melden.
+- **Wie Plugwhen vom Drosseln erfährt (Nutzer 06.11.):** nur über Entitäten, am Wächter wird nichts geändert. Hauptweg: Plugwhen vergleicht, was tatsächlich
+  angekommen ist (Wallbox-Zähler, Ladestand), mit dem Plan und holt auf, egal warum es weniger war (Wächter, Auto, Wallbox). Zusatz, wenn der Wächter gewählt ist:
+  dessen Status-Sensor („greift ein", Attribut `interventions`, Sensor „Entlastung jetzt") als Erklärung und als Anstoß, sofort neu zu rechnen.
+  Beide Integrationen bleiben einzeln voll lauffähig.
+

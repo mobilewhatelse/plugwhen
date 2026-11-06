@@ -1,4 +1,16 @@
 {
+  "services": {
+    "calculate_potential": {
+      "name": "Potenzial berechnen",
+      "description": "Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
+      "fields": {
+        "days": {
+          "name": "Tage",
+          "description": "Wie weit zurück (14 bis 365 Tage, Standard 90)."
+        }
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {
@@ -18,12 +30,20 @@
         "data": {
           "waechter_entry": "Viertelstunden-Wächter",
           "load_entity": "Andere Last-Prognose",
-          "availability_entity": "Verfügbarkeit von Strom"
+          "availability_entity": "Verfügbarkeit von Strom",
+          "grid_energy_entity": "Energiezähler Netzbezug",
+          "price_low": "Leistungspreis je kW und Jahr",
+          "price_high": "Leistungspreis über der Schwelle",
+          "price_threshold": "Schwelle"
         },
         "data_description": {
           "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
           "load_entity": "Nur für eine andere Quelle: ein Sensor mit den Attributen hours (t, typical, high) und target_kw. Nicht nötig, wenn Sie den Wächter gewählt haben.",
-          "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose."
+          "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose.",
+          "grid_energy_entity": "Für den Potenzialrechner: der Bezugszähler (Wh oder kWh, mit Langzeitstatistik). Wird vom Viertelstunden-Wächter übernommen, wenn er gewählt ist.",
+          "price_low": "Für den Potenzialrechner, in Ihrer Währung je kW und Jahr (bis zur Schwelle). Leer: vom Wächter übernommen, sonst werden nur kW gezeigt.",
+          "price_high": "Preis je kW und Jahr über der Schwelle. Leer: derselbe Preis.",
+          "price_threshold": "kW, ab denen der höhere Preis gilt. 0 = ein Preis."
         }
       }
     }
@@ -146,6 +166,16 @@
           "infeasible": "Ziel nicht erreichbar",
           "no_departure": "Keine Abfahrt",
           "unknown_soc": "Ladestand unbekannt"
+        }
+      },
+      "potential": {
+        "name": "Potenzial durch verteiltes Laden",
+        "state": {
+          "worth_it": "Lohnt sich",
+          "setting_enough": "Wallbox-Einstellung reicht",
+          "little": "Gering",
+          "too_little_data": "Zu wenig Daten",
+          "no_data": "Daten fehlen"
         }
       },
       "readiness": {

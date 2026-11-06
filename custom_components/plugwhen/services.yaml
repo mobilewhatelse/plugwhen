@@ -1,0 +1,10 @@
+calculate_potential:
+  fields:
+    days:
+      required: false
+      default: 90
+      selector:
+        number:
+          min: 14
+          max: 365
+          mode: box

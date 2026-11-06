@@ -1,4 +1,16 @@
 {
+  "services": {
+    "calculate_potential": {
+      "name": "Calculate the potential",
+      "description": "Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
+      "fields": {
+        "days": {
+          "name": "Days",
+          "description": "How far back (14 to 365 days, default 90)."
+        }
+      }
+    }
+  },
   "config": {
     "step": {
       "user": {
@@ -18,12 +30,20 @@
         "data": {
           "waechter_entry": "Quarter-hour peak guard",
           "load_entity": "Other load forecast",
-          "availability_entity": "Availability of power"
+          "availability_entity": "Availability of power",
+          "grid_energy_entity": "Grid import energy counter",
+          "price_low": "Demand charge per kW and year",
+          "price_high": "Demand charge above the threshold",
+          "price_threshold": "Threshold"
         },
         "data_description": {
           "waechter_entry": "Choose the quarter-hour peak guard and Plugwhen finds its load forecast by itself (and keeps the charging under its peak target). Suggested automatically if exactly one is installed.",
           "load_entity": "Only for another source: a sensor with the attributes hours (t, typical, high) and target_kw. Not needed when you chose the peak guard.",
-          "availability_entity": "A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast."
+          "availability_entity": "A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast.",
+          "grid_energy_entity": "For the potential calculator: the meter's import counter (Wh or kWh, with long-term statistics). Taken from the quarter-hour peak guard if it is chosen.",
+          "price_low": "For the potential calculator, in your currency per kW and year (up to the threshold). Empty: taken from the peak guard, otherwise only kW are shown.",
+          "price_high": "Price per kW and year above the threshold. Empty: the same price.",
+          "price_threshold": "kW from which the higher price applies. 0 = one price."
         }
       }
     }
@@ -146,6 +166,16 @@
           "infeasible": "Target not reachable",
           "no_departure": "No departure",
           "unknown_soc": "State of charge unknown"
+        }
+      },
+      "potential": {
+        "name": "Potential of spreading the charging",
+        "state": {
+          "worth_it": "Worth it",
+          "setting_enough": "Wallbox setting is enough",
+          "little": "Little",
+          "too_little_data": "Too little data",
+          "no_data": "Data missing"
         }
       },
       "readiness": {

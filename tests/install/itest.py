@@ -177,7 +177,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 10, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 11, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
@@ -294,6 +294,7 @@ def main():
     log(bool(old_ready), "its readiness sensor exists")
     if old_ready:
         oid = old_ready["entity_id"]
+        wait_for(lambda: (state(oid) or {}).get("attributes", {}).get("soc_stale") is not None, 30)  # first computation done
         fresh_attr = (state(oid) or {}).get("attributes", {})
         log(fresh_attr.get("soc_stale") is False and state(oid)["state"] != "unknown", "a fresh state of charge is believed", f"{state(oid)['state']} / {fresh_attr.get('soc_stale')}")
         ok = wait_for(lambda: (state(oid) or {}).get("attributes", {}).get("soc_stale") is True, 540)  # checked at every computation, at the latest every 5 minutes
@@ -304,12 +305,24 @@ def main():
         log(bool(ok), "a new value: believed again", state(oid)["state"])
         svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})
 
+    # ---------- potential calculator ----------
+    pot = wait_for(lambda: find("sensor", "testauto_potential"), 60)
+    log(bool(pot), "the potential sensor exists")
+    if pot:
+        ok = wait_for(lambda: state(pot["entity_id"])["state"] == "no_data", 60)
+        log(bool(ok), "without a grid counter the potential says: data missing", state(pot["entity_id"])["state"] + " " + str(state(pot["entity_id"])["attributes"].get("missing")))
+        s_p, d_p = api("POST", "/api/services/plugwhen/calculate_potential?return_response", {"days": 30})
+        resp = (d_p or {}).get("service_response", {}).get("vehicles", {}) if isinstance(d_p, dict) else {}
+        log(s_p == 200 and resp.get("Testauto", {}).get("status") == "no_data" and "grid_energy" in (resp.get("Testauto", {}).get("missing") or []),
+            "the service answers and names what is missing", str(resp.get("Testauto")))
+
     # connections: load forecast and availability as options
     svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})   # (33.3 - 25) % of 60 kWh / 0.9 = 5.5 kWh
     svc("number", "set_value", {"entity_id": resid, "value": 100})
     s, d = api("POST", "/api/config/config_entries/options/flow", {"handler": entry_id})
     s2, d2 = api("POST", f"/api/config/config_entries/options/flow/{d['flow_id']}",
-                 {"load_entity": "sensor.test_last", "availability_entity": "sensor.test_verfuegbar"})
+                 {"load_entity": "sensor.test_last", "availability_entity": "sensor.test_verfuegbar",
+                  "grid_energy_entity": "sensor.netz_zaehler", "price_low": 33.82, "price_high": 67.64, "price_threshold": 10})
     log(s == 200 and d.get("type") == "form" and d2.get("type") == "create_entry", "connections can be set in the options", f"{d.get('type')} / {d2.get('type')}")
     ok = wait_for(lambda: ((state(pid) or {}).get("attributes") or {}).get("availability_used") is True, 90)
     pa = (state(pid) or {}).get("attributes") or {}
@@ -323,6 +336,14 @@ def main():
         a0 = datetime.now(tzv).replace(minute=0, second=0, microsecond=0) + timedelta(hours=2)
         log(all(a0 <= s0 and e0 <= a0 + timedelta(hours=3) for s0, e0 in zip(starts, ends)), "all windows lie inside the availability window",
             str([x.strftime("%H:%M") for x in starts]))
+
+    if pot:
+        s_p, d_p = api("POST", "/api/services/plugwhen/calculate_potential?return_response", {"days": 30})
+        resp = (d_p or {}).get("service_response", {}).get("vehicles", {}) if isinstance(d_p, dict) else {}
+        log(s_p == 200 and resp.get("Testauto", {}).get("status") == "too_little_data",
+            "with all entities but no history yet: too little data (no made-up numbers)", str(resp.get("Testauto")))
+        ok = wait_for(lambda: state(pot["entity_id"])["state"] == "too_little_data", 30)
+        log(bool(ok), "the potential sensor shows it", state(pot["entity_id"])["state"])
 
     wk = state(week["entity_id"])
     log(isinstance(wk["attributes"].get("week"), list) and len(wk["attributes"]["week"]) == 7, "weekly plan has seven days", str(wk["state"]))

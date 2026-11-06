@@ -17,7 +17,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
-    HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_LOAD, O_WAECHTER, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
+    O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
@@ -30,6 +31,7 @@ from .messages import notice_text
 from .need import MIN_SAMPLES, Need, compute_need
 from .notice import Notice, check_ready, dedupe_key, should_check
 from .plan import make_plan
+from .potential import Prices, calculate as calculate_potential, clean_grid
 
 _LOGGER = logging.getLogger(__name__)
 _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
@@ -64,6 +66,8 @@ class Vehicle:
     history_error: str | None = None
     availability_used: bool = False
     load_used: bool = False
+    potential: dict[str, Any] | None = None
+    potential_at: datetime | None = None
 
 
 class Plugwhen:
@@ -129,6 +133,9 @@ class Plugwhen:
             if v.history_at is None or now - v.history_at >= HISTORY_INTERVAL:
                 await self._load_history(v, now)
             self._compute(v, now)
+            if v.potential_at is None or now - v.potential_at >= POTENTIAL_INTERVAL:
+                v.potential_at = now
+                self.entry.async_create_background_task(self.hass, self._potential_and_tell(v), f"{DOMAIN} potential")
         async_dispatcher_send(self.hass, self.signal)
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
@@ -236,6 +243,97 @@ class Plugwhen:
                 return dep, "entity"
         dep = self._learned_departure(v, now)
         return dep, ("learned" if dep is not None else None)
+
+    # ---------- potential calculator ----------
+
+    def _waechter_values(self) -> dict[str, Any]:
+        """Settings and measured peaks of the chosen quarter-hour peak guard, read from its entities (nothing is imported)."""
+        wid = self.entry.options.get(O_WAECHTER)
+        entry = self.hass.config_entries.async_get_entry(wid) if wid else None
+        if entry is None:
+            return {}
+        from homeassistant.helpers import entity_registry as er
+
+        ents = {str(e.unique_id): e.entity_id for e in er.async_entries_for_config_entry(er.async_get(self.hass), wid)}
+        num = lambda key: self._float(ents.get(f"{wid}_{key}"))  # noqa: E731
+        out: dict[str, Any] = {"grid_energy": {**entry.data, **entry.options}.get("grid_energy") or None}
+        for key in ("limit", "margin", "price_low", "price_high", "price_threshold"):
+            out[key] = num(key)
+        mp = self._state(ents.get(f"{wid}_month_peak"))
+        measured = {}
+        for m in (mp.attributes.get("months") if mp else None) or []:
+            try:
+                if abs(float(m["peak_kw"]) - float(m["peak_without_kw"])) < 0.01:   # only months the guard did not change
+                    measured[str(m["month"])] = float(m["peak_without_kw"])
+            except (KeyError, TypeError, ValueError):
+                continue
+        out["measured"] = measured
+        return out
+
+    async def _potential_and_tell(self, v: Vehicle) -> None:
+        await self.async_potential(v)
+        async_dispatcher_send(self.hass, self.signal)
+
+    async def async_potential(self, v: Vehicle, days: int = POTENTIAL_DAYS) -> dict[str, Any]:
+        """Replay the last `days` with other ways of charging (see potential.py). Read-only; the result goes to the sensor."""
+        now = dt_util.now()
+        v.potential_at = now
+        w = self._waechter_values()
+        grid_id = self.entry.options.get(O_GRID_ENERGY) or w.get("grid_energy")
+        wb_id, odo_id = v.cfg.get(V_WALLBOX_ENERGY), v.cfg.get(V_ODOMETER)
+        missing = [k for k, e in (("grid_energy", grid_id), ("wallbox_energy", wb_id), ("odometer", odo_id)) if not e]
+        if missing:
+            v.potential = {"status": "no_data", "missing": missing, "computed_at": now.isoformat()}
+            return v.potential
+        try:
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.statistics import statistics_during_period
+
+            stats = await get_instance(self.hass).async_add_executor_job(
+                statistics_during_period, self.hass, now - timedelta(days=days), now, {grid_id, wb_id, odo_id}, "hour", None,
+                {"change", "state"},
+            )
+        except Exception as err:  # noqa: BLE001 - a calculation that cannot run must not disturb the planner
+            v.potential = {"status": "no_data", "error": str(err), "computed_at": now.isoformat()}
+            return v.potential
+
+        def hourly(eid: str, field: str, convert) -> dict[datetime, float]:
+            unit = self._unit(eid)
+            out = {}
+            for row in stats.get(eid, []):
+                val = convert(row.get(field), unit)
+                if val is not None:
+                    out[dt_util.as_local(dt_util.utc_from_timestamp(row["start"]))] = val
+            return out
+
+        grid = clean_grid(hourly(grid_id, "change", to_kwh))
+        car = {t: max(0.0, x) for t, x in hourly(wb_id, "change", to_kwh).items()}
+        odo = hourly(odo_id, "state", to_km)
+        ks = sorted(odo)
+        trips = [b for a, b in zip(ks, ks[1:]) if 0.5 < odo[b] - odo[a] < 400]
+        low = self.entry.options.get(O_PRICE_LOW) or w.get("price_low")
+        prices = None
+        if low:
+            high = self.entry.options.get(O_PRICE_HIGH) or w.get("price_high") or low
+            threshold = self.entry.options.get(O_PRICE_THRESHOLD)
+            if threshold is None:
+                threshold = w.get("price_threshold") or 0.0
+            prices = Prices(float(low), float(high), float(threshold))
+        guard_kw = (w["limit"] - (w.get("margin") or 0.0)) if w.get("limit") else None
+        full = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
+        result = calculate_potential(
+            grid, car, trips, full_kw=full, min_kw=float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
+            fixed_kw=min(full, POTENTIAL_FIXED_KW), guard_kw=guard_kw, quarter_add_kw=POTENTIAL_QUARTER_ADD_KW,
+            prices=prices, measured_peaks=w.get("measured") or None,
+        )
+        result.update({
+            "computed_at": now.isoformat(), "history_days": days,
+            "sources": {"grid_energy": grid_id, "wallbox_energy": wb_id, "odometer": odo_id,
+                        "prices": "settings" if self.entry.options.get(O_PRICE_LOW) else ("guard" if w.get("price_low") else None),
+                        "guard_kw": guard_kw},
+        })
+        v.potential = result
+        return result
 
     def _load_entity(self) -> str | None:
         """The load forecast sensor: an entity named in the settings, else the one of the chosen quarter-hour peak guard."""

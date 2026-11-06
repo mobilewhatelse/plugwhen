@@ -90,6 +90,12 @@ template:
         device_class: battery
         state_class: measurement
         state: "{{ 'unknown' if is_state('input_boolean.soc_ausfall', 'on') else states('input_number.auto_soc') | float(0) }}"
+      - name: Netz Zaehler
+        unique_id: netz_zaehler
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "5000"
       - name: Wallbox Zaehler
         unique_id: wb_zaehler
         unit_of_measurement: kWh

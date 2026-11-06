@@ -36,6 +36,15 @@ EN = dict(
     s_plan="Charge plan", s_ready="Ready for departure",
     plan_planned="Planned", plan_not_needed="Not needed", plan_infeasible="Target not reachable", plan_no_departure="No departure", plan_unknown="State of charge unknown",
     r_ready="Ready", r_plug="Plug in", r_low="Too low", r_late="Too late", r_unreach="Not reachable", r_unknown="Unknown",
+    s_pot="Potential of spreading the charging", p_worth="Worth it", p_setting="Wallbox setting is enough", p_little="Little",
+    p_few="Too little data", p_nodata="Data missing",
+    o_grid="Grid import energy counter", o_plow="Demand charge per kW and year", o_phigh="Demand charge above the threshold", o_pthr="Threshold",
+    od_grid="For the potential calculator: the meter's import counter (Wh or kWh, with long-term statistics). Taken from the quarter-hour peak guard if it is chosen.",
+    od_plow="For the potential calculator, in your currency per kW and year (up to the threshold). Empty: taken from the peak guard, otherwise only kW are shown.",
+    od_phigh="Price per kW and year above the threshold. Empty: the same price.",
+    od_pthr="kW from which the higher price applies. 0 = one price.",
+    sv_name="Calculate the potential", sv_desc="Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
+    sv_days="Days", sv_days_d="How far back (14 to 365 days, default 90).",
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
 DE = dict(
@@ -70,6 +79,15 @@ DE = dict(
     s_plan="Ladeplan", s_ready="Bereit zur Abfahrt",
     plan_planned="Geplant", plan_not_needed="Nicht nötig", plan_infeasible="Ziel nicht erreichbar", plan_no_departure="Keine Abfahrt", plan_unknown="Ladestand unbekannt",
     r_ready="Bereit", r_plug="Bitte anstecken", r_low="Zu niedrig", r_late="Zu spät", r_unreach="Nicht erreichbar", r_unknown="Unbekannt",
+    s_pot="Potenzial durch verteiltes Laden", p_worth="Lohnt sich", p_setting="Wallbox-Einstellung reicht", p_little="Gering",
+    p_few="Zu wenig Daten", p_nodata="Daten fehlen",
+    o_grid="Energiezähler Netzbezug", o_plow="Leistungspreis je kW und Jahr", o_phigh="Leistungspreis über der Schwelle", o_pthr="Schwelle",
+    od_grid="Für den Potenzialrechner: der Bezugszähler (Wh oder kWh, mit Langzeitstatistik). Wird vom Viertelstunden-Wächter übernommen, wenn er gewählt ist.",
+    od_plow="Für den Potenzialrechner, in Ihrer Währung je kW und Jahr (bis zur Schwelle). Leer: vom Wächter übernommen, sonst werden nur kW gezeigt.",
+    od_phigh="Preis je kW und Jahr über der Schwelle. Leer: derselbe Preis.",
+    od_pthr="kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
+    sv_name="Potenzial berechnen", sv_desc="Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
+    sv_days="Tage", sv_days_d="Wie weit zurück (14 bis 365 Tage, Standard 90).",
     sw_learn="Kilometer je Wochentag lernen", sw_notice="Warnen, wenn das Auto nicht bereit sein wird", n_res="Reserve",
 )
 
@@ -84,12 +102,17 @@ def build(L):
             "charging_entity": L["d_chg"], "wallbox_energy_entity": L["d_wb"], "departure_entity": L["d_dep"],
             "notify_service": L["d_notify"], "notify_hour": L["d_hour"]}
     step = {"title": L["v_title"], "description": L["v_desc"], "data": data, "data_description": desc}
+    services = {"calculate_potential": {"name": L["sv_name"], "description": L["sv_desc"],
+                                         "fields": {"days": {"name": L["sv_days"], "description": L["sv_days_d"]}}}}
     return {
+        "services": services,
         "config": {"step": {"user": {"title": "Plugwhen", "description": L["c_desc"]}}, "abort": {"single_instance_allowed": L["c_single"]}},
         "options": {"step": {"init": {
             "title": L["o_title"], "description": L["o_desc"],
-            "data": {"waechter_entry": L["o_wachter"], "load_entity": L["o_load"], "availability_entity": L["o_avail"]},
-            "data_description": {"waechter_entry": L["od_wachter"], "load_entity": L["od_load"], "availability_entity": L["od_avail"]},
+            "data": {"waechter_entry": L["o_wachter"], "load_entity": L["o_load"], "availability_entity": L["o_avail"],
+                     "grid_energy_entity": L["o_grid"], "price_low": L["o_plow"], "price_high": L["o_phigh"], "price_threshold": L["o_pthr"]},
+            "data_description": {"waechter_entry": L["od_wachter"], "load_entity": L["od_load"], "availability_entity": L["od_avail"],
+                                 "grid_energy_entity": L["od_grid"], "price_low": L["od_plow"], "price_high": L["od_phigh"], "price_threshold": L["od_pthr"]},
         }}},
         "config_subentries": {"vehicle": {
             "entry_type": L["entry_type"], "initiate_flow": {"user": L["add"], "reconfigure": L["reconf"]},
@@ -104,6 +127,8 @@ def build(L):
                 "charge_plan": {"name": L["s_plan"], "state": {"planned": L["plan_planned"], "not_needed": L["plan_not_needed"],
                                                                "infeasible": L["plan_infeasible"], "no_departure": L["plan_no_departure"],
                                                                "unknown_soc": L["plan_unknown"]}},
+                "potential": {"name": L["s_pot"], "state": {"worth_it": L["p_worth"], "setting_enough": L["p_setting"], "little": L["p_little"],
+                                                           "too_little_data": L["p_few"], "no_data": L["p_nodata"]}},
                 "readiness": {"name": L["s_ready"], "state": {"ready": L["r_ready"], "plug_in": L["r_plug"], "low": L["r_low"],
                                                               "too_late": L["r_late"], "not_reachable": L["r_unreach"], "unknown": L["r_unknown"]}},
             },

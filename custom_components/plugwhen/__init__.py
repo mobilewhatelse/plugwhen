@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from typing import Any
 
-from .const import PLATFORMS
+import voluptuous as vol
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.service import async_register_admin_service
+
+from .const import DOMAIN, PLATFORMS, POTENTIAL_DAYS
 from .coordinator import Plugwhen
 
 type PlugwhenEntry = ConfigEntry[Plugwhen]
@@ -24,7 +29,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await plug.async_start()
     entry.async_on_unload(entry.add_update_listener(_reload))
+    _register_services(hass)
     return True
+
+
+def _register_services(hass: HomeAssistant) -> None:
+    if hass.services.has_service(DOMAIN, "calculate_potential"):
+        return
+
+    async def handle(call: ServiceCall) -> dict[str, Any]:
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries or getattr(entries[0], "runtime_data", None) is None:
+            raise ServiceValidationError("Plugwhen is not set up")
+        plug = entries[0].runtime_data
+        out = {}
+        for v in plug.vehicles.values():
+            r = await plug.async_potential(v, int(call.data.get("days", POTENTIAL_DAYS)))
+            out[v.name] = {k: r.get(k) for k in ("status", "verdict", "saving_spread_per_year", "saving_spread_vs_guard_per_year",
+                                                 "peak_as_is_kw", "peak_spread_kw", "days", "sessions", "model_error_kw", "missing")}
+        from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+        async_dispatcher_send(hass, plug.signal)
+        return {"vehicles": out}
+
+    async_register_admin_service(
+        hass, DOMAIN, "calculate_potential", handle,
+        schema=vol.Schema({vol.Optional("days", default=POTENTIAL_DAYS): vol.All(vol.Coerce(int), vol.Range(min=14, max=365))}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:

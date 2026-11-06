@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 (unreleased) - potential calculator
+
+- **Potential calculator** (sensor *Potential of spreading the charging* per vehicle, service `plugwhen.calculate_potential`):
+  replays the household's own history (grid import counter, wallbox counter, odometer; 90 days) with four ways of charging -
+  as it was, spread evenly over the parking time, the wallbox's own "ready by" with 4.1 kW, and the peak guard - and compares the
+  monthly peak quarter hour, the demand charge and how often the car would not have been ready. Result: *worth it*, *wallbox
+  setting is enough*, *little*, *too little data* or *data missing*. Read only, an estimate; it says which data it used.
+- Takes grid counter, prices, limit and measured peaks from the chosen quarter-hour peak guard; for the model check only months
+  the guard did not change are used. Without prices only kW are shown.
+- The estimate of the car's real quarter-hour power: inside a charging block its hourly mean, at the edges the block's level
+  (a car that already charges slowly is not counted as a full-power peak; that would overstate the saving).
+- Options: grid import counter, demand charge per kW and year (two levels and a threshold).
+
 ## 0.2.0 (unreleased) - plan, warning, connections
 
 - **Charge plan** per vehicle (sensor *Charge plan*): in which quarter hours to charge until the departure. Available power
