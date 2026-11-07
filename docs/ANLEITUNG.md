@@ -1,6 +1,6 @@
 # Plugwhen – Anleitung (Deutsch)
 
-Stand: Version 0.6.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+Stand: Version 0.6.1 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
 
 ## Wofür?
 
@@ -134,11 +134,12 @@ jedem Tag kennt das Modell nur die Tage davor. Zwei Fragen:
 
 - **Hätte die Reichweite gereicht?** Mit der festen Reserve allein (was ein Auto ohne Lernen vorhielte) und mit der Reserve, angehoben um das
   für den Wochentag Gelernte (der größere Wert aus Reserve und 80. Perzentil des Wochentags). Zwei Balken zeigen den Anteil der Tage.
-- **Wurde die Abfahrt richtig geraten?** Die gelernte übliche Stunde der ersten Fahrt gegen die echte, auf eine Stunde genau (der Verlauf kennt
-  die Stunde, nicht die Minute), als ein Balken je Wochentag.
-- **Wäre das Auto rechtzeitig fertig gewesen?** Ein Plan bis zur üblichen (mittleren) Abfahrt gegen einen bis zur frühen Abfahrt, als zwei Balken.
+- **Wäre das Auto rechtzeitig fertig gewesen?** Ein Plan bis zur üblichen (mittleren) Abfahrt gegen einen bis zur frühen Abfahrt (20. Perzentil), als
+  zwei Balken und dann je Wochentag für den frühen Plan. Echte Abfahrten schwanken, deshalb ist nicht „auf die Stunde erraten“ die nützliche Zahl,
+  sondern „rechtzeitig fertig“; darum zielt der Plan auf die frühe Abfahrt.
 
-Urteil: **Lernen hilft** (mindestens 5 Prozentpunkte mehr Tage gedeckt), **Reserve reicht** (weniger als 2 Punkte: die Reserve allein genügt, der
+Urteil: **Lernen hilft** (mindestens 5 Prozentpunkte mehr Tage gedeckt), **Lernen hilft bei der Abfahrt** (die Kilometer helfen kaum, aber der frühe
+Plan ist an mindestens 10 Punkten mehr Tagen rechtzeitig fertig als der mittlere), **Reserve reicht** (weniger als 2 Punkte: die Reserve allein genügt, der
 gelernte Wert kostet nichts, bringt aber wenig), **kaum Unterschied** oder **zu wenig Daten** (weniger als 21 Tage prüfbar). Tage ohne Kilometer
 zählen nicht. Beim Auto des Autors deckt die Reserve allein etwa 88 % der Tage, mit dem Gelernten etwa 90 %; am meisten hilft der Verlauf bei der
 Abfahrtszeit.

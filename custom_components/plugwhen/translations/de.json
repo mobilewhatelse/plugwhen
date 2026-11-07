@@ -184,6 +184,7 @@
         "name": "Bringt das Lernen etwas?",
         "state": {
           "learning_helps": "Lernen hilft",
+          "departure_helps": "Lernen hilft bei der Abfahrt",
           "reserve_enough": "Reserve reicht",
           "little": "Kaum Unterschied",
           "too_little_data": "Zu wenig Daten"

@@ -296,5 +296,5 @@ class LearningCheckSensor(PlugwhenEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         r = self.plug.insight(self.vehicle)
         keys = ("days", "reserve_km", "coverage_reserve_pct", "coverage_learned_pct", "gain_points", "departure_right_pct",
-                "departure_days", "departure_by_weekday")
+                "departure_days", "departure_by_weekday", "ready_median_pct", "ready_early_pct", "departure_gain_points")
         return {**{k: r[k] for k in keys}, "chart": chart_learning(r, self.hass.config.language)}

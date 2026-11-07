@@ -59,6 +59,6 @@ POTENTIAL_STATES = ["worth_it", "setting_enough", "little", "too_little_data", "
 MODES = ["off", "learn"]                       # "switch" follows when the wallbox can be switched (0.6)
 DEFAULT_MODE = "learn"
 WOULD_STATES = ["charge", "pause", "none", "off"]
-LEARNING_STATES = ["learning_helps", "reserve_enough", "little", "too_little_data"]
+LEARNING_STATES = ["learning_helps", "departure_helps", "reserve_enough", "little", "too_little_data"]
 PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure", "unknown_soc"]
 READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable", "unknown"]

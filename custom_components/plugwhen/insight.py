@@ -11,8 +11,9 @@ two questions are answered:
   earlier. Counted for the median hour and for the early hour (20th percentile) the plan now aims at.
 
 From that comes one plain verdict: `learning_helps` (the learned value covers at least 5 points more days than the reserve
-alone), `reserve_enough` (less than 2 points: the reserve alone does it), `little` in between, `too_little_data` (fewer than
-21 days could be checked). Nothing is invented: a day without kilometres is not counted.
+alone), `departure_helps` (the kilometres hardly help, but a plan until the early departure is ready in time on at least 10 points
+more days than one until the usual departure), `reserve_enough` (less than 2 points: the reserve alone does it), `little` in between,
+`too_little_data` (fewer than 21 days could be checked). Nothing is invented: a day without kilometres is not counted.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover
 WARMUP_DAYS = 28          # days the model sees before the first day is checked
 MIN_CHECKED_DAYS = 21
 HELPS_POINTS = 0.05
+DEPARTURE_HELPS_POINTS = 0.10   # ready in time on at least 10 points more days with the early plan than with the median plan
 SAME_POINTS = 0.02
 DEPARTURE_TOLERANCE_H = 1.0
 
@@ -34,7 +36,7 @@ DEPARTURE_TOLERANCE_H = 1.0
 def learning_check(records: list[DayRecord], reserve_km: float, warmup_days: int = WARMUP_DAYS) -> dict[str, Any]:
     model = MobilityModel()
     checked = covered_reserve = covered_learned = 0
-    dep = {wd: [0, 0] for wd in range(7)}          # weekday -> [right, checked]
+    dep = {wd: [0, 0, 0, 0] for wd in range(7)}    # weekday -> [guessed right, checked, ready with the early plan, ready with the median plan]
     ready_median = ready_early = 0
     for i, rec in enumerate(sorted(records, key=lambda r: r.day)):
         km = rec.clean_km()
@@ -48,9 +50,13 @@ def learning_check(records: list[DayRecord], reserve_km: float, warmup_days: int
                 wd = rec.day.weekday()
                 dep[wd][1] += 1
                 dep[wd][0] += abs(p.departure_hour - rec.first_move_hour) <= DEPARTURE_TOLERANCE_H
-                ready_median += rec.first_move_hour >= p.departure_hour          # finished at the median: in time?
+                in_time_median = rec.first_move_hour >= p.departure_hour          # finished at the median: in time?
                 early = p.departure_early if p.departure_early is not None else p.departure_hour
-                ready_early += rec.first_move_hour >= early
+                in_time_early = rec.first_move_hour >= early
+                ready_median += in_time_median
+                ready_early += in_time_early
+                dep[wd][2] += in_time_early
+                dep[wd][3] += in_time_median
         model.add_day(rec)
 
     reserve = covered_reserve / checked if checked else None
@@ -61,7 +67,13 @@ def learning_check(records: list[DayRecord], reserve_km: float, warmup_days: int
         verdict = "too_little_data"
     else:
         gain = learned - reserve
-        verdict = "learning_helps" if gain >= HELPS_POINTS else "reserve_enough" if gain < SAME_POINTS else "little"
+        dep_gain = (ready_early - ready_median) / dep_total if dep_total else 0.0
+        if gain >= HELPS_POINTS:
+            verdict = "learning_helps"                    # the kilometres help
+        elif dep_gain >= DEPARTURE_HELPS_POINTS:
+            verdict = "departure_helps"                   # the kilometres hardly do, the departure does
+        else:
+            verdict = "reserve_enough" if gain < SAME_POINTS else "little"
     return {
         "verdict": verdict,
         "days": checked,
@@ -73,7 +85,10 @@ def learning_check(records: list[DayRecord], reserve_km: float, warmup_days: int
         "departure_days": dep_total,
         "ready_median_pct": round(100 * ready_median / dep_total) if dep_total else None,
         "ready_early_pct": round(100 * ready_early / dep_total) if dep_total else None,
+        "departure_gain_points": round(100 * (ready_early - ready_median) / dep_total) if dep_total else None,
         "departure_by_weekday": [
-            {"weekday": wd, "days": n, "right_pct": round(100 * ok / n) if n else None} for wd, (ok, n) in sorted(dep.items())
+            {"weekday": wd, "days": n, "right_pct": round(100 * ok / n) if n else None,
+             "ready_early_pct": round(100 * early / n) if n else None, "ready_median_pct": round(100 * med / n) if n else None}
+            for wd, (ok, n, early, med) in sorted(dep.items())
         ],
     }

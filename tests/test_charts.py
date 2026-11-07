@@ -35,6 +35,7 @@ class ChartTest(unittest.TestCase):
             self.assertIn("100 %", svg)                                          # learned value covers all days
             self.assertIn("n=", svg)
         self.assertIn("Reserve plus Gelerntes", chart_learning(check(), "de"))
+        self.assertIn("Rechtzeitig fertig je Wochentag", chart_learning(check(), "de"))
         self.assertIn("reserve plus learned", chart_learning(check(), "en"))
 
     def test_learning_chart_without_data_says_so(self):

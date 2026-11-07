@@ -23,7 +23,7 @@ GREEN, RED, BLUE, GREY, SUN = "#2fbf71", "#e5534b", "#5b8def", "#8a94a6", "#f2b6
 T = {
     "de": dict(
         cover="Tage, an denen die Reichweite gereicht hätte", only_reserve="nur feste Reserve ({km} km)", with_learning="Reserve plus Gelerntes",
-        departure="Abfahrtszeit richtig geraten (± 1 Stunde)", days_checked="{n} Tage geprüft", no_data="Noch zu wenig Daten",
+        departure="Rechtzeitig fertig je Wochentag (Plan bis zur frühen Abfahrt)", days_checked="{n} Tage geprüft", no_data="Noch zu wenig Daten",
         ready_title="Tage, an denen das Auto rechtzeitig fertig gewesen wäre", ready_median="Plan bis zur üblichen Abfahrt", ready_early="Plan bis zur frühen Abfahrt",
         wd=["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], agree="Plan und Wallbox stimmten überein", differ="abweichend",
         shadow_title="Plan gegen Wirklichkeit, Stunden je Tag", no_shadow="Noch keine Daten: der Vergleich füllt sich Tag für Tag",
@@ -36,7 +36,7 @@ T = {
     ),
     "en": dict(
         cover="Days on which the range would have been enough", only_reserve="fixed reserve only ({km} km)", with_learning="reserve plus learned",
-        departure="Departure hour guessed right (± 1 hour)", days_checked="{n} days checked", no_data="Too little data yet",
+        departure="Ready in time per weekday (plan until the early departure)", days_checked="{n} days checked", no_data="Too little data yet",
         ready_title="Days on which the car would have been ready in time", ready_median="plan until the usual departure", ready_early="plan until the early departure",
         wd=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], agree="plan and wallbox agreed", differ="differed",
         shadow_title="Plan against reality, hours per day", no_shadow="No data yet: the comparison fills up day by day",
@@ -100,7 +100,7 @@ def chart_learning(check: dict[str, Any] | None, lang: str | None = None) -> str
     body.append(f"<line x1='10' y1='{top + ph}' x2='{W - 10}' y2='{top + ph}' stroke='{GREY}' stroke-opacity='0.4'/>")
     for wd, day in enumerate(check.get("departure_by_weekday") or []):
         x = 22 + wd * step
-        pct = day.get("right_pct")
+        pct = day.get("ready_early_pct")
         if pct is None:
             body.append(f"<rect x='{x}' y='{top + ph - 3}' width='{bw}' height='3' fill='{GREY}' fill-opacity='0.35'/>")
         else:

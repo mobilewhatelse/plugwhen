@@ -2,7 +2,7 @@
 
 # Plugwhen
 
-> **Status: version 0.6.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
+> **Status: version 0.6.1 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
 > recorded plug-in times, potential calculator, ready-made dashboard, learn mode). It **plans and shows**, it does not control the
 > wallbox yet. Private repository. German guide: [docs/ANLEITUNG.md](docs/ANLEITUNG.md).
 
@@ -134,12 +134,12 @@ and on each day the model only knows the days before it. Two questions:
 
 - **Would the range have been enough?** With the fixed reserve alone (what a car without learning would keep) and with the reserve lifted
   by what was learned for that weekday (the larger of the reserve and the weekday's 80th percentile). Two bars show the share of days.
-- **Was the departure guessed right?** The learned usual hour of the first trip against the real one, within one hour (the history knows
-  the hour, not the minute), as one bar per weekday.
 - **Would the car have been ready in time?** A plan that finishes at the usual (median) departure against one that finishes at the early
-  departure, as two bars.
+  departure (20th percentile), as two bars and then per weekday for the early plan. Real departures vary, so the useful number is not
+  "guessed to the hour" but "ready in time"; that is why the plan aims at the early departure.
 
-Verdict: **learning helps** (at least 5 percentage points more days covered), **reserve is enough** (less than 2 points: the reserve alone
+Verdict: **learning helps** (at least 5 percentage points more days covered), **learning helps for the departure** (the kilometres hardly help,
+but the early plan is ready in time on at least 10 points more days than the median plan), **reserve is enough** (less than 2 points: the reserve alone
 does it, the learned value costs nothing but brings little), **little difference**, or **too little data** (fewer than 21 days could be
 checked). Days without kilometres are not counted. On the author's car the reserve alone covers about 88 % of the days and with the
 learned value about 90 %; the departure hour is what the history helps most with.

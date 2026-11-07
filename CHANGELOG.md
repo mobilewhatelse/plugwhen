@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1 (unreleased) - the check says what it knows about the departure
+
+- **The check *Does learning help?* no longer shows "departure guessed right within one hour"** (31 to 46 % in one house, which looked
+  like a failure and is the wrong question, because real departures vary). It shows what the plan aims at: ready in time with the plan
+  until the usual departure against the early one (52 against 85 % in that house), and per weekday for the early plan.
+- **New verdict `departure_helps`** (*Learning helps for the departure*): the kilometres hardly help, but the early plan is ready in
+  time on at least 10 points more days than the median plan. The card says it in two plain lines, kilometres and departure.
+  Attributes `ready_median_pct`, `ready_early_pct`, `departure_gain_points`, per weekday `ready_early_pct` and `ready_median_pct`.
+
 ## 0.6.0 (unreleased) - honest numbers
 
 - **The plan aims at the early departure** (20th percentile of the weekday's first trips) instead of the median: a car that is ready at

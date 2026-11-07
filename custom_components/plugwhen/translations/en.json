@@ -184,6 +184,7 @@
         "name": "Does learning help?",
         "state": {
           "learning_helps": "Learning helps",
+          "departure_helps": "Learning helps for the departure",
           "reserve_enough": "Reserve is enough",
           "little": "Little difference",
           "too_little_data": "Too little data"

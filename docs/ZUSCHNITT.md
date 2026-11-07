@@ -282,3 +282,18 @@ Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
   Prüfung „rechtzeitig fertig": Plan bis Median gegen Plan bis frühe Abfahrt als zwei Balken.
 - **Vorgehen danach (vereinbart):** Schritt B Tarife (Preis-Entität als Eingang in beiden Modulen, kein drittes Modul; Vergleichsmodus Haus im Wächter, Auto in Plugwhen, Summe im Wächter;
   Preishistorie aus der Langzeitstatistik der Preis-Entität), Schritt C Schalten erst nach Wochen im Lernmodus. Nicht empfohlen: mehr Lernlogik bei den Kilometern (feste Reserve leistet fast dasselbe).
+
+## 24. Preis-Schnittstelle mit Stufen und Energiegemeinschaft als Datenquelle (Idee des Nutzers 07.11.2026, nichts gebaut)
+- **Gedanke:** Mit variablen Tarifen kommt eine Energiegemeinschaft dazu: feste Preise der Gemeinschaft für die zugeteilte Menge, variabler Preis für den Rest, Klima und Batterie auf billige Zeiten legen,
+  die Grundlast mit dem Anteil der Gemeinschaft decken.
+- **Einschätzung:** ja, aber die Gemeinschaft ist eine **Datenquelle (Adapter)**, kein weiterer Optimierer. Gemeinsame **Preis-Schnittstelle v2** (Erweiterung der Verfügbarkeits-Schnittstelle): je Viertelstunde
+  Stufen `{kw, preis}`: eigene PV (Preis = entgangene Einspeisevergütung), Anteil der Gemeinschaft (feste Menge, fester Preis), Netz (variabler Preis je Viertelstunde, unbegrenzt, innerhalb der Spitzengrenze).
+  Der Planer füllt die billigsten Stufen zuerst. Die Grundlast zieht man wie bei der PV ab (`calibrate.base_load`): nur was der Anteil über der Grundlast liegt, ist für verschiebbare Verbraucher frei, der Rest verfällt, wenn der Verbrauch nicht in diese Viertelstunden wandert.
+- **Grenzen:** (1) Die Zuteilung je Viertelstunde kennt nur der Betreiber (statischer Schlüssel: aus PV-Prognose der Gemeinschaftsanlagen ableitbar; dynamischer Schlüssel: hängt vom Verbrauch der anderen ab, nur Schätzung) → das Signal
+  „Gemeinschafts-Ampel" muss der Betreiber liefern. (2) Batterie am billigen Tarif laden lohnt nur, wenn der Preisabstand die Verluste (grob 10 bis 15 %) übersteigt. (3) Klima braucht Komfortgrenzen (Vorkühlen, höchste Verschiebung).
+  (4) Verschiebung in billige Stunden erzeugt Spitzen, die Spitzengrenze des Wächters gilt weiter.
+- **Reihenfolge:** B1 Preis-Eingang plus **Vergleichsmodus** (erst messen, was ein variabler Tarif bringt), B2 Gemeinschafts-Adapter und Schnittstelle v2, B3 Batterie (einfachster steuerbarer Fall), B4 Klima.
+  Quellen sind austauschbar, die Verbraucher (Plugwhen, später Batterie/Klima) lesen nur die Schnittstelle: so entstehen nicht sieben Kombinationen. Ob Batterie und Klima in Plugwhen gehören (Name!) oder ein eigener Verbraucher werden, ist offen.
+- **Entscheidung des Nutzers 07.11.2026: Die Energiegemeinschaft wird ein eigenes Modul, nur für die Gemeinschaft** (eigene Integration, eigenes Repository, eigener Name). Es ist die Datenquelle (Adapter) für die Preis-Schnittstelle v2:
+  holt Zuteilung, feste Preise und das Gemeinschafts-Signal der Gemeinschaft und stellt sie als Stufen bereit; es optimiert nichts selbst. Plugwhen und Wächter bleiben unabhängig und lesen nur die Schnittstelle (Auswahl des anderen Moduls,
+  keine Entitäten von Hand). Vorteil: das Modul kann der Gemeinschaft allein gehören oder angeboten werden (eigene Lizenz, eigener Support), ohne die zwei anderen zu berühren.

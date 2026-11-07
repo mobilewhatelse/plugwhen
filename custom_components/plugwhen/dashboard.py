@@ -25,6 +25,10 @@ TEXT = {
         reserve="Reserve (km), mit der das Auto mindestens losfährt", learn="Kilometer je Wochentag lernen",
         notice="Warnen, wenn das Auto nicht bereit sein wird",
         settings_note="**Reserve** ist die Untergrenze der Reichweite. Ist der Schalter an, hebt der gelernte hohe Wert eines Wochentags sie bei Bedarf an. Aus: nur die Reserve zählt.",
+        lc_km="Kilometer", lc_depl="Abfahrt", lc_km_helps="Mit dem Gelernten wären", lc_km_helps_b="Prozentpunkte mehr Tage gedeckt gewesen",
+        lc_km_same="Die feste Reserve allein deckt fast genauso viele Tage", lc_km_same_b="das Lernen der Kilometer bringt hier wenig",
+        lc_dep_good="Mit dem Plan bis zur frühen Abfahrt wäre das Auto an", lc_dep_good_b="Prozent der Tage rechtzeitig fertig gewesen, bis zur üblichen nur an",
+        lc_dep_none="Zur Abfahrt gibt es noch keine Aussage.",
         lc_h="Bringt das Lernen etwas?", lc_tile="Lernen: lohnt es sich?", lc_yes="Ja.", lc_no="Kaum.", lc_some="Wenig.",
         lc_helps_a="Mit dem Gelernten wären", lc_helps_b="Prozentpunkte mehr Tage gedeckt gewesen",
         lc_enough="Die feste Reserve allein hätte fast genauso viele Tage gedeckt", lc_enough_b="Das Lernen schadet nicht, bringt bei der Reichweite hier aber wenig.",
@@ -78,6 +82,10 @@ TEXT = {
         reserve="Reserve (km) the car always leaves with", learn="Learn kilometres per weekday",
         notice="Warn when the car will not be ready",
         settings_note="**Reserve** is the lowest range. With the switch on, a weekday's learned high value raises it when needed. Off: only the reserve counts.",
+        lc_km="Kilometres", lc_depl="Departure", lc_km_helps="With what was learned", lc_km_helps_b="percentage points more days would have been covered",
+        lc_km_same="The fixed reserve alone covers almost as many days", lc_km_same_b="learning the kilometres brings little here",
+        lc_dep_good="With the plan until the early departure the car would have been ready in time on", lc_dep_good_b="percent of the days, with the one until the usual departure only on",
+        lc_dep_none="There is no statement about the departure yet.",
         lc_h="Does learning help?", lc_tile="Does learning help?", lc_yes="Yes.", lc_no="Hardly.", lc_some="A little.",
         lc_helps_a="With what was learned", lc_helps_b="percentage points more days would have been covered",
         lc_enough="The fixed reserve alone would have covered almost as many days", lc_enough_b="Learning does no harm, but brings little for the range here.",
@@ -171,10 +179,11 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
     lc_id = ids["learning_check"]
     lc_line = (
         "{% set a = " + _s(lc_id) + ".attributes %}{% set st = states('" + lc_id + "') %}"
-        f"{{% if st == 'too_little_data' %}}{t['lc_few_a']} {{{{ a.days }}}} {t['lc_few_b']}"
-        f"{{% elif st == 'learning_helps' %}}**{t['lc_yes']}** {t['lc_helps_a']} {{{{ a.gain_points }}}} {t['lc_helps_b']}."
-        f"{{% elif st == 'reserve_enough' %}}**{t['lc_no']}** {t['lc_enough']}."
-        f"{{% else %}}**{t['lc_some']}** {t['lc_helps_a']} {{{{ a.gain_points }}}} {t['lc_helps_b']}.{{% endif %}}"
+        f"{{% if st == 'too_little_data' %}}{t['lc_few_a']} {{{{ a.days }}}} {t['lc_few_b']}{{% else %}}"
+        f"**{t['lc_km']}:** {{% if st == 'learning_helps' %}}{t['lc_km_helps']} {{{{ a.gain_points }}}} {t['lc_km_helps_b']}."
+        f"{{% else %}}{t['lc_km_same']} ({{{{ a.coverage_reserve_pct }}}} → {{{{ a.coverage_learned_pct }}}} %): {t['lc_km_same_b']}.{{% endif %}}\n\n"
+        f"**{t['lc_depl']}:** {{% if a.ready_early_pct is not none %}}{t['lc_dep_good']} {{{{ a.ready_early_pct }}}} {t['lc_dep_good_b']} {{{{ a.ready_median_pct }}}} %."
+        f"{{% else %}}{t['lc_dep_none']}{{% endif %}}{{% endif %}}"
     )
     calib_line = (
         "{% set a = " + _s(ids["charge_plan"]) + ".attributes %}{% set n = " + need + " %}"
