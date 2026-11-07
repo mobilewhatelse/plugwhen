@@ -271,3 +271,14 @@ Anstecken als Fensterbeginn. Vorhanden: Abfahrt, Bedarf, Plan, Warnung.
   nur Solarprognose (fester kleiner Strom in erwarteten Sonnenstunden) > keine PV (nur Pflicht verteilt oder sofort). Plugwhen nimmt automatisch die beste eingetragene
   Quelle und zeigt, womit es arbeitet. Ohne Netzbezug: kein Spitzenschutz, Potenzialrechner „Daten fehlen". Einstellung „kein Netz" (Inselanlage): nur Sonne und Akku,
   Warnung rechtzeitig, wenn beides nicht bis zur Abfahrt reicht.
+
+## 23. Kritische Durchsicht und Schritt A „ehrlicher rechnen" (07.11.2026, Version 0.6.0)
+- **Befund der Durchsicht:** Der Wächter ist der belastbare Teil (misst, drosselt, Monatsspitze 9,48 kW bei Grenze 9,5). Plugwhen rechnet sauber, hat aber ohne Schalten keinen Geldwert.
+  Schwächen: Abfahrt am Median (an ~50 % der frühen Tage zu spät), Zahlen nur für ein Haus (0,7 kW Zuschlag, 0,5 kW Abzug, 0,9 Wirkungsgrad), Solarprognose ungeprüft,
+  Verteilen bis 1,4 kW kostet Ladeverluste, beide Module hängen am Leistungspreis (AT 2027, Flandern; DE kaum).
+- **Gebaut in 0.6.0:** `departure_early` (20. Perzentil) als Planziel, `pref_kw` (bevorzugte Leistung, Standard 4 kW, Fallback auf Minimum), `calibrate.py` (Viertelstunden-Zuschlag aus
+  5-Minuten-Statistik des Wächter-Netzbezugs, Grundlast aus Stunden 1–5 des Bezugszählers, Ladeverluste aus Ladestandsanstieg × Kapazität gegen Wallbox-Energie, `SolarAccuracy`
+  erwartet/gemessen je Tag mit Faktor 0,5–1,5 aus der Erzeugungsstatistik des Energie-Dashboards). Alles mit Vorgabe und überschreibbar; Dashboard-Zeile sagt gelernt/eingestellt/Vorgabe.
+  Prüfung „rechtzeitig fertig": Plan bis Median gegen Plan bis frühe Abfahrt als zwei Balken.
+- **Vorgehen danach (vereinbart):** Schritt B Tarife (Preis-Entität als Eingang in beiden Modulen, kein drittes Modul; Vergleichsmodus Haus im Wächter, Auto in Plugwhen, Summe im Wächter;
+  Preishistorie aus der Langzeitstatistik der Preis-Entität), Schritt C Schalten erst nach Wochen im Lernmodus. Nicht empfohlen: mehr Lernlogik bei den Kilometern (feste Reserve leistet fast dasselbe).

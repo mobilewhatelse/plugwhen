@@ -121,6 +121,20 @@ class PlanTest(unittest.TestCase):
         p = plan(need_kwh=0.2, target_kw=None, load=load(default=0.5))
         self.assertTrue(all(kw >= 1.4 for kw in p["quarters"].values()))
 
+    def test_preferred_power_is_not_undercut_when_the_energy_fits(self):
+        p = plan(target_kw=None, load=load(default=1.0), need_kwh=12.0, pref_kw=4.0)       # 12 kWh fit easily at 4 kW
+        self.assertTrue(all(kw >= 4.0 - 1e-6 for kw in p["quarters"].values()), min(p["quarters"].values()))
+        self.assertAlmostEqual(p["planned_kwh"], 12.0, places=1)
+        self.assertEqual(p["spread_floor_kw"], 4.0)
+
+    def test_preferred_power_gives_way_when_the_peak_target_leaves_less_room(self):
+        # the house takes 7 kW all night, the target is 9.5 kW: only 2.5 kW are left for the car, below the preferred 4 kW
+        p = plan(load=load(default=7.0), need_kwh=10.0, pref_kw=4.0)
+        self.assertEqual(p["status"], "planned")
+        self.assertAlmostEqual(p["planned_kwh"], 10.0, places=1)
+        self.assertTrue(all(kw <= 2.5 + 1e-9 for kw in p["quarters"].values()))
+        self.assertEqual(p["spread_floor_kw"], 1.4)
+
     def test_charging_allowed(self):
         p = plan(load=load(default=0.5), need_kwh=5.5, target_kw=None)
         planned = next(iter(p["quarters"]))

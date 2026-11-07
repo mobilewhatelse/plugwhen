@@ -37,6 +37,9 @@ V_WALLBOX_ENERGY = "wallbox_energy_entity"  # optional: wallbox energy counter (
 V_DEPARTURE = "departure_entity"          # optional: time or date-time of the next departure (replaces the learned one)
 V_CHARGE_MAX = "charge_kw_max"            # what the wallbox can deliver
 V_CHARGE_MIN = "charge_kw_min"            # lowest charging power (1 phase, 6 A = 1.4 kW)
+V_CHARGE_PREF = "charge_kw_pref"          # preferred lowest power: spread no flatter than this (the car's charger wastes more below)
+DEFAULT_CHARGE_PREF = 4.0
+CALIBRATE_INTERVAL = timedelta(hours=24)  # learn the house-specific numbers again (quarter add, base load, solar accuracy)
 V_NOTIFY = "notify_service"               # optional: e.g. notify.mobile_app_phone
 V_NOTIFY_HOUR = "notify_hour"             # the warning is sent from this hour of the evening on
 
@@ -56,5 +59,6 @@ POTENTIAL_STATES = ["worth_it", "setting_enough", "little", "too_little_data", "
 MODES = ["off", "learn"]                       # "switch" follows when the wallbox can be switched (0.6)
 DEFAULT_MODE = "learn"
 WOULD_STATES = ["charge", "pause", "none", "off"]
+LEARNING_STATES = ["learning_helps", "reserve_enough", "little", "too_little_data"]
 PLAN_STATES = ["planned", "not_needed", "infeasible", "no_departure", "unknown_soc"]
 READINESS_STATES = ["ready", "plug_in", "low", "too_late", "not_reachable", "unknown"]

@@ -74,15 +74,17 @@ def records_from_hourly(
             prev_last = r["last_o"]
         elif prev_last is None:
             continue  # nothing known yet
-        home = away = None
+        home = away = charged = None
         if r["wb_last"] is not None:
             if prev_wb is not None:
                 home = max(0.0, r["wb_last"] - prev_wb)
             prev_wb = r["wb_last"]
+        if capacity_kwh:
+            charged = round(r["rise"] / 100.0 * capacity_kwh, 2)
         if home is not None and capacity_kwh:
             away = max(0.0, r["rise"] / 100.0 * capacity_kwh - home * efficiency)
         out.append(DayRecord(d, km=km, first_move_hour=r["first_move"] if km is not None and km >= 2.0 else None,
-                             home_kwh=home, away_kwh=away))
+                             home_kwh=home, away_kwh=away, charged_kwh=charged))
     return [r for r in out if r.km is not None or r.home_kwh is not None]
 
 

@@ -1,6 +1,6 @@
 # Plugwhen – Anleitung (Deutsch)
 
-Stand: Version 0.5.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+Stand: Version 0.6.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
 
 ## Wofür?
 
@@ -112,6 +112,39 @@ Vergleichstabelle, Steckzeiten, Einstellungen und gelernte Woche. Nur Standardka
 **So geht's:** Entwicklerwerkzeuge → Aktionen → *Dashboard erstellen* ausführen, das YAML aus der Antwort oder der Benachrichtigung kopieren.
 Dann Einstellungen → Dashboards → Dashboard hinzufügen, öffnen, drei Punkte → Bearbeiten → drei Punkte → Roher Konfigurationseditor, einfügen,
 speichern. Der Dienst **schreibt nie in ein bestehendes Dashboard**. Nach dem Hinzufügen eines Fahrzeugs neu erstellen.
+
+## Ehrliche Zahlen: was gelernt statt gesetzt wird
+
+Jede Zahl, die vom Haus oder vom Auto abhängt, hat eine Vorgabe, die überall funktioniert, und Plugwhen ersetzt sie durch einen gelernten Wert,
+sobald genug Daten da sind (täglich im Hintergrund; das Dashboard sagt, welcher gerade gilt):
+
+| Zahl | Vorgabe | Gelernt aus |
+|---|---|---|
+| Abfahrt, auf die der Plan zielt | gelernte mittlere Stunde | die **frühe** Abfahrt (20. Perzentil der ersten Fahrten des Wochentags): ein Auto, das zur mittleren Abfahrt fertig ist, ist an etwa der Hälfte der frühen Tage zu spät |
+| bevorzugte kleinste Ladeleistung | 4 kW (Einstellung je Auto) | der Plan verteilt nicht flacher; der Lader im Auto hat unter wenigen kW höhere Verluste; bis zum Minimum nur, wenn die Energie sonst nicht passt |
+| Ladeverluste | 10 % | Tage mit Laden nur zu Hause: Anstieg des Ladestands × Akkugröße gegen die Wallbox-Energie (begrenzt auf 2 bis 25 %) |
+| Abzug von der Solarprognose | 0,5 kW | die nächtliche Grundlast (Median der Stunden 1 bis 5 des Bezugszählers); eine Einstellung geht vor |
+| Viertelstunden-Zuschlag des Potenzialrechners | 0,7 kW | die 5-Minuten-Statistik des Netzbezugs des gewählten Wächters: höchste Viertelstunde über dem Stundenmittel, 80. Perzentil |
+| Treffsicherheit der Solarprognose | 1,0 | erwartete gegen gemessene Solarenergie je Tag (Erzeugungsstatistik des Energie-Dashboards), Median der letzten 30 Tage, 0,5 bis 1,5; der Plan rechnet mit der skalierten Prognose |
+
+## Bringt das Lernen etwas? (eine Prüfung am eigenen Verlauf)
+
+Sensor **Bringt das Lernen etwas?** (und eine Karte mit zwei Grafiken im Dashboard). Er geht den Verlauf *Ihres* Autos Tag für Tag durch, und an
+jedem Tag kennt das Modell nur die Tage davor. Zwei Fragen:
+
+- **Hätte die Reichweite gereicht?** Mit der festen Reserve allein (was ein Auto ohne Lernen vorhielte) und mit der Reserve, angehoben um das
+  für den Wochentag Gelernte (der größere Wert aus Reserve und 80. Perzentil des Wochentags). Zwei Balken zeigen den Anteil der Tage.
+- **Wurde die Abfahrt richtig geraten?** Die gelernte übliche Stunde der ersten Fahrt gegen die echte, auf eine Stunde genau (der Verlauf kennt
+  die Stunde, nicht die Minute), als ein Balken je Wochentag.
+- **Wäre das Auto rechtzeitig fertig gewesen?** Ein Plan bis zur üblichen (mittleren) Abfahrt gegen einen bis zur frühen Abfahrt, als zwei Balken.
+
+Urteil: **Lernen hilft** (mindestens 5 Prozentpunkte mehr Tage gedeckt), **Reserve reicht** (weniger als 2 Punkte: die Reserve allein genügt, der
+gelernte Wert kostet nichts, bringt aber wenig), **kaum Unterschied** oder **zu wenig Daten** (weniger als 21 Tage prüfbar). Tage ohne Kilometer
+zählen nicht. Beim Auto des Autors deckt die Reserve allein etwa 88 % der Tage, mit dem Gelernten etwa 90 %; am meisten hilft der Verlauf bei der
+Abfahrtszeit.
+
+Die Karte des Lernmodus hat eine zweite Grafik: je Tag die Stunden, in denen Plan und Wallbox übereinstimmten (grün), und die Stunden, in denen
+sie abwichen (rot).
 
 ## Lernmodus
 

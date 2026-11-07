@@ -47,6 +47,7 @@ class DayRecord:
     home_kwh: float | None = None        # energy charged at the home wallbox (None = unknown)
     away_kwh: float | None = None        # energy charged elsewhere (None = unknown)
     consumption: float | None = None     # kWh per km on that day, if known
+    charged_kwh: float | None = None     # energy that went into the battery that day (rise of the state of charge x capacity)
 
     def clean_km(self) -> float | None:
         if self.km is None or self.km < 0 or self.km > MAX_PLAUSIBLE_KM_DAY:
@@ -63,6 +64,7 @@ class WeekdayPlan:
     drive_share: float | None        # 0..1
     departure_hour: float | None
     home_charge_share: float | None  # 0..1, None = not enough days with charging
+    departure_early: float | None = None  # the early departure (20th percentile): the plan aims at this, not at the median
 
 
 def quantile_high(values: list[float], q: float = HIGH_QUANTILE) -> float:
@@ -70,6 +72,15 @@ def quantile_high(values: list[float], q: float = HIGH_QUANTILE) -> float:
     s = sorted(values)
     if len(s) < 4:
         return s[-1]
+    return s[max(0, math.ceil(q * len(s)) - 1)]
+
+
+def quantile_low(values: list[float], q: float = 1.0 - HIGH_QUANTILE) -> float:
+    """Nearest-rank low quantile; with fewer than four values the smallest one. A car that is ready at the median departure
+    is late on about half of the early days, so the plan aims at the early departure."""
+    s = sorted(values)
+    if len(s) < 4:
+        return s[0]
     return s[max(0, math.ceil(q * len(s)) - 1)]
 
 
@@ -123,6 +134,7 @@ class MobilityModel:
             drive_share=round(sum(1 for k in kms if k >= MIN_DRIVE_KM) / len(kms), 2),
             departure_hour=round(median(hours), 1) if len(hours) >= MIN_DEPARTURE_DAYS else None,
             home_charge_share=round(sum(shares) / len(shares), 2) if len(shares) >= MIN_CHARGE_DAYS else None,
+            departure_early=round(quantile_low(hours), 1) if len(hours) >= MIN_DEPARTURE_DAYS else None,
         )
 
     def week(self) -> list[WeekdayPlan]:
@@ -138,7 +150,7 @@ class MobilityModel:
     # ---------- persistence ----------
 
     def to_dict(self) -> dict[str, Any]:
-        return {"days": {str(wd): [[r.day.isoformat(), r.km, r.first_move_hour, r.home_kwh, r.away_kwh, r.consumption]
+        return {"days": {str(wd): [[r.day.isoformat(), r.km, r.first_move_hour, r.home_kwh, r.away_kwh, r.consumption, r.charged_kwh]
                                    for r in lst] for wd, lst in self.days.items() if lst}}
 
     @classmethod
@@ -147,7 +159,7 @@ class MobilityModel:
         for _, rows in (d.get("days") or {}).items():
             for row in rows:
                 try:
-                    m.add_day(DayRecord(date.fromisoformat(row[0]), *[None if x is None else float(x) for x in row[1:6]]))
+                    m.add_day(DayRecord(date.fromisoformat(row[0]), *[None if x is None else float(x) for x in row[1:7]]))
                 except (TypeError, ValueError, IndexError):
                     continue
         return m

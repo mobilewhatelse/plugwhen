@@ -42,9 +42,12 @@ def make_plan(
     load: list[dict[str, Any]] | None = None,
     target_kw: float | None = None,
     available_kw: dict[datetime, float] | None = None,
+    pref_kw: float | None = None,
 ) -> dict[str, Any]:
     """Return the plan. `load` is a list of quarter hours {t, typical, high, n}; quarter hours not listed there count as
-    unknown (`DEFAULT_HIGH_KW`). `available_kw` maps a quarter-hour start to the usable available power in kW."""
+    unknown (`DEFAULT_HIGH_KW`). `available_kw` maps a quarter-hour start to the usable available power in kW.
+    `pref_kw`: the preferred lowest charging power (the car's charger wastes more below a few kW); the rest is spread no
+    flatter than this, and only if the energy does not fit that way the wallbox minimum `min_kw` is used."""
     result: dict[str, Any] = {
         "status": "planned", "needed_kwh": round(need_kwh, 2), "planned_kwh": 0.0, "available_kwh": 0.0, "grid_kwh": 0.0,
         "shortfall_kwh": 0.0, "windows": [], "quarters": {}, "ready_at": None, "latest_start": None,
@@ -90,9 +93,16 @@ def make_plan(
             continue
         put(q, max(min_kw, min(max_kw, q["avail"], remaining / (QUARTER_H * q["frac"]))))
 
-    # 2. the rest spread over the parking time with the lowest even grid import (quiet quarter hours get more)
+    # 2. the rest spread over the parking time with the lowest even grid import (quiet quarter hours get more); no flatter
+    #    than the preferred power, and only when that does not fit down to the wallbox minimum
     rest = [q for q in quarters if q["t"] not in plan]
-    for t, p in _spread(rest, remaining, max_kw, min_kw, target_kw).items():
+    floor = max(min_kw, min(max_kw, pref_kw)) if pref_kw else min_kw
+    spread = _spread(rest, remaining, max_kw, floor, target_kw)
+    delivered = sum(p * QUARTER_H * next(q for q in rest if q["t"] == t)["frac"] for t, p in spread.items())
+    if floor > min_kw and remaining - delivered > 0.1:
+        spread = _spread(rest, remaining, max_kw, min_kw, target_kw)
+    result["spread_floor_kw"] = floor if floor > min_kw and remaining - delivered <= 0.1 else min_kw
+    for t, p in spread.items():
         put(next(q for q in rest if q["t"] == t), p)
 
     # 3. what is still missing (tiny amounts below the wallbox minimum): the quietest quarter hours, the later one first

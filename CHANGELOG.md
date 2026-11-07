@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.6.0 (unreleased) - honest numbers
+
+- **The plan aims at the early departure** (20th percentile of the weekday's first trips) instead of the median: a car that is ready at
+  the median departure is late on about half of the early days. The check *Does learning help?* shows both as bars (ready in time:
+  plan until the usual departure against plan until the early departure).
+- **Preferred lowest charging power** (setting per car, default 4 kW): the rest is spread no flatter than this, because the car's charger
+  wastes more energy at very low power; down to the wallbox minimum only if the energy does not fit. Attribute `spread_floor_kw`.
+- **House-specific numbers learned instead of set** (daily, defaults until enough data, overridable): charging losses from days with
+  home charging only; the deduction from the solar forecast from the night-time base load (the setting is optional now); the
+  quarter-hour add of the potential calculator from the 5-minute statistics of the peak guard's grid import (was a fixed 0.7 kW measured
+  in one house). Attributes `efficiency`, `efficiency_learned`, `solar_deduct_kw`, `solar_deduct_source`, `quarter_add_kw`.
+- **Accuracy of the solar forecast**: predicted against measured solar energy per day (production statistic of the Energy dashboard);
+  the median ratio of the last 30 days scales the forecast before the plan uses it (0.5 to 1.5). Attribute `solar_factor`.
+- Dashboard: one line under the plan chart says which numbers are learned, set or default.
+
+## 0.5.1 (unreleased) - does the learning help, two charts
+
+- **Sensor "Does learning help?"**: walks through the history of the car day by day (the model only knows the days before each day):
+  how many days the range would have been enough with the fixed reserve alone and with the learned value, and how often the departure
+  hour was guessed right (within one hour) per weekday. Verdict: *learning helps*, *reserve is enough*, *little difference*, *too little
+  data* (fewer than 21 days).
+- **Two charts as SVG** (attribute `chart`, shown by a normal markdown card, no custom card): the check above (two bars and one bar per
+  weekday) and, in learn mode, plan against reality per day (green = agreed, red = differed). German and English labels.
+- Dashboard: card *Does learning help?* with the verdict in plain words and the chart; the learn mode card has its chart.
+- **Three more charts** (attribute `chart` / `plug_chart`): the charge plan as a timeline from now to the departure (windows as bars,
+  yellow = sun, blue = grid, departure marked), the potential as one bar per way of charging (highest quarter hour, demand charge,
+  how often not ready), the plug-in times of the last 14 days as one strip per day.
+- **Dashboard cleaned up, graphics first** (user feedback): fewer cards, charts instead of text and tables, one short line where a number
+  needs words, settings stay. Left out: range needed and target state of charge (in the status line), the plan tile and text, the
+  table of the learned week (the learning check shows it as a chart), explanation texts.
+
 ## 0.5.0 (unreleased) - learn mode
 
 - **Mode per car** (select, *Off* or *Learn*, default Learn, the last choice survives a restart) and the sensor **Would switch**:

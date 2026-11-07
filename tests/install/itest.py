@@ -177,7 +177,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 13, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 14, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
@@ -200,6 +200,10 @@ def main():
     log(num(cid) == 0.0 and abs((num(tid) or 0) - 33.3) < 0.2 and num(rid) == 100.0,
         "enough charge: 100 km, target 33 %, charge 0 kWh", f"{num(cid)} / {num(tid)} / {num(rid)}")
     log(state(lid)["state"] == "on", "kilometre learning is on by default")
+    ca, pa0 = state(cid)["attributes"], state(pid)["attributes"]
+    log("efficiency" in ca and ca.get("efficiency_learned") is False and pa0.get("solar_deduct_source") == "default" and pa0.get("pref_kw") == 4.0,
+        "house numbers start as defaults (efficiency, solar deduction, preferred power) and say so",
+        f"eff {ca.get('efficiency')} learned {ca.get('efficiency_learned')} deduct {pa0.get('solar_deduct_source')} pref {pa0.get('pref_kw')}")
     log(num(resid) == 100.0, "reserve starts at the value of the set-up")
 
     # a low battery: 10 % -> (33.3 - 10) % of 60 kWh / 0.9 = 15.6 kWh (recomputed when a setting changes)
@@ -244,6 +248,15 @@ def main():
     if mode_s and would_s:
         mid, wid = mode_s["entity_id"], would_s["entity_id"]
         log(state(mid)["state"] == "learn", "the mode is learn by default", state(mid)["state"])
+        lc = find("sensor", "does_learning_help")
+        log(bool(lc), "the sensor 'does learning help' exists")
+        if lc:
+            ok = wait_for(lambda: state(lc["entity_id"])["state"] in ("too_little_data", "learning_helps", "reserve_enough", "little"), 30)
+            la = state(lc["entity_id"])["attributes"]
+            log(bool(ok) and state(lc["entity_id"])["state"] == "too_little_data" and str(la.get("chart", "")).startswith("<svg"),
+                "no history yet: too little data, and the chart says so (valid SVG)", f"{state(lc['entity_id'])['state']} / {str(la.get('chart'))[:40]}")
+        wa0 = state(wid)["attributes"] if would_s else {}
+        log(str(wa0.get("chart", "")).startswith("<svg"), "learn mode: the chart of plan against reality is delivered as SVG", str(wa0.get("chart"))[:40])
         ok = wait_for(lambda: state(wid)["state"] in ("charge", "pause"), 30)
         wa = state(wid)["attributes"]
         log(bool(ok) and wa.get("reason") in ("in_window", "waiting_for_window", "plan_done", "cannot_reach_target") and "summary" in wa,

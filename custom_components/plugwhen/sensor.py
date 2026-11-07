@@ -12,7 +12,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import PlugwhenEntry
-from .const import PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
+from .charts import chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow
+from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
 
 
@@ -28,6 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             ReadinessSensor(plug, v),
             PotentialSensor(plug, v),
             WouldSwitchSensor(plug, v),
+            LearningCheckSensor(plug, v),
             WeekPlanSensor(plug, v),
         ], config_subentry_id=sub_id)
 
@@ -63,6 +65,7 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "plugged": v.plugged,
             "reserve_km": v.reserve_km,
             "learn_km": v.learn_km,
+            "efficiency": v.efficiency or 0.9, "efficiency_learned": v.efficiency is not None,
             "departure": v.departure.isoformat() if v.departure else None,
             "samples": v.plan.samples if v.plan else 0,
         }
@@ -113,7 +116,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
     (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`."""
 
-    _unrecorded_attributes = frozenset({"windows"})
+    _unrecorded_attributes = frozenset({"windows", "chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = PLAN_STATES
     _attr_icon = "mdi:calendar-clock"
@@ -140,12 +143,17 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
             "load_forecast_used": v.load_used, "load_entity": self.plug._load_entity(), "availability_used": v.availability_used,
             "availability_source": v.availability_source,
+            "solar_factor": self.plug.solar_factor(), "solar_deduct_kw": self.plug.solar_deduct_kw(),
+            "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
+            "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
+            "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),
         }
 
 
 class ReadinessSensor(PlugwhenEntity, SensorEntity):
     """Will the car be ready at the next departure? `ready`, or what to do: `plug_in`, `low`, `too_late`, `not_reachable`."""
 
+    _unrecorded_attributes = frozenset({"plug_chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = READINESS_STATES
     _attr_icon = "mdi:car-electric"
@@ -168,6 +176,7 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
                "soc_stale": v.soc_stale}
         if v.cfg.get("plugged_entity"):   # how the car was actually plugged in over the last four weeks
             out["plugging"] = v.plug_log.summary(dt_util.now())
+            out["plug_chart"] = chart_plugs(v.plug_log.intervals(), dt_util.now(), self.hass.config.language)
         return out
 
 
@@ -176,7 +185,7 @@ class PotentialSensor(PlugwhenEntity, SensorEntity):
     State: worth_it, setting_enough (the wallbox's own "ready by" with a low current is about as good), little,
     too_little_data, no_data (an entity is missing)."""
 
-    _unrecorded_attributes = frozenset({"strategies"})
+    _unrecorded_attributes = frozenset({"strategies", "chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = POTENTIAL_STATES
     _attr_icon = "mdi:chart-bell-curve-cumulative"
@@ -197,7 +206,10 @@ class PotentialSensor(PlugwhenEntity, SensorEntity):
         keys = ("saving_spread_per_year", "saving_spread_vs_guard_per_year", "peak_as_is_kw", "peak_spread_kw", "days", "sessions",
                 "session_kwh_median", "window_h_median", "sessions_with_plug_times", "model_error_kw", "computed_at", "history_days", "sources", "missing", "error",
                 "strategies")
-        return {k: p.get(k) for k in keys if k in p}
+        out = {k: p.get(k) for k in keys if k in p}
+        cur = {"EUR": "€", "USD": "$", "GBP": "£"}.get(self.hass.config.currency or "EUR", self.hass.config.currency or "€")
+        out["chart"] = chart_potential(p, self.hass.config.language, cur)
+        return out
 
 
 class WeekPlanSensor(PlugwhenEntity, SensorEntity):
@@ -236,7 +248,7 @@ class WouldSwitchSensor(PlugwhenEntity, SensorEntity):
     The attributes give the reason, when it is expected to change, the journal of the last decisions and how they compare with
     what the wallbox really did over the last days."""
 
-    _unrecorded_attributes = frozenset({"journal"})
+    _unrecorded_attributes = frozenset({"journal", "chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = WOULD_STATES
     _attr_icon = "mdi:eye-outline"
@@ -259,4 +271,30 @@ class WouldSwitchSensor(PlugwhenEntity, SensorEntity):
         return {
             "mode": v.mode, "reason": d.reason, "planned_kw": d.kw, "until": iso(d.until),
             "summary": v.shadow.summary(dt_util.now()), "journal": v.shadow.journal[-12:][::-1],
+            "chart": chart_shadow(v.shadow.days, dt_util.now().date(), self.hass.config.language),
         }
+
+
+class LearningCheckSensor(PlugwhenEntity, SensorEntity):
+    """Does the learning bring anything for this car? Walks through its history day by day (the model only knows the days before
+    each day) and compares the range with the fixed reserve alone against the reserve lifted by what was learned, and how often
+    the departure hour was guessed right. State: learning_helps, reserve_enough, little, too_little_data."""
+
+    _unrecorded_attributes = frozenset({"chart", "departure_by_weekday"})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = LEARNING_STATES
+    _attr_icon = "mdi:school-outline"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "learning_check")
+
+    @property
+    def native_value(self) -> str:
+        return self.plug.insight(self.vehicle)["verdict"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        r = self.plug.insight(self.vehicle)
+        keys = ("days", "reserve_km", "coverage_reserve_pct", "coverage_learned_pct", "gain_points", "departure_right_pct",
+                "departure_days", "departure_by_weekday")
+        return {**{k: r[k] for k in keys}, "chart": chart_learning(r, self.hass.config.language)}

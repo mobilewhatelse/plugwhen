@@ -47,7 +47,7 @@
           "load_entity": "Only for another source: a sensor with the attributes hours (t, typical, high) and target_kw. Not needed when you chose the peak guard.",
           "availability_entity": "A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast.",
           "use_solar_forecast": "Charge from the expected solar surplus first while the car is at home, then spread the rest over the parking time. Works with any solar forecast set up in the Energy dashboard; without one the rest is simply spread.",
-          "solar_deduct_kw": "kW taken off the solar forecast first, for what the house and a home battery use. The rest counts as available for the car.",
+          "solar_deduct_kw": "kW taken off the solar forecast first, for what the house and a home battery use. Empty: learned from the night-time base load of the grid import counter (default 0.5 kW until then).",
           "grid_energy_entity": "For the potential calculator: the meter's import counter (Wh or kWh, with long-term statistics). Taken from the quarter-hour peak guard if it is chosen.",
           "price_low": "For the potential calculator, in your currency per kW and year (up to the threshold). Empty: taken from the peak guard, otherwise only kW are shown.",
           "price_high": "Price per kW and year above the threshold. Empty: the same price.",
@@ -77,6 +77,7 @@
             "consumption_kwh_100": "Consumption (until learned)",
             "charge_kw_max": "Wallbox power (maximum)",
             "charge_kw_min": "Wallbox power (minimum)",
+            "charge_kw_pref": "Preferred lowest charging power",
             "plugged_entity": "Plugged in (optional)",
             "charging_entity": "Charging (optional)",
             "wallbox_energy_entity": "Wallbox energy counter (optional)",
@@ -93,6 +94,7 @@
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
             "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
             "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
+            "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
@@ -114,6 +116,7 @@
             "consumption_kwh_100": "Consumption (until learned)",
             "charge_kw_max": "Wallbox power (maximum)",
             "charge_kw_min": "Wallbox power (minimum)",
+            "charge_kw_pref": "Preferred lowest charging power",
             "plugged_entity": "Plugged in (optional)",
             "charging_entity": "Charging (optional)",
             "wallbox_energy_entity": "Wallbox energy counter (optional)",
@@ -130,6 +133,7 @@
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
             "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
             "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
+            "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
@@ -174,6 +178,15 @@
           "infeasible": "Target not reachable",
           "no_departure": "No departure",
           "unknown_soc": "State of charge unknown"
+        }
+      },
+      "learning_check": {
+        "name": "Does learning help?",
+        "state": {
+          "learning_helps": "Learning helps",
+          "reserve_enough": "Reserve is enough",
+          "little": "Little difference",
+          "too_little_data": "Too little data"
         }
       },
       "would_switch": {

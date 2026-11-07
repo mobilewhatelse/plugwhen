@@ -2,7 +2,7 @@
 
 # Plugwhen
 
-> **Status: version 0.5.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
+> **Status: version 0.6.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
 > recorded plug-in times, potential calculator, ready-made dashboard, learn mode). It **plans and shows**, it does not control the
 > wallbox yet. Private repository. German guide: [docs/ANLEITUNG.md](docs/ANLEITUNG.md).
 
@@ -113,6 +113,40 @@ potential with the comparison table, plug-in times, settings and the learned wee
 Settings → Dashboards → Add dashboard, open it, three dots → Edit → three dots → Raw configuration editor, paste, save. The service
 **never writes into an existing dashboard**. Create it again after adding a vehicle.
 
+## Honest numbers: what is learned instead of set
+
+Every number that depends on the house or the car has a default that works everywhere, and Plugwhen replaces it with a learned
+value as soon as there is enough data (daily, in the background; the dashboard says which one is in use):
+
+| Number | Default | Learned from |
+|---|---|---|
+| departure the plan aims at | learned median hour | the **early** departure (20th percentile of the weekday's first trips): a car ready at the median is late on about half of the early days |
+| preferred lowest charging power | 4 kW (setting per car) | the plan spreads no flatter than this; the car's charger wastes more below a few kW; down to the minimum only if the energy does not fit |
+| charging losses | 10 % | days with home charging only: rise of the state of charge x capacity against the wallbox energy (clamped 2 to 25 %) |
+| deduction from the solar forecast | 0.5 kW | the night-time base load (median of the hours 1 to 5 of the grid import counter); a setting overrides it |
+| quarter-hour add of the potential calculator | 0.7 kW | the 5-minute statistics of the grid import of the chosen peak guard: highest quarter hour above its hour's mean, 80th percentile |
+| accuracy of the solar forecast | 1.0 | predicted against measured solar energy per day (the Energy dashboard's production statistic), median ratio of the last 30 days, 0.5 to 1.5; the plan uses the scaled forecast |
+
+## Does the learning help? (a check on your own history)
+
+Sensor **Does learning help?** (and a card with two charts in the dashboard). It walks through the history of *your* car day by day,
+and on each day the model only knows the days before it. Two questions:
+
+- **Would the range have been enough?** With the fixed reserve alone (what a car without learning would keep) and with the reserve lifted
+  by what was learned for that weekday (the larger of the reserve and the weekday's 80th percentile). Two bars show the share of days.
+- **Was the departure guessed right?** The learned usual hour of the first trip against the real one, within one hour (the history knows
+  the hour, not the minute), as one bar per weekday.
+- **Would the car have been ready in time?** A plan that finishes at the usual (median) departure against one that finishes at the early
+  departure, as two bars.
+
+Verdict: **learning helps** (at least 5 percentage points more days covered), **reserve is enough** (less than 2 points: the reserve alone
+does it, the learned value costs nothing but brings little), **little difference**, or **too little data** (fewer than 21 days could be
+checked). Days without kilometres are not counted. On the author's car the reserve alone covers about 88 % of the days and with the
+learned value about 90 %; the departure hour is what the history helps most with.
+
+The learn mode card has a second chart: per day, the hours in which the plan and the wallbox agreed (green) and the hours in which they
+differed (red).
+
 ## Learn mode
 
 Per car the select *Mode* has two settings today: **Off** and **Learn** (default; the last choice is kept over a restart). In **Learn**
@@ -144,6 +178,7 @@ last 7 days and the journal.
 | `sensor` Learned days | attribute `week` |
 | `sensor` Would switch | learn mode: `charge`, `pause`, `none`, `off`; attributes `reason`, `planned_kw`, `until`, `summary`, `journal` |
 | `select` Mode | `off` or `learn` |
+| `sensor` Does learning help? | `learning_helps`, `reserve_enough`, `little`, `too_little_data`; attributes `coverage_reserve_pct`, `coverage_learned_pct`, `departure_right_pct`, `chart` |
 | `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready | settings |
 
 ## Limits

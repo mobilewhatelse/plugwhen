@@ -112,8 +112,9 @@ def main():
     s_w, d_w = it.api("POST", "/api/services/viertelstunden_waechter/create_dashboard?return_response", {})
     wtext = json.dumps(((d_w or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_w, dict) else ""
     ready = (it.find("sensor", "testauto_ready_for_departure") or {}).get("entity_id", "?")
-    log(s_w == 200 and pid in wtext and ready in wtext and "car_plan" in wtext,
-        "the guard's dashboard shows the charge plan and readiness of Plugwhen", f"{s_w} {len(wtext)} chars, readiness {ready}")
+    log(s_w == 200 and pid in wtext and f'"entity": "{ready}"' not in wtext and "ladeplan_berechnen" not in wtext and "charge_plan_enabled" not in wtext,
+        "the guard's dashboard shows only the charge plan of Plugwhen (no own plan, readiness stays on Plugwhen's dashboard)",
+        f"{s_w} {len(wtext)} chars")
     s_p, d_p = it.api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
     ptext = json.dumps(((d_p or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_p, dict) else ""
     log(s_p == 200 and pid in ptext and "zweitauto" in ptext.lower(), "Plugwhen's dashboard has both vehicles", f"{s_p} {len(ptext)} chars")

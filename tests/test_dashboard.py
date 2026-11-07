@@ -18,10 +18,15 @@ def ids(prefix):
 
 class DashboardTest(unittest.TestCase):
     def test_one_vehicle_all_entities_used(self):
+        """Every entity except the ones left out on purpose (their numbers are in the status line or a chart)."""
+        hidden = {"need_range", "target_soc", "week_plan"}
         views = build_views([{"name": "Car", "ids": ids("car")}], "en")
         text = json.dumps(views)
-        for eid in ids("car").values():
-            self.assertIn(eid, text)
+        for key, eid in ids("car").items():
+            if key in hidden:
+                self.assertNotIn(f'"entity": "{eid}"', text, key)
+            else:
+                self.assertIn(eid, text, key)
         self.assertEqual(len(views), 1)
         self.assertEqual(views[0]["type"], "sections")
 

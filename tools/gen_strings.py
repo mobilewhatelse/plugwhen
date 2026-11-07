@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"
 
 EN = dict(
     f_name="Name", f_odo="Odometer", f_soc="State of charge", f_age="Maximum age of the state of charge", f_cap="Battery capacity", f_res="Reserve", f_cons="Consumption (until learned)",
-    f_max="Wallbox power (maximum)", f_min="Wallbox power (minimum)", f_plug="Plugged in (optional)", f_chg="Charging (optional)",
+    f_max="Wallbox power (maximum)", f_min="Wallbox power (minimum)", f_pref="Preferred lowest charging power", f_plug="Plugged in (optional)", f_chg="Charging (optional)",
     f_wb="Wallbox energy counter (optional)", f_dep="Departure (optional)", f_notify="Notify service (optional)", f_hour="Warn from this hour",
     d_odo="Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
     d_soc="Sensor with the state of charge of the battery in percent.",
@@ -16,6 +16,7 @@ EN = dict(
     d_cons="Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
     d_max="What the wallbox can deliver at most. The plan never plans more.",
     d_min="Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
+    d_pref="The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
     d_plug="On when the car is plugged in. Needed for the warning \"plug in\".",
     d_chg="On while the car is charging. No warning is sent while it charges.",
     d_wb="Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
@@ -31,7 +32,7 @@ EN = dict(
     o_wachter="Quarter-hour peak guard", o_load="Other load forecast", o_avail="Availability of power",
     o_solar="Use the solar forecast of the Energy dashboard", o_sdeduct="Deduction from the solar forecast",
     od_solar="Charge from the expected solar surplus first while the car is at home, then spread the rest over the parking time. Works with any solar forecast set up in the Energy dashboard; without one the rest is simply spread.",
-    od_sdeduct="kW taken off the solar forecast first, for what the house and a home battery use. The rest counts as available for the car.",
+    od_sdeduct="kW taken off the solar forecast first, for what the house and a home battery use. Empty: learned from the night-time base load of the grid import counter (default 0.5 kW until then).",
     od_wachter="Choose the quarter-hour peak guard and Plugwhen finds its load forecast by itself (and keeps the charging under its peak target). Suggested automatically if exactly one is installed.",
     od_load="Only for another source: a sensor with the attributes hours (t, typical, high) and target_kw. Not needed when you chose the peak guard.",
     od_avail="A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast.",
@@ -48,13 +49,14 @@ EN = dict(
     od_pthr="kW from which the higher price applies. 0 = one price.",
     sv_name="Calculate the potential", sv_desc="Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
     sv_days="Days", sv_days_d="How far back (14 to 365 days, default 90).",
+    s_lc="Does learning help?", lc_helps="Learning helps", lc_enough="Reserve is enough", lc_little="Little difference", lc_few="Too little data",
     m_mode="Mode", m_off="Off", m_learn="Learn", s_would="Would switch", w_charge="charge", w_pause="pause", w_none="no decision", w_off="off",
     sd_name="Create the dashboard", sd_desc="Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only.",
     sw_learn="Learn kilometres per weekday", sw_notice="Warn when the car will not be ready", n_res="Reserve",
 )
 DE = dict(
     f_name="Name", f_odo="Kilometerstand", f_soc="Ladestand", f_age="Höchstalter des Ladestands", f_cap="Batteriekapazität", f_res="Reserve", f_cons="Verbrauch (bis gelernt)",
-    f_max="Wallbox-Leistung (höchstens)", f_min="Wallbox-Leistung (mindestens)", f_plug="Angesteckt (optional)", f_chg="Lädt (optional)",
+    f_max="Wallbox-Leistung (höchstens)", f_min="Wallbox-Leistung (mindestens)", f_pref="Bevorzugte kleinste Ladeleistung", f_plug="Angesteckt (optional)", f_chg="Lädt (optional)",
     f_wb="Energiezähler der Wallbox (optional)", f_dep="Abfahrt (optional)", f_notify="Benachrichtigungsdienst (optional)", f_hour="Warnen ab Uhrzeit",
     d_odo="Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
     d_soc="Sensor mit dem Ladestand der Batterie in Prozent.",
@@ -64,6 +66,7 @@ DE = dict(
     d_cons="Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
     d_max="Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
     d_min="Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
+    d_pref="Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
     d_plug="An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
     d_chg="An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
     d_wb="Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
@@ -79,7 +82,7 @@ DE = dict(
     o_wachter="Viertelstunden-Wächter", o_load="Andere Last-Prognose", o_avail="Verfügbarkeit von Strom",
     o_solar="Solarprognose des Energie-Dashboards nutzen", o_sdeduct="Abzug von der Solarprognose",
     od_solar="Zuerst mit dem erwarteten Sonnenüberschuss laden, solange das Auto zu Hause steht, den Rest über die Standzeit verteilen. Funktioniert mit jeder Solarprognose, die im Energie-Dashboard eingerichtet ist; ohne wird der Rest einfach verteilt.",
-    od_sdeduct="kW, die zuerst von der Solarprognose abgehen, für Haus und Hausakku. Der Rest gilt als verfügbar fürs Auto.",
+    od_sdeduct="kW, die zuerst von der Solarprognose abgehen, für Haus und Hausakku. Leer: aus der nächtlichen Grundlast des Bezugszählers gelernt (bis dahin 0,5 kW).",
     od_wachter="Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
     od_load="Nur für eine andere Quelle: ein Sensor mit den Attributen hours (t, typical, high) und target_kw. Nicht nötig, wenn Sie den Wächter gewählt haben.",
     od_avail="Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose.",
@@ -96,6 +99,7 @@ DE = dict(
     od_pthr="kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
     sv_name="Potenzial berechnen", sv_desc="Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
     sv_days="Tage", sv_days_d="Wie weit zurück (14 bis 365 Tage, Standard 90).",
+    s_lc="Bringt das Lernen etwas?", lc_helps="Lernen hilft", lc_enough="Reserve reicht", lc_little="Kaum Unterschied", lc_few="Zu wenig Daten",
     m_mode="Betriebsart", m_off="Aus", m_learn="Lernen", s_would="Würde schalten", w_charge="laden", w_pause="pausieren", w_none="keine Entscheidung", w_off="aus",
     sd_name="Dashboard erstellen", sd_desc="Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation (alle Fahrzeuge) und gibt es als YAML zurück, auch als Benachrichtigung, zum Einfügen in ein neues Dashboard (Bearbeiten, Raw-Konfigurationseditor). Nur Standardkarten. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren.",
     sw_learn="Kilometer je Wochentag lernen", sw_notice="Warnen, wenn das Auto nicht bereit sein wird", n_res="Reserve",
@@ -104,11 +108,11 @@ DE = dict(
 
 def build(L):
     data = {"name": L["f_name"], "odometer_entity": L["f_odo"], "soc_entity": L["f_soc"], "soc_max_age_h": L["f_age"], "capacity_kwh": L["f_cap"],
-            "reserve_km": L["f_res"], "consumption_kwh_100": L["f_cons"], "charge_kw_max": L["f_max"], "charge_kw_min": L["f_min"],
+            "reserve_km": L["f_res"], "consumption_kwh_100": L["f_cons"], "charge_kw_max": L["f_max"], "charge_kw_min": L["f_min"], "charge_kw_pref": L["f_pref"],
             "plugged_entity": L["f_plug"], "charging_entity": L["f_chg"], "wallbox_energy_entity": L["f_wb"],
             "departure_entity": L["f_dep"], "notify_service": L["f_notify"], "notify_hour": L["f_hour"]}
     desc = {"odometer_entity": L["d_odo"], "soc_entity": L["d_soc"], "soc_max_age_h": L["d_age"], "capacity_kwh": L["d_cap"], "reserve_km": L["d_res"],
-            "consumption_kwh_100": L["d_cons"], "charge_kw_max": L["d_max"], "charge_kw_min": L["d_min"], "plugged_entity": L["d_plug"],
+            "consumption_kwh_100": L["d_cons"], "charge_kw_max": L["d_max"], "charge_kw_min": L["d_min"], "charge_kw_pref": L["d_pref"], "plugged_entity": L["d_plug"],
             "charging_entity": L["d_chg"], "wallbox_energy_entity": L["d_wb"], "departure_entity": L["d_dep"],
             "notify_service": L["d_notify"], "notify_hour": L["d_hour"]}
     step = {"title": L["v_title"], "description": L["v_desc"], "data": data, "data_description": desc}
@@ -138,6 +142,7 @@ def build(L):
                 "charge_plan": {"name": L["s_plan"], "state": {"planned": L["plan_planned"], "not_needed": L["plan_not_needed"],
                                                                "infeasible": L["plan_infeasible"], "no_departure": L["plan_no_departure"],
                                                                "unknown_soc": L["plan_unknown"]}},
+                "learning_check": {"name": L["s_lc"], "state": {"learning_helps": L["lc_helps"], "reserve_enough": L["lc_enough"], "little": L["lc_little"], "too_little_data": L["lc_few"]}},
                 "would_switch": {"name": L["s_would"], "state": {"charge": L["w_charge"], "pause": L["w_pause"], "none": L["w_none"], "off": L["w_off"]}},
                 "potential": {"name": L["s_pot"], "state": {"worth_it": L["p_worth"], "setting_enough": L["p_setting"], "little": L["p_little"],
                                                            "too_little_data": L["p_few"], "no_data": L["p_nodata"]}},

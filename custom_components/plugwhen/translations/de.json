@@ -47,7 +47,7 @@
           "load_entity": "Nur für eine andere Quelle: ein Sensor mit den Attributen hours (t, typical, high) und target_kw. Nicht nötig, wenn Sie den Wächter gewählt haben.",
           "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose.",
           "use_solar_forecast": "Zuerst mit dem erwarteten Sonnenüberschuss laden, solange das Auto zu Hause steht, den Rest über die Standzeit verteilen. Funktioniert mit jeder Solarprognose, die im Energie-Dashboard eingerichtet ist; ohne wird der Rest einfach verteilt.",
-          "solar_deduct_kw": "kW, die zuerst von der Solarprognose abgehen, für Haus und Hausakku. Der Rest gilt als verfügbar fürs Auto.",
+          "solar_deduct_kw": "kW, die zuerst von der Solarprognose abgehen, für Haus und Hausakku. Leer: aus der nächtlichen Grundlast des Bezugszählers gelernt (bis dahin 0,5 kW).",
           "grid_energy_entity": "Für den Potenzialrechner: der Bezugszähler (Wh oder kWh, mit Langzeitstatistik). Wird vom Viertelstunden-Wächter übernommen, wenn er gewählt ist.",
           "price_low": "Für den Potenzialrechner, in Ihrer Währung je kW und Jahr (bis zur Schwelle). Leer: vom Wächter übernommen, sonst werden nur kW gezeigt.",
           "price_high": "Preis je kW und Jahr über der Schwelle. Leer: derselbe Preis.",
@@ -77,6 +77,7 @@
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
             "charge_kw_max": "Wallbox-Leistung (höchstens)",
             "charge_kw_min": "Wallbox-Leistung (mindestens)",
+            "charge_kw_pref": "Bevorzugte kleinste Ladeleistung",
             "plugged_entity": "Angesteckt (optional)",
             "charging_entity": "Lädt (optional)",
             "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
@@ -93,6 +94,7 @@
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
             "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
             "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
+            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
@@ -114,6 +116,7 @@
             "consumption_kwh_100": "Verbrauch (bis gelernt)",
             "charge_kw_max": "Wallbox-Leistung (höchstens)",
             "charge_kw_min": "Wallbox-Leistung (mindestens)",
+            "charge_kw_pref": "Bevorzugte kleinste Ladeleistung",
             "plugged_entity": "Angesteckt (optional)",
             "charging_entity": "Lädt (optional)",
             "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
@@ -130,6 +133,7 @@
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
             "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
             "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
+            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
@@ -174,6 +178,15 @@
           "infeasible": "Ziel nicht erreichbar",
           "no_departure": "Keine Abfahrt",
           "unknown_soc": "Ladestand unbekannt"
+        }
+      },
+      "learning_check": {
+        "name": "Bringt das Lernen etwas?",
+        "state": {
+          "learning_helps": "Lernen hilft",
+          "reserve_enough": "Reserve reicht",
+          "little": "Kaum Unterschied",
+          "too_little_data": "Zu wenig Daten"
         }
       },
       "would_switch": {
