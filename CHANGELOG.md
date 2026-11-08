@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 (unreleased) - sun windows
+
+- **Sun windows:** when does plugging in with the sun make sense? A strip chart for the next five days (car at home, sun available, orange
+  frame where charging with the sun covers a need or replaces grid energy later) and the best window as a line below. Attributes
+  `sun_windows` and `best_sun_window` in the look-ahead, attribute `sun_chart` at the charge plan; a card in the dashboard under *The next
+  departures*. Works without a solar plant (the chart then says there is no forecast).
+
 ## 0.7.0 (unreleased) - look ahead, charging habit, house-only add
 
 - **Look-ahead: when must I charge at the latest?** Up to fourteen days and ten departures ahead, for normal behaviour (the learned trips):

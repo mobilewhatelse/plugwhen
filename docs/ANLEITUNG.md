@@ -141,6 +141,11 @@ Leistung und bei voller Leistung nötig ist.
   Abfahrt kommt: Sonne im selben Fenster (gelb), mit Sonne vorgeladen (orange), Netz (blau).
 - **Eine Vorwarnung am Vorabend:** Ab der Abendstunde der Warnung sagt Plugwhen, dass **morgen** geladen werden muss (mit dem spätesten Start) oder
   dass sich morgen das Vorladen mit Sonne lohnt. Einmal je Tag und Art. Laden, das heute geschehen muss, ist Sache der Anstecken-Warnung.
+- **Sonnenfenster:** eine Streifengrafik für die nächsten fünf Tage: grau, wo das Auto voraussichtlich zu Hause ist (roter Strich = Abfahrt), gelb, wo in
+  dieser Zeit die Sonne Leistung liefert, ein **oranger Rahmen, wo sich das Anstecken lohnt** (es deckt einen Bedarf oder ersetzt Netzstrom vor einer
+  späteren Abfahrt). Darunter: *Am sinnvollsten: Sa 10:00–13:00, bis zu 12 kWh.* Sonne ohne Bedarf wird ohne Rahmen gezeigt. Ohne Solarprognose sagt die
+  Grafik das; sonst braucht Plugwhen keine Anlage. Nur eine Empfehlung, es wird nichts geschaltet. Die Daten stehen im Attribut `sun_windows` (und
+  `best_sun_window`) der Vorausschau.
 - **Ohne Solaranlage** wird nichts vorgeladen; die Vorausschau sagt dann nur, was jede Abfahrt aus dem Netz braucht und bis wann.
 - Sie **empfiehlt nur, es wird nichts geschaltet.** Die Annahmen sind offen: Wie lange das Auto weg ist, folgt aus der Länge der Fahrt (3 Stunden plus
   1 Stunde je 12 km, 3 bis 10 Stunden), bis es aus den Steckzeiten gelernt wird; die Fahrten sind die typischen. Die Solarprognose reicht so weit, wie

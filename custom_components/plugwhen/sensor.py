@@ -12,7 +12,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import PlugwhenEntry
-from .charts import chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow
+from .charts import (chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow,
+                     chart_sun_windows)
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
 
@@ -117,7 +118,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
     (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`."""
 
-    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart"})
+    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = PLAN_STATES
     _attr_icon = "mdi:calendar-clock"
@@ -148,6 +149,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
             "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
+            "sun_chart": chart_sun_windows(v.horizon, dt_util.now(), self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),
         }
 

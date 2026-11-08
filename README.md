@@ -142,6 +142,11 @@ at the preferred power and at full power.
 - **A heads-up on the evening before:** from the evening hour of the warning on, Plugwhen tells you that **tomorrow** charging will be
   needed (with the latest start) or that charging ahead with the sun pays tomorrow. Once per day and kind. Charging that has to happen
   today is the job of the plug-in warning.
+- **Sun windows:** a strip chart for the next five days: grey where the car is expected at home (red tick = departure), yellow where the
+  sun delivers power in that time, an **orange frame where plugging in pays** (it covers a need or replaces grid energy before a later
+  departure). Below it: *Best: Sat 10:00-13:00, up to 12 kWh.* Sun without a need is shown without a frame. Without a solar forecast the
+  chart says so; nothing else in Plugwhen needs a plant. A recommendation only, nothing is switched. The data is in the attribute
+  `sun_windows` (and `best_sun_window`) of the look-ahead.
 - **Without a solar plant** nothing is pre-charged; the look-ahead then only says what each departure needs from the grid and by when.
 - It **recommends only; nothing is switched.** Assumptions are open: the time the car is away follows from the length of the trip (3 h
   plus 1 h per 12 km, 3 to 10 h) until it is learned from the plug-in times; the trips are the typical ones. The solar forecast reaches as

@@ -69,6 +69,29 @@ def _sun_in(start: datetime, end: datetime, sun_kw: dict[datetime, float] | None
     return total, first, last
 
 
+def _sun_segments(start: datetime, end: datetime, sun_kw: dict[datetime, float] | None, max_kw: float) -> list[dict[str, Any]]:
+    """The stretches inside [start, end] in which the sun delivers real power (at least MIN_SUN_KW): from, to, energy, mean power.
+    A gap of one quarter hour does not split a stretch (a cloud passing by)."""
+    if not sun_kw or end <= start:
+        return []
+    segs: list[list[Any]] = []                        # [from, to, kwh, gap_kwh_pending]
+    t = _quarter(start)
+    while t < end:
+        nxt = t + QUARTER
+        lo, hi = max(t, start), min(nxt, end)
+        frac = (hi - lo).total_seconds() / 900.0
+        kw = min(max_kw, max(0.0, sun_kw.get(t, 0.0)))
+        if frac > 0 and kw >= MIN_SUN_KW:
+            kwh = kw * QUARTER_H * frac
+            if segs and (lo - segs[-1][1]) <= QUARTER:
+                segs[-1][1] = hi
+                segs[-1][2] += kwh
+            else:
+                segs.append([lo, hi, kwh])
+        t = nxt
+    return [{"from": a, "to": b, "kwh": k, "avg_kw": k / max(1e-6, (b - a).total_seconds() / 3600.0)} for a, b, k in segs]
+
+
 def horizon_plan(
     now: datetime,
     soc_kwh: float | None,
@@ -106,9 +129,11 @@ def horizon_plan(
         soc_end = max(soc, target)                       # at the end of the window, before the trip
         need = deficit / eff                             # from the wallbox
         sun, first, last = _sun_in(home_from, trip.departure, sun_kw, max_kw)
+        segments = _sun_segments(home_from, trip.departure, sun_kw, max_kw)
         direct = min(sun, need)
         rows.append({"trip": trip, "home_from": home_from, "need": need, "sun": sun, "direct": direct, "grid": need - direct,
-                     "spare": sun - direct, "soc_end": soc_end, "extra": 0.0, "pre_in": 0.0, "first": first, "last": last, "items": {}})
+                     "spare": sun - direct, "soc_end": soc_end, "extra": 0.0, "pre_in": 0.0, "first": first, "last": last, "items": {},
+                     "segments": segments})
         soc = max(0.0, soc_end - trip.km_typical * consumption)
         prev = trip
 
@@ -163,6 +188,17 @@ def horizon_plan(
             "latest_start_pref": iso(r0["trip"].departure - timedelta(hours=r0["need"] / min(max_kw, pref_kw))) if pref_kw else None,
             "covered_by_sun": r0["grid"] < TINY_KWH,
         }
+    # the sun windows in the times the car is at home: when would it make sense to plug in? (a recommendation, nothing is switched)
+    windows = []
+    for i, r in enumerate(rows):
+        used = r["direct"] + sum(r["items"].values())
+        purpose = "need" if r["direct"] >= TINY_KWH else ("precharge" if sum(r["items"].values()) >= TINY_KWH else "spare")
+        for sg in r["segments"]:
+            windows.append({"from": iso(sg["from"]), "to": iso(sg["to"]), "sun_kwh": round(sg["kwh"], 1), "avg_kw": round(sg["avg_kw"], 1),
+                            "purpose": purpose, "used_kwh": round(used, 1), "home_from": iso(r["home_from"]), "departure": iso(r["trip"].departure)})
+    result["sun_windows"] = windows
+    best = next((w for w in windows if w["purpose"] in ("need", "precharge") and w["sun_kwh"] >= 1.0), None)
+    result["best_sun_window"] = best
     with_pre = sum(max(0.0, r["grid"]) for r in rows)
     result.update({"grid_without_precharge_kwh": round(without, 1), "grid_with_precharge_kwh": round(with_pre, 1),
                    "saved_grid_kwh": round(without - with_pre, 1)})

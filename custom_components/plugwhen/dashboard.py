@@ -247,6 +247,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "markdown", "content": calib_line},
             {"type": "heading", "heading": head(t["hz_h"]), "icon": "mdi:calendar-arrow-right"},
             {"type": "markdown", "content": _chart(ids["charge_plan"], "horizon_chart")},
+            {"type": "markdown", "content": _chart(ids["charge_plan"], "sun_chart")},
             {"type": "markdown", "content": hz_tpl},
         ]},
         {"type": "grid", "cards": [

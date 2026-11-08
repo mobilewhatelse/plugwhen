@@ -258,6 +258,8 @@ def main():
         pa_h = state(pid)["attributes"]
         log("horizon" in pa_h and str(pa_h.get("horizon_chart", "")).startswith("<svg"),
             "the charge plan carries the look-ahead and its chart (valid SVG), also without a solar plant", f"{(pa_h.get('horizon') or {}).get('status')} / {str(pa_h.get('horizon_chart'))[:30]}")
+        log(str(pa_h.get("sun_chart", "")).startswith("<svg") and "sun_windows" in (pa_h.get("horizon") or {}),
+            "the charge plan carries the sun windows and their chart (valid SVG), also without a solar plant", f"{len((pa_h.get('horizon') or {}).get('sun_windows') or [])} windows / {str(pa_h.get('sun_chart'))[:30]}")
         hb = find("sensor", "charging_habit")
         hba = state(hb["entity_id"])["attributes"] if hb else {}
         log(bool(hb) and hba.get("status") in ("too_little_data", "ok", "no_data") and str(hba.get("chart", "")).startswith("<svg"),
