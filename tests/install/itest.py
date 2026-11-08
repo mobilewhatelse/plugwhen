@@ -169,6 +169,11 @@ def main():
            "departure_entity": "input_datetime.abfahrt", "charge_kw_max": 11, "charge_kw_min": 1.4,
            "notify_service": "script.notify_sink, script.notify_sink_2", "notify_hour": 0}
     s, d = api("POST", "/api/config/config_entries/subentries/flow", {"handler": [entry_id, "vehicle"]})
+    fields = {f.get("name"): f for f in (d.get("data_schema") or [])}
+    sels = {k: ((fields.get(k) or {}).get("selector") or {}).get("entity") or {} for k in ("odometer_entity", "soc_entity", "wallbox_energy_entity")}
+    log(all(v and "device_class" not in str(v) for v in sels.values()), "odometer, state of charge and wallbox counter do not filter by device class", str(sels))
+    s3, d3 = api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", dict(car, odometer_entity="sensor.wallbox_zaehler"))
+    log(s3 == 200 and (d3.get("errors") or {}).get("odometer_entity") == "not_distance", "a sensor with a wrong unit (kWh as odometer) is refused with a clear error", str(d3.get("errors")))
     s2, d2 = api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", dict(car, soc_entity="sensor.auto_kilometerstand"))
     log(s2 == 200 and (d2.get("errors") or {}).get("soc_entity") == "same_entity", "the same sensor twice is refused", str(d2.get("errors")))
     api("DELETE", f"/api/config/config_entries/subentries/flow/{d['flow_id']}")

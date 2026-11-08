@@ -27,6 +27,9 @@
     }
   },
   "options": {
+    "error": {
+      "not_energy": "Dieser Sensor hat keine Energieeinheit (Wh, kWh oder MWh). Ergänzen Sie beim Template-Sensor unit_of_measurement: kWh oder wählen Sie einen anderen Sensor."
+    },
     "step": {
       "init": {
         "title": "Verbindungen",
@@ -146,7 +149,10 @@
       "error": {
         "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein.",
         "min_above_max": "Die kleinste Leistung liegt über der größten.",
-        "notify_format": "Jeden Dienst als domain.name angeben, durch Komma getrennt, zum Beispiel notify.mobile_app_handy."
+        "notify_format": "Jeden Dienst als domain.name angeben, durch Komma getrennt, zum Beispiel notify.mobile_app_handy.",
+        "not_distance": "Dieser Sensor hat keine Entfernungseinheit (km oder mi). Wählen Sie den Kilometerstand oder ergänzen Sie beim Template-Sensor unit_of_measurement: km.",
+        "not_percent": "Dieser Sensor hat keine Prozent-Einheit. Wählen Sie den Ladestand in % oder ergänzen Sie beim Template-Sensor unit_of_measurement: \"%\".",
+        "not_energy": "Dieser Sensor hat keine Energieeinheit (Wh, kWh oder MWh). Ergänzen Sie beim Template-Sensor unit_of_measurement: kWh oder wählen Sie einen anderen Sensor."
       },
       "abort": {
         "reconfigure_successful": "Das Fahrzeug wurde aktualisiert."

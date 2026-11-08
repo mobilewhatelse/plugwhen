@@ -26,7 +26,9 @@ EN = dict(
     v_title="Vehicle", v_desc="Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.",
     c_desc="Works out when to plug in so that the car is ready when you leave. Vehicles are added afterwards on the integration page.",
     c_single="Plugwhen is already set up.", entry_type="Vehicle", add="Add vehicle", reconf="Reconfigure vehicle",
-    e_same="Odometer and state of charge must be different sensors.", e_minmax="The minimum power is above the maximum.",
+    e_same="Odometer and state of charge must be different sensors.", e_dist="This sensor has no distance unit (km or mi). Choose the odometer or add unit_of_measurement: km to the template sensor.",
+    e_pct="This sensor has no percent unit. Choose the state of charge in % or add unit_of_measurement: \"%\" to the template sensor.",
+    e_en="This sensor has no energy unit (Wh, kWh or MWh). Add unit_of_measurement: kWh to the template sensor or choose another sensor.", e_minmax="The minimum power is above the maximum.",
     e_notify="Enter each service as domain.name, separated by commas, for example notify.mobile_app_phone.", ok="The vehicle was updated.",
     o_title="Connections", o_desc="Optional. Plugwhen also works alone. Connect it to what you have: the load forecast of the quarter-hour peak guard (keeps the car's charging under the peak target) and a sensor of the availability interface (when power is cheap or free).",
     o_wachter="Quarter-hour peak guard", o_load="Other load forecast", o_avail="Availability of power",
@@ -76,7 +78,9 @@ DE = dict(
     v_title="Fahrzeug", v_desc="Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.",
     c_desc="Berechnet, wann man anstecken soll, damit das Auto bei der Abfahrt bereit ist. Fahrzeuge fügen Sie danach auf der Integrationsseite hinzu.",
     c_single="Plugwhen ist schon eingerichtet.", entry_type="Fahrzeug", add="Fahrzeug hinzufügen", reconf="Fahrzeug ändern",
-    e_same="Kilometerstand und Ladestand müssen verschiedene Sensoren sein.", e_minmax="Die kleinste Leistung liegt über der größten.",
+    e_same="Kilometerstand und Ladestand müssen verschiedene Sensoren sein.", e_dist="Dieser Sensor hat keine Entfernungseinheit (km oder mi). Wählen Sie den Kilometerstand oder ergänzen Sie beim Template-Sensor unit_of_measurement: km.",
+    e_pct="Dieser Sensor hat keine Prozent-Einheit. Wählen Sie den Ladestand in % oder ergänzen Sie beim Template-Sensor unit_of_measurement: \"%\".",
+    e_en="Dieser Sensor hat keine Energieeinheit (Wh, kWh oder MWh). Ergänzen Sie beim Template-Sensor unit_of_measurement: kWh oder wählen Sie einen anderen Sensor.", e_minmax="Die kleinste Leistung liegt über der größten.",
     e_notify="Jeden Dienst als domain.name angeben, durch Komma getrennt, zum Beispiel notify.mobile_app_handy.", ok="Das Fahrzeug wurde aktualisiert.",
     o_title="Verbindungen", o_desc="Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
     o_wachter="Viertelstunden-Wächter", o_load="Andere Last-Prognose", o_avail="Verfügbarkeit von Strom",
@@ -122,7 +126,7 @@ def build(L):
     return {
         "services": services,
         "config": {"step": {"user": {"title": "Plugwhen", "description": L["c_desc"]}}, "abort": {"single_instance_allowed": L["c_single"]}},
-        "options": {"step": {"init": {
+        "options": {"error": {"not_energy": L["e_en"]}, "step": {"init": {
             "title": L["o_title"], "description": L["o_desc"],
             "data": {"waechter_entry": L["o_wachter"], "load_entity": L["o_load"], "availability_entity": L["o_avail"], "use_solar_forecast": L["o_solar"], "solar_deduct_kw": L["o_sdeduct"],
                      "grid_energy_entity": L["o_grid"], "price_low": L["o_plow"], "price_high": L["o_phigh"], "price_threshold": L["o_pthr"]},
@@ -132,7 +136,8 @@ def build(L):
         "config_subentries": {"vehicle": {
             "entry_type": L["entry_type"], "initiate_flow": {"user": L["add"], "reconfigure": L["reconf"]},
             "step": {"user": step, "reconfigure": step},
-            "error": {"same_entity": L["e_same"], "min_above_max": L["e_minmax"], "notify_format": L["e_notify"]},
+            "error": {"same_entity": L["e_same"], "min_above_max": L["e_minmax"], "notify_format": L["e_notify"],
+                      "not_distance": L["e_dist"], "not_percent": L["e_pct"], "not_energy": L["e_en"]},
             "abort": {"reconfigure_successful": L["ok"]},
         }},
         "entity": {

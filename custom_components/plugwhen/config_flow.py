@@ -19,6 +19,7 @@ from .const import (
     O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
+from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
 
 WAECHTER_DOMAIN = "viertelstunden_waechter"
 
@@ -46,8 +47,8 @@ def find_waechter_entry(hass: HomeAssistant) -> str | None:
 def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
     return vol.Schema({
         vol.Required(V_NAME, default=d.get(V_NAME, vol.UNDEFINED)): TextSelector(),
-        vol.Required(V_ODOMETER, default=d.get(V_ODOMETER, vol.UNDEFINED)): _ent("sensor", "distance"),
-        vol.Required(V_SOC, default=d.get(V_SOC, vol.UNDEFINED)): _ent("sensor", "battery"),
+        vol.Required(V_ODOMETER, default=d.get(V_ODOMETER, vol.UNDEFINED)): _ent("sensor"),
+        vol.Required(V_SOC, default=d.get(V_SOC, vol.UNDEFINED)): _ent("sensor"),
         vol.Required(V_SOC_MAX_AGE, default=d.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)): _num(0, 168, 0.01, "h"),
         vol.Required(V_CAPACITY, default=d.get(V_CAPACITY, DEFAULT_CAPACITY_KWH)): _num(5, 250, 0.5, "kWh"),
         vol.Required(V_RESERVE, default=d.get(V_RESERVE, DEFAULT_RESERVE_KM)): _num(0, 600, 5, "km"),
@@ -57,7 +58,7 @@ def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
         vol.Required(V_CHARGE_PREF, default=d.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)): _num(0.5, 50, 0.1, "kW"),
         _opt(V_PLUGGED, d): _ent(["binary_sensor", "switch", "input_boolean"]),
         _opt(V_CHARGING, d): _ent(["binary_sensor", "switch", "input_boolean"]),
-        _opt(V_WALLBOX_ENERGY, d): _ent("sensor", "energy"),
+        _opt(V_WALLBOX_ENERGY, d): _ent("sensor"),
         _opt(V_DEPARTURE, d): _ent(["time", "datetime", "input_datetime", "sensor"]),
         _opt(V_NOTIFY, d): TextSelector(),
         vol.Required(V_NOTIFY_HOUR, default=d.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)): _num(0, 23, 1, "h"),
@@ -87,24 +88,32 @@ class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
         return {SUBENTRY_VEHICLE: VehicleFlow}
 
 
+OPTION_UNITS = {O_GRID_ENERGY: (ENERGY_UNITS, "not_energy")}
+VEHICLE_UNITS = {V_ODOMETER: (DISTANCE_UNITS, "not_distance"), V_SOC: (PERCENT_UNITS, "not_percent"),
+                 V_WALLBOX_ENERGY: (ENERGY_UNITS, "not_energy")}
+
+
 class PlugwhenOptionsFlow(OptionsFlow):
     """Connections to other integrations. Everything is optional: Plugwhen also works alone."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data={k: v for k, v in user_input.items() if v not in (None, "")})
-        current = dict(self.config_entry.options)
+            errors = unit_errors(self.hass.states.get, user_input, OPTION_UNITS)
+            if not errors:
+                return self.async_create_entry(data={k: v for k, v in user_input.items() if v not in (None, "")})
+        current = dict(self.config_entry.options) if user_input is None else dict(user_input)
         if not current.get(O_WAECHTER) and not current.get(O_LOAD):
             found = find_waechter_entry(self.hass)  # offered, not forced
             if found:
                 current[O_WAECHTER] = found
-        return self.async_show_form(step_id="init", data_schema=vol.Schema({
+        return self.async_show_form(step_id="init", errors=errors, data_schema=vol.Schema({
             _opt(O_WAECHTER, current): ConfigEntrySelector(ConfigEntrySelectorConfig(integration=WAECHTER_DOMAIN)),
             _opt(O_LOAD, current): _ent("sensor"),
             _opt(O_AVAIL, current): _ent("sensor"),
             vol.Required(O_SOLAR, default=current.get(O_SOLAR, True)): BooleanSelector(),
             _opt(O_SOLAR_DEDUCT, current): _num(0, 20, 0.1, "kW"),
-            _opt(O_GRID_ENERGY, current): _ent("sensor", "energy"),
+            _opt(O_GRID_ENERGY, current): _ent("sensor"),
             _opt(O_PRICE_LOW, current): _num(0, 5000, 0.01, "/kW/a"),
             _opt(O_PRICE_HIGH, current): _num(0, 5000, 0.01, "/kW/a"),
             _opt(O_PRICE_THRESHOLD, current): _num(0, 100, 0.1, "kW"),
@@ -123,6 +132,10 @@ class VehicleFlow(ConfigSubentryFlow):
         if user_input is not None:
             if user_input[V_ODOMETER] == user_input[V_SOC]:
                 errors[V_SOC] = "same_entity"
+            else:
+                errors = unit_errors(self.hass.states.get, user_input, VEHICLE_UNITS)
+            if errors:
+                pass
             elif float(user_input[V_CHARGE_MIN]) > float(user_input[V_CHARGE_MAX]):
                 errors[V_CHARGE_MIN] = "min_above_max"
             elif any("." not in x.strip() for x in (user_input.get(V_NOTIFY) or "").split(",") if x.strip()):

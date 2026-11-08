@@ -27,6 +27,9 @@
     }
   },
   "options": {
+    "error": {
+      "not_energy": "This sensor has no energy unit (Wh, kWh or MWh). Add unit_of_measurement: kWh to the template sensor or choose another sensor."
+    },
     "step": {
       "init": {
         "title": "Connections",
@@ -146,7 +149,10 @@
       "error": {
         "same_entity": "Odometer and state of charge must be different sensors.",
         "min_above_max": "The minimum power is above the maximum.",
-        "notify_format": "Enter each service as domain.name, separated by commas, for example notify.mobile_app_phone."
+        "notify_format": "Enter each service as domain.name, separated by commas, for example notify.mobile_app_phone.",
+        "not_distance": "This sensor has no distance unit (km or mi). Choose the odometer or add unit_of_measurement: km to the template sensor.",
+        "not_percent": "This sensor has no percent unit. Choose the state of charge in % or add unit_of_measurement: \"%\" to the template sensor.",
+        "not_energy": "This sensor has no energy unit (Wh, kWh or MWh). Add unit_of_measurement: kWh to the template sensor or choose another sensor."
       },
       "abort": {
         "reconfigure_successful": "The vehicle was updated."

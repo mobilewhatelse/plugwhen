@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.3 (unreleased) - any sensor with the right unit
+
+- **Odometer, state of charge, wallbox energy counter and grid energy can be any sensor**, also a template sensor without a device class.
+  Before, such sensors were missing from the list (the same problem was reported for the peak guard). Instead of the device class the dialog
+  now checks the **unit** when saving (kilometres or miles; percent; Wh, kWh or MWh) and says what to add if it does not fit.
+  A sensor without any unit is accepted where Plugwhen assumes one (kilometres, percent, kWh).
+
 ## 0.7.2 (unreleased) - learn mode says when it is still learning
 
 - The learn-mode chart *Plan against reality* shows **"Still learning · x of 7 days with a comparison"** instead of bars until seven days
