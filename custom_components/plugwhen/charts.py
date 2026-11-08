@@ -22,6 +22,7 @@ from xml.sax.saxutils import escape
 
 GREEN, RED, BLUE, GREY, SUN = "#2fbf71", "#e5534b", "#5b8def", "#8a94a6", "#f2b632"
 ORANGE = "#f0883e"
+SHADOW_MIN_DAYS = 7              # days with a comparison before the learn-mode chart shows bars
 
 T = {
     "de": dict(
@@ -30,6 +31,7 @@ T = {
         ready_title="Tage, an denen das Auto rechtzeitig fertig gewesen wäre", ready_median="Plan bis zur üblichen Abfahrt", ready_early="Plan bis zur frühen Abfahrt",
         wd=["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], agree="Plan und Wallbox stimmten überein", differ="abweichend",
         shadow_title="Plan gegen Wirklichkeit, Stunden je Tag", no_shadow="Noch keine Daten: der Vergleich füllt sich Tag für Tag",
+        shadow_learning="Lernt noch · {n} von {m} Tagen mit Vergleich",
         hours="h", sun="Sonne", grid="Netz", now="jetzt", departure_at="Abfahrt", nothing="Es muss nichts geladen werden",
         unknown_soc="Ladestand unbekannt: kein Plan", no_dep="Keine Abfahrt bekannt", missing="Es fehlen {kwh} kWh bis zur Abfahrt",
         pot_title="Höchste Viertelstunde und Leistungspreis je Ladeweise", not_ready="{n}× nicht fertig",
@@ -51,6 +53,7 @@ T = {
         ready_title="Days on which the car would have been ready in time", ready_median="plan until the usual departure", ready_early="plan until the early departure",
         wd=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], agree="plan and wallbox agreed", differ="differed",
         shadow_title="Plan against reality, hours per day", no_shadow="No data yet: the comparison fills up day by day",
+        shadow_learning="Still learning · {n} of {m} days with a comparison",
         hours="h", sun="sun", grid="grid", now="now", departure_at="departure", nothing="Nothing needs to be charged",
         unknown_soc="State of charge unknown: no plan", no_dep="No departure known", missing="{kwh} kWh missing at departure",
         pot_title="Highest quarter hour and demand charge per way of charging", not_ready="{n}x not ready",
@@ -147,6 +150,9 @@ def chart_shadow(days: dict[str, dict[str, float]] | None, today: date, lang: st
         rows.append((d, agree, differ))
     if not any(a + b > 0.05 for _, a, b in rows):
         return _svg(W, 60, _text(10, 34, t["no_shadow"], size=14))
+    compared = sum(1 for _, a, b in rows if a + b > 0.05)
+    if compared < SHADOW_MIN_DAYS:                                 # a value only when it says something
+        return _svg(W, 60, _text(10, 34, t["shadow_learning"].format(n=compared, m=SHADOW_MIN_DAYS), size=14))
     top, ph = 40, 150
     vmax = max(4.0, max(a + b for _, a, b in rows))
     vmax = float(int(vmax) + 1)

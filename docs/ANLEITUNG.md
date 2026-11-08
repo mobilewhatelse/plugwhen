@@ -79,7 +79,7 @@ oft das Auto nicht fertig gewesen wäre.
 | verteilt (Plugwhen) | die Energie gleichmäßig über das Standzeit-Fenster |
 
 Das Standzeit-Fenster ist das echte, sobald Steckzeiten mitgeschrieben sind, sonst die Annahme „angesteckt ab Ankunft“.
-Urteil: *lohnt sich*, *Wallbox-Einstellung reicht* (die eigene Funktion der Wallbox schafft fast dasselbe, ohne die Abfahrt zu verpassen), *gering*
+Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox schafft fast dasselbe, ohne die Abfahrt zu verpassen), *gering*
 (weniger als 1 kW Unterschied), *zu wenig Daten* (unter 14 Tagen oder 5 Ladungen) oder *Daten fehlen*.
 
 **So werden die Preise gerechnet:**
@@ -170,7 +170,7 @@ jedem Tag kennt das Modell nur die Tage davor. Zwei Fragen:
   zwei Balken und dann je Wochentag für den frühen Plan. Echte Abfahrten schwanken, deshalb ist nicht „auf die Stunde erraten“ die nützliche Zahl,
   sondern „rechtzeitig fertig“; darum zielt der Plan auf die frühe Abfahrt.
 
-Urteil: **Lernen hilft** (mindestens 5 Prozentpunkte mehr Tage gedeckt), **Lernen hilft bei der Abfahrt** (die Kilometer helfen kaum, aber der frühe
+Urteil: **Lernen hilft** (mindestens 5 Prozentpunkte mehr Tage gedeckt), **Hilft bei Abfahrt** (die Kilometer helfen kaum, aber der frühe
 Plan ist an mindestens 10 Punkten mehr Tagen rechtzeitig fertig als der mittlere), **Reserve reicht** (weniger als 2 Punkte: die Reserve allein genügt, der
 gelernte Wert kostet nichts, bringt aber wenig), **kaum Unterschied** oder **zu wenig Daten** (weniger als 21 Tage prüfbar). Tage ohne Kilometer
 zählen nicht. Beim Auto des Autors deckt die Reserve allein etwa 88 % der Tage, mit dem Gelernten etwa 90 %; am meisten hilft der Verlauf bei der

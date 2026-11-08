@@ -85,7 +85,7 @@ quarter hour per month, the demand charge and how often the car would not have b
 | spread | Plugwhen's way: the energy evenly over the parking window |
 
 The parking window is the real one when plug-in times are recorded, otherwise "plugged in from arrival".
-Result: *worth it*, *wallbox setting is enough* (the wallbox's own function gets almost the same without missing the
+Result: *worth it*, *setting is enough* (the wallbox's own function gets almost the same without missing the
 departure), *little* (less than 1 kW difference), *too little data* (fewer than 14 days or 5 sessions) or *data missing*.
 
 **Prices.** Monthly cost = (peak up to the threshold x price up to the threshold + rest above x price above) / 12; per year =
@@ -171,7 +171,7 @@ and on each day the model only knows the days before it. Two questions:
   departure (20th percentile), as two bars and then per weekday for the early plan. Real departures vary, so the useful number is not
   "guessed to the hour" but "ready in time"; that is why the plan aims at the early departure.
 
-Verdict: **learning helps** (at least 5 percentage points more days covered), **learning helps for the departure** (the kilometres hardly help,
+Verdict: **learning helps** (at least 5 percentage points more days covered), **helps with departure** (the kilometres hardly help,
 but the early plan is ready in time on at least 10 points more days than the median plan), **reserve is enough** (less than 2 points: the reserve alone
 does it, the learned value costs nothing but brings little), **little difference**, or **too little data** (fewer than 21 days could be
 checked). Days without kilometres are not counted. On the author's car the reserve alone covers about 88 % of the days and with the

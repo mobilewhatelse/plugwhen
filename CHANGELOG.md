@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2 (unreleased) - learn mode says when it is still learning
+
+- The learn-mode chart *Plan against reality* shows **"Still learning · x of 7 days with a comparison"** instead of bars until seven days
+  could be compared (days on which Plugwhen decided to charge or pause). A value only when it says something.
+- **Shorter tile names and states** so that nothing is cut off on a phone: *Potential* (was *Potential of spreading the charging*), *Learning useful?*,
+  states *Setting is enough* and *Helps with departure*.
+
 ## 0.7.1 (unreleased) - sun windows
 
 - **Sun windows:** when does plugging in with the sun make sense? A strip chart for the next five days (car at home, sun available, orange

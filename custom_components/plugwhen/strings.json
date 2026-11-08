@@ -187,7 +187,7 @@
         "name": "Does learning help?",
         "state": {
           "learning_helps": "Learning helps",
-          "departure_helps": "Learning helps for the departure",
+          "departure_helps": "Helps with departure",
           "reserve_enough": "Reserve is enough",
           "little": "Little difference",
           "too_little_data": "Too little data"
@@ -206,7 +206,7 @@
         "name": "Potential of spreading the charging",
         "state": {
           "worth_it": "Worth it",
-          "setting_enough": "Wallbox setting is enough",
+          "setting_enough": "Setting is enough",
           "little": "Little",
           "too_little_data": "Too little data",
           "no_data": "Data missing"
