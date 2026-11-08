@@ -66,7 +66,7 @@ class ChartTest(unittest.TestCase):
         for d in (None, {}, {TODAY.isoformat(): {"charge_charging": 0, "pause_idle": 0, "pause_charging": 0, "charge_idle": 0}}):
             svg = chart_shadow(d, TODAY, "en")
             parse(svg)
-            self.assertIn("No data yet", svg)
+            self.assertIn("Still learning · 0 of 7 days", svg)
 
     def test_texts_are_escaped(self):
         svg = chart_learning({**check(), "reserve_km": 100}, "en")

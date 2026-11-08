@@ -148,8 +148,6 @@ def chart_shadow(days: dict[str, dict[str, float]] | None, today: date, lang: st
         agree = ((v.get("charge_charging", 0) + v.get("pause_idle", 0)) / 3600) if v else 0.0
         differ = ((v.get("pause_charging", 0) + v.get("charge_idle", 0)) / 3600) if v else 0.0
         rows.append((d, agree, differ))
-    if not any(a + b > 0.05 for _, a, b in rows):
-        return _svg(W, 60, _text(10, 34, t["no_shadow"], size=14))
     compared = sum(1 for _, a, b in rows if a + b > 0.05)
     if compared < SHADOW_MIN_DAYS:                                 # a value only when it says something
         return _svg(W, 60, _text(10, 34, t["shadow_learning"].format(n=compared, m=SHADOW_MIN_DAYS), size=14))
