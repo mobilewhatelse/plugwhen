@@ -21,6 +21,8 @@ hourly mean within an hour) + the car. Everything is an estimate: the result say
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -161,7 +163,7 @@ def find_sessions(grid: dict[datetime, float], car: dict[datetime, float], trips
 
 
 def _plan(strategy: str, s: Session, grid, car, full_kw: float, min_kw: float, guard_kw: float | None,
-          fixed_kw: float, quarter_add_kw: float) -> tuple[dict[datetime, float], float]:
+          fixed_kw: float, quarter_add) -> tuple[dict[datetime, float], float]:
     """Car grid energy per hour for one session and the energy still missing at departure."""
     if strategy in ("as_is", "guard"):
         want = {h: _grid_part(grid, car, h) for h in s.hours}
@@ -185,7 +187,8 @@ def _plan(strategy: str, s: Session, grid, car, full_kw: float, min_kw: float, g
     if strategy == "guard" and guard_kw:
         held, backlog = {}, 0.0
         for h in s.hours:
-            hq = (_house(grid, car, h) or 0.0) + quarter_add_kw
+            hh = _house(grid, car, h) or 0.0
+            hq = hh + quarter_add(hh)
             give = min(want.get(h, 0.0) + backlog, max(min_kw, guard_kw - hq), full_kw)
             backlog = want.get(h, 0.0) + backlog - give
             held[h] = give
@@ -202,13 +205,14 @@ def calculate(
     min_kw: float = 1.4,
     fixed_kw: float = 4.1,
     guard_kw: float | None = None,
-    quarter_add_kw: float = 0.7,
+    quarter_add_kw: float | Callable[[float], float] = 0.7,
     prices: Prices | None = None,
     measured_peaks: dict[str, float] | None = None,
     plugged: list[tuple[datetime, datetime | None]] | None = None,
 ) -> dict[str, Any]:
     """The comparison for the given history. `measured_peaks` (month -> kW, measured without a guard) checks the model;
     `plugged` (recorded plug-in times) makes the parking windows real instead of assumed."""
+    qa = quarter_add_kw if callable(quarter_add_kw) else (lambda _h, v=float(quarter_add_kw): v)   # a number or a function of the house load
     hours = sorted(t for t in grid if t in car)
     days = len({t.date() for t in hours})
     sessions = find_sessions(grid, car, trips, plugged)
@@ -224,7 +228,7 @@ def calculate(
         load: dict[datetime, float] = defaultdict(float)
         missing = []
         for s in sessions:
-            plan, miss = _plan(st, s, grid, car, full_kw, min_kw, guard_kw, fixed_kw, quarter_add_kw)
+            plan, miss = _plan(st, s, grid, car, full_kw, min_kw, guard_kw, fixed_kw, qa)
             for h, v in plan.items():
                 load[h] += v
             if miss > 0.5:
@@ -239,7 +243,7 @@ def calculate(
                 gp = _grid_part(grid, car, t)
                 share = gp / car[t] if car.get(t) else 0.0         # the part of the car's power that came from the grid
                 c = real_q.get(t, c) * share
-            peaks[t.strftime("%Y-%m")] = max(peaks[t.strftime("%Y-%m")], house + quarter_add_kw + c)
+            peaks[t.strftime("%Y-%m")] = max(peaks[t.strftime("%Y-%m")], house + qa(house) + c)
         entry: dict[str, Any] = {
             "peaks": {m: round(peaks[m], 2) for m in months if m in peaks},
             "not_ready": len(missing),

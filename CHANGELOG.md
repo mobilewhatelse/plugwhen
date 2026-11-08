@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0 (unreleased) - look ahead, charging habit, house-only add
+
+- **Look-ahead: when must I charge at the latest?** Up to fourteen days and ten departures ahead, for normal behaviour (the learned trips):
+  until when the charge lasts (`lasts_until`), the first charging that is needed (`first_need`: day, latest start at the preferred power and at
+  full power) and per departure the energy that is missing. Chart *The next departures* (sun in the same window, sun charged ahead, grid).
+- **Charge ahead with the sun** (needs a solar forecast, works without a plant: then nothing is pre-charged): sun left over in an earlier window
+  (the weekend) covers the grid energy of a later departure (Wednesday), as far as the battery stays below 80 %. A recommendation, nothing is switched.
+- **Heads-up on the evening before:** tomorrow charging is needed (with the latest start), or charging ahead with the sun pays tomorrow. Once per
+  day and kind, German and English texts. The plan chart shows the latest start at full power as a dashed line.
+- **Charging habit:** sensor and chart, the energy per weekday during the day (9 to 17 h), at night (20 to 7 h) and in between, from the energy
+  counter of the wallbox only (no solar plant needed, no judgement).
+- **The quarter-hour add is measured for the house alone and by load level.** One learned value (0.26 kW in one house) was wrong: quiet hours
+  need about 0.1 kW, loaded hours several, and in loaded hours the car's own current steps and the throttling are in the grid import and are modelled
+  separately. Hours without wallbox energy are collected for good (the recorder keeps 5-minute values for ten days); a load level with fewer than
+  12 hours uses the default 0.7 kW.
+- **Learn mode also records the energy delivered although nothing was needed** (for example charging with the sun): `kwh_needless` and
+  `needless_h` in the summary, a line on the card. The automatic mode needs that number.
+
 ## 0.6.1 (unreleased) - the check says what it knows about the departure
 
 - **The check *Does learning help?* no longer shows "departure guessed right within one hour"** (31 to 46 % in one house, which looked

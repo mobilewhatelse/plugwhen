@@ -21,8 +21,8 @@ QUARTER = timedelta(minutes=15)
 MAX_GAP = timedelta(minutes=20)    # a longer gap (restart, outage) is not attributed to the last state
 JOURNAL_KEEP = 60
 DAYS_KEEP = 60
-SECONDS_KEYS = ("charge_charging", "charge_idle", "pause_charging", "pause_idle")
-ENERGY_KEYS = ("kwh_charge", "kwh_pause")
+SECONDS_KEYS = ("charge_charging", "charge_idle", "pause_charging", "pause_idle", "needless_charging")
+ENERGY_KEYS = ("kwh_charge", "kwh_pause", "kwh_needless")
 
 
 def _quarter(t: datetime) -> datetime:
@@ -75,7 +75,7 @@ class ShadowLog:
             k: {**_empty_day(), **{a: float(b) for a, b in v.items() if a in SECONDS_KEYS + ENERGY_KEYS}}
             for k, v in (d.get("days") or {}).items() if isinstance(v, dict)
         }
-        self._last: tuple[datetime, str | None, bool | None, float | None] | None = None
+        self._last: tuple[datetime, str | None, bool | None, float | None, str | None] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"journal": self.journal, "days": self.days}
@@ -92,17 +92,25 @@ class ShadowLog:
                 del self.journal[:-JOURNAL_KEEP]
                 changed = True
         if self._last is not None:
-            t0, a0, c0, e0 = self._last
+            t0, a0, c0, e0, r0 = self._last
             dt = now - t0
-            if timedelta(0) < dt <= MAX_GAP and a0 in ("charge", "pause"):
+            if timedelta(0) < dt <= MAX_GAP and (a0 in ("charge", "pause") or (a0 == "none" and r0 == "not_needed")):
                 day = self.days.setdefault(t0.date().isoformat(), _empty_day())
-                if c0 is not None:
-                    day[f"{a0}_{'charging' if c0 else 'idle'}"] += dt.total_seconds()
-                    changed = True
-                if energy_kwh is not None and e0 is not None and energy_kwh >= e0:
-                    day[f"kwh_{a0}"] += energy_kwh - e0
-                    changed = True
-        self._last = (now, decision.action if decision else None, charging, energy_kwh)
+                if a0 == "none":                        # nothing was needed: what the wallbox delivered anyway (for example with the sun)
+                    if c0:
+                        day["needless_charging"] += dt.total_seconds()
+                        changed = True
+                    if energy_kwh is not None and e0 is not None and energy_kwh >= e0:
+                        day["kwh_needless"] += energy_kwh - e0
+                        changed = True
+                else:
+                    if c0 is not None:
+                        day[f"{a0}_{'charging' if c0 else 'idle'}"] += dt.total_seconds()
+                        changed = True
+                    if energy_kwh is not None and e0 is not None and energy_kwh >= e0:
+                        day[f"kwh_{a0}"] += energy_kwh - e0
+                        changed = True
+        self._last = (now, decision.action if decision else None, charging, energy_kwh, decision.reason if decision else None)
         for old in sorted(self.days)[:-DAYS_KEEP]:
             del self.days[old]
         return changed
@@ -118,7 +126,7 @@ class ShadowLog:
                 seen += 1 if any(v[k] for k in SECONDS_KEYS + ENERGY_KEYS) else 0
                 for k, x in v.items():
                     tot[k] += x
-        decided = sum(tot[k] for k in SECONDS_KEYS)
+        decided = sum(tot[k] for k in ("charge_charging", "charge_idle", "pause_charging", "pause_idle"))
         agree = tot["charge_charging"] + tot["pause_idle"]
         return {
             "days": seen,
@@ -127,4 +135,6 @@ class ShadowLog:
             "charge_but_idle_h": round(tot["charge_idle"] / 3600, 1),
             "kwh_in_pause": round(tot["kwh_pause"], 1),
             "kwh_in_charge": round(tot["kwh_charge"], 1),
+            "needless_h": round(tot["needless_charging"] / 3600, 1),
+            "kwh_needless": round(tot["kwh_needless"], 1),
         }

@@ -1,6 +1,6 @@
 # Plugwhen – Anleitung (Deutsch)
 
-Stand: Version 0.6.1 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+Stand: Version 0.7.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
 
 ## Wofür?
 
@@ -124,8 +124,35 @@ sobald genug Daten da sind (täglich im Hintergrund; das Dashboard sagt, welcher
 | bevorzugte kleinste Ladeleistung | 4 kW (Einstellung je Auto) | der Plan verteilt nicht flacher; der Lader im Auto hat unter wenigen kW höhere Verluste; bis zum Minimum nur, wenn die Energie sonst nicht passt |
 | Ladeverluste | 10 % | Tage mit Laden nur zu Hause: Anstieg des Ladestands × Akkugröße gegen die Wallbox-Energie (begrenzt auf 2 bis 25 %) |
 | Abzug von der Solarprognose | 0,5 kW | die nächtliche Grundlast (Median der Stunden 1 bis 5 des Bezugszählers); eine Einstellung geht vor |
-| Viertelstunden-Zuschlag des Potenzialrechners | 0,7 kW | die 5-Minuten-Statistik des Netzbezugs des gewählten Wächters: höchste Viertelstunde über dem Stundenmittel, 80. Perzentil |
+| Viertelstunden-Zuschlag des Potenzialrechners | 0,7 kW | die 5-Minuten-Statistik des Netzbezugs des gewählten Wächters, **nur für das Haus** (Stunden ohne Wallbox-Energie) und **nach Lastzustand** (ruhige, mittlere, hohe Stunden): höchste Viertelstunde über dem Stundenmittel, 80. Perzentil; ein Zustand braucht 12 Stunden, bis dahin gilt dort 0,7 kW; die Stunden werden dauerhaft gesammelt |
 | Treffsicherheit der Solarprognose | 1,0 | erwartete gegen gemessene Solarenergie je Tag (Erzeugungsstatistik des Energie-Dashboards), Median der letzten 30 Tage, 0,5 bis 1,5; der Plan rechnet mit der skalierten Prognose |
+
+## Vorausschau: wann muss ich spätestens laden?
+
+Der Plan reicht bis zur nächsten Abfahrt; am selben Tag ist es oft schon zu spät. Die **Vorausschau** geht bis zu **vierzehn Tage und zehn
+Abfahrten** weit und beantwortet **bei normalem Verhalten** (den gelernten Fahrten): *Bis wann reicht der Ladestand, und wann muss das Laden
+spätestens beginnen?* Für jede Abfahrt wird die fehlende Energie gerechnet (das Auto muss mit mindestens der Reichweite losfahren, die der Bedarf
+verlangt; nach jeder Fahrt hat es die erwartete Energie verbraucht) und der **späteste Start**: die Abfahrt minus die Zeit, die bei bevorzugter
+Leistung und bei voller Leistung nötig ist.
+
+- **Mit Sonne vorladen** (mit Solarprognose, z. B. aus dem Energie-Dashboard): Sonne, die in einem früheren Fenster übrig ist (zum Beispiel am
+  Wochenende), wird für den Netzstrom einer späteren Abfahrt genutzt (zum Beispiel Mittwoch), solange der Akku unter 80 % bleibt und die Sonne reicht.
+  Beispiel: *Samstag 10 bis 13 Uhr, 14 kWh, ersetzt Netzstrom vor Mittwoch 07:00.* Die Grafik *Die nächsten Abfahrten* zeigt, woher der Strom jeder
+  Abfahrt kommt: Sonne im selben Fenster (gelb), mit Sonne vorgeladen (orange), Netz (blau).
+- **Eine Vorwarnung am Vorabend:** Ab der Abendstunde der Warnung sagt Plugwhen, dass **morgen** geladen werden muss (mit dem spätesten Start) oder
+  dass sich morgen das Vorladen mit Sonne lohnt. Einmal je Tag und Art. Laden, das heute geschehen muss, ist Sache der Anstecken-Warnung.
+- **Ohne Solaranlage** wird nichts vorgeladen; die Vorausschau sagt dann nur, was jede Abfahrt aus dem Netz braucht und bis wann.
+- Sie **empfiehlt nur, es wird nichts geschaltet.** Die Annahmen sind offen: Wie lange das Auto weg ist, folgt aus der Länge der Fahrt (3 Stunden plus
+  1 Stunde je 12 km, 3 bis 10 Stunden), bis es aus den Steckzeiten gelernt wird; die Fahrten sind die typischen. Die Solarprognose reicht so weit, wie
+  der Anbieter sie liefert, danach rechnet die Vorausschau mit dem Netz.
+- Das Plan-Bild zeigt den spätesten Start bei voller Leistung als gestrichelte Linie.
+
+## Wann laden Sie? (die Ladegewohnheit)
+
+Sensor **Ladegewohnheit** (Anteil der Energie, die nachts, 20 bis 7 Uhr, in den letzten 90 Tagen geladen wurde) und eine Grafik je Wochentag: die Energie an
+einem durchschnittlichen Montag, Dienstag und so weiter, **tagsüber (9 bis 17 Uhr)**, **nachts** und dazwischen. Sie braucht nur den Energiezähler der
+Wallbox, keine Solaranlage, und sie bewertet nicht (mit Nachtstrom ist nachts laden genau richtig). Sie zeigt, wohin sich das Laden verschieben ließe: Ein Wochentag mit viel
+Laden in der Nacht ist, wo Netzstrom und Spitzen herkommen. Unter 28 Tagen Daten steht *zu wenig Daten*.
 
 ## Bringt das Lernen etwas? (eine Prüfung am eigenen Verlauf)
 

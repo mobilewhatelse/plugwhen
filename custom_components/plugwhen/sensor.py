@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import PlugwhenEntry
-from .charts import chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow
+from .charts import chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
 
@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             PotentialSensor(plug, v),
             WouldSwitchSensor(plug, v),
             LearningCheckSensor(plug, v),
+            ChargingHabitSensor(plug, v),
             WeekPlanSensor(plug, v),
         ], config_subentry_id=sub_id)
 
@@ -116,7 +117,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
     (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`."""
 
-    _unrecorded_attributes = frozenset({"windows", "chart"})
+    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = PLAN_STATES
     _attr_icon = "mdi:calendar-clock"
@@ -146,6 +147,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "solar_factor": self.plug.solar_factor(), "solar_deduct_kw": self.plug.solar_deduct_kw(),
             "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
             "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
+            "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),
         }
 
@@ -298,3 +300,27 @@ class LearningCheckSensor(PlugwhenEntity, SensorEntity):
         keys = ("days", "reserve_km", "coverage_reserve_pct", "coverage_learned_pct", "gain_points", "departure_right_pct",
                 "departure_days", "departure_by_weekday", "ready_median_pct", "ready_early_pct", "departure_gain_points")
         return {**{k: r[k] for k in keys}, "chart": chart_learning(r, self.hass.config.language)}
+
+
+class ChargingHabitSensor(PlugwhenEntity, SensorEntity):
+    """When the car is charged: the share of the energy charged at night (20 to 7 h) over the last 90 days. The attributes give the
+    day and the weekend share and, per weekday, the energy during the day, at night and in between, and a chart. It works without
+    a solar plant: it only needs the energy counter of the wallbox. It does not judge (with a night tariff, night charging is fine)."""
+
+    _unrecorded_attributes = frozenset({"chart", "by_weekday"})
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:chart-bar-stacked"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "habit")
+
+    @property
+    def native_value(self) -> int | None:
+        h = self.vehicle.habit
+        return h.get("night_share_pct") if h and h.get("status") == "ok" else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        h = self.vehicle.habit or {"status": "no_data"}
+        keys = ("status", "days", "total_kwh", "day_share_pct", "night_share_pct", "weekend_share_pct", "weekdays_night_share_pct")
+        return {**{k: h.get(k) for k in keys}, "by_weekday": h.get("weekday"), "chart": chart_habit(h, self.hass.config.language)}

@@ -180,6 +180,9 @@
           "unknown_soc": "State of charge unknown"
         }
       },
+      "habit": {
+        "name": "Charging habit"
+      },
       "learning_check": {
         "name": "Does learning help?",
         "state": {

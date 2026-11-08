@@ -2,7 +2,7 @@
 
 # Plugwhen
 
-> **Status: version 0.6.1 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
+> **Status: version 0.7.0 in development** (learned week, need, charge plan with sun first and the rest spread, warning,
 > recorded plug-in times, potential calculator, ready-made dashboard, learn mode). It **plans and shows**, it does not control the
 > wallbox yet. Private repository. German guide: [docs/ANLEITUNG.md](docs/ANLEITUNG.md).
 
@@ -124,8 +124,36 @@ value as soon as there is enough data (daily, in the background; the dashboard s
 | preferred lowest charging power | 4 kW (setting per car) | the plan spreads no flatter than this; the car's charger wastes more below a few kW; down to the minimum only if the energy does not fit |
 | charging losses | 10 % | days with home charging only: rise of the state of charge x capacity against the wallbox energy (clamped 2 to 25 %) |
 | deduction from the solar forecast | 0.5 kW | the night-time base load (median of the hours 1 to 5 of the grid import counter); a setting overrides it |
-| quarter-hour add of the potential calculator | 0.7 kW | the 5-minute statistics of the grid import of the chosen peak guard: highest quarter hour above its hour's mean, 80th percentile |
+| quarter-hour add of the potential calculator | 0.7 kW | the 5-minute statistics of the grid import of the chosen peak guard, **for the house alone** (hours in which the wallbox delivered nothing) and **by load level** (quiet, medium, high hours): highest quarter hour above its hour's mean, 80th percentile; a level needs 12 hours, until then 0.7 kW applies there; the hours are collected for good |
 | accuracy of the solar forecast | 1.0 | predicted against measured solar energy per day (the Energy dashboard's production statistic), median ratio of the last 30 days, 0.5 to 1.5; the plan uses the scaled forecast |
+
+## Looking ahead: when must I charge at the latest?
+
+The plan reaches the next departure; on the same day it is often too late. The **look-ahead** goes up to **fourteen days and ten
+departures** ahead and answers, **for normal behaviour** (the learned trips): *until when does the charge last, and by when must
+charging start at the latest?* For every departure it works out the energy that is missing (the car must leave with at least the range
+the need asks for, after each trip it has used the expected energy) and the **latest start**: the departure minus the time needed
+at the preferred power and at full power.
+
+- **Charge ahead with the sun** (with a solar forecast, e.g. of the Energy dashboard): sun that is left over in an earlier window (for
+  example the weekend) is used for the grid energy of a later departure (for example Wednesday), as far as the battery stays below
+  80 % and the sun lasts. Example: *Saturday 10 to 13 h, 14 kWh, replaces grid energy before Wednesday 07:00.* The chart *The next
+  departures* shows where the energy of each departure comes from: sun in the same window (yellow), sun charged ahead (orange), grid (blue).
+- **A heads-up on the evening before:** from the evening hour of the warning on, Plugwhen tells you that **tomorrow** charging will be
+  needed (with the latest start) or that charging ahead with the sun pays tomorrow. Once per day and kind. Charging that has to happen
+  today is the job of the plug-in warning.
+- **Without a solar plant** nothing is pre-charged; the look-ahead then only says what each departure needs from the grid and by when.
+- It **recommends only; nothing is switched.** Assumptions are open: the time the car is away follows from the length of the trip (3 h
+  plus 1 h per 12 km, 3 to 10 h) until it is learned from the plug-in times; the trips are the typical ones. The solar forecast reaches as
+  far as the forecast provider delivers it, beyond that the look-ahead counts on the grid.
+- The plan chart shows the latest start at full power as a dashed line.
+
+## When do you charge? (the charging habit)
+
+Sensor **Charging habit** (the share of the energy charged at night, 20 to 7 h, over the last 90 days) and a chart per weekday: the
+energy on an average Monday, Tuesday and so on, **during the day (9 to 17 h)**, **at night** and in between. It needs only the
+energy counter of the wallbox, no solar plant, and it does not judge (with a night tariff, night charging is what you want). It shows where charging could
+move: a weekday with much night charging is where grid energy and peaks come from. Fewer than 28 days of data give *too little data*.
 
 ## Does the learning help? (a check on your own history)
 
@@ -178,6 +206,7 @@ last 7 days and the journal.
 | `sensor` Learned days | attribute `week` |
 | `sensor` Would switch | learn mode: `charge`, `pause`, `none`, `off`; attributes `reason`, `planned_kw`, `until`, `summary`, `journal` |
 | `select` Mode | `off` or `learn` |
+| `sensor` Charging habit | share of the energy charged at night; attributes `by_weekday`, `day_share_pct`, `weekend_share_pct`, `chart` |
 | `sensor` Does learning help? | `learning_helps`, `reserve_enough`, `little`, `too_little_data`; attributes `coverage_reserve_pct`, `coverage_learned_pct`, `departure_right_pct`, `chart` |
 | `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready | settings |
 

@@ -23,16 +23,18 @@ from .const import (
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
 )
 from .freshness import soc_is_stale
-from .calibrate import SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_from_5min
+from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
+from .habit import charging_habit
 from .history import records_from_hourly, to_km, to_kwh
 from .insight import learning_check
 from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours, merge_available, surplus_from_solar
 from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
-from .messages import notice_text
+from .horizon import Trip, horizon_plan
+from .messages import ahead_text, notice_text
 from .need import DEFAULT_EFFICIENCY, MIN_SAMPLES, Need, compute_need
-from .notice import Notice, check_ready, dedupe_key, should_check
+from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, should_check
 from .plan import make_plan
 from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
@@ -40,6 +42,8 @@ from .potential import Prices, calculate as calculate_potential, clean_grid
 _LOGGER = logging.getLogger(__name__)
 _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
 LOOKAHEAD_DAYS = 7
+HORIZON_DAYS = 14             # days looked at for the look-ahead (as far as possible: with normal behaviour, when is charging needed?)
+HORIZON_TRIPS = 10            # departures in the look-ahead
 MIN_DRIVE_SHARE = 0.5        # a weekday counts as a day of departure if the car is used on at least half of its days
 SENT_KEEP = 8                # warnings remembered per vehicle (so that a restart does not repeat them)
 
@@ -78,6 +82,8 @@ class Vehicle:
     records: list = field(default_factory=list)   # daily records of the history (for the check of the learning)
     insight_cache: tuple | None = None       # ((reserve, number of records, loaded at), result)
     efficiency: float | None = None          # learned share of the wallbox energy that reaches the battery (None = default)
+    habit: dict | None = None                # when the car is charged (per weekday: day, night, in between)
+    horizon: dict | None = None              # look-ahead over the next departures (deficits, pre-charging with the sun)
     mode: str = DEFAULT_MODE                 # "off" or "learn" (nothing is switched in either)
     decision: Decision | None = None         # what would be switched now (learn mode)
     shadow: ShadowLog = field(default_factory=ShadowLog)
@@ -100,6 +106,7 @@ class Plugwhen:
         self._calib: dict[str, Any] = {"quarter_add_kw": None, "base_load_kw": None, "at": None}
         self._calib_at: datetime | None = None
         self._solar_acc = SolarAccuracy()
+        self._add_model = QuarterAddModel()
         self._solar: dict[datetime, float] | None = None
         self._solar_at: datetime | None = None
         for sub in entry.subentries.values():
@@ -118,6 +125,7 @@ class Plugwhen:
         if isinstance(calib.get("calib"), dict):
             self._calib.update({k: calib["calib"].get(k) for k in ("quarter_add_kw", "base_load_kw", "at")})
         self._solar_acc = SolarAccuracy(calib.get("solar"))
+        self._add_model = QuarterAddModel(calib.get("add"))
         for v in self.vehicles.values():
             v.shadow = ShadowLog(shadows.get(v.sub_id))
         for v in self.vehicles.values():
@@ -225,7 +233,7 @@ class Plugwhen:
 
             stats = await get_instance(self.hass).async_add_executor_job(
                 statistics_during_period, self.hass, now - timedelta(days=HISTORY_DAYS), now, ids, "hour", None,
-                {"state", "mean", "max"},
+                {"state", "mean", "max", "change"},
             )
         except Exception as err:  # noqa: BLE001 - the planner must not break because the history is missing
             v.history_error = str(err)
@@ -244,6 +252,11 @@ class Plugwhen:
                 out.append((dt_util.as_local(dt_util.utc_from_timestamp(row["start"])), convert(val, unit)))
             return out
 
+        if wb_id:
+            wb_unit = self._unit(wb_id)
+            hourly_wb = {dt_util.as_local(dt_util.utc_from_timestamp(r["start"])): to_kwh(float(r["change"]), wb_unit)
+                         for r in stats.get(wb_id, []) if r.get("change") is not None}
+            v.habit = charging_habit(hourly_wb, now)
         odometer = series(odo_id, "state", "max", to_km)
         if not odometer:
             v.history_error = "no statistics for the odometer (the sensor needs a state class)"
@@ -367,15 +380,14 @@ class Plugwhen:
         full = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
         result = calculate_potential(
             grid, car, trips, full_kw=full, min_kw=float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
-            fixed_kw=min(full, POTENTIAL_FIXED_KW), guard_kw=guard_kw, quarter_add_kw=self.quarter_add_kw(),
+            fixed_kw=min(full, POTENTIAL_FIXED_KW), guard_kw=guard_kw, quarter_add_kw=self.quarter_add_fn(),
             prices=prices, measured_peaks=w.get("measured") or None, plugged=v.plug_log.intervals() or None,
         )
         result.update({
             "computed_at": now.isoformat(), "history_days": days,
             "sources": {"grid_energy": grid_id, "wallbox_energy": wb_id, "odometer": odo_id,
                         "prices": "settings" if self.entry.options.get(O_PRICE_LOW) else ("guard" if w.get("price_low") else None),
-                        "guard_kw": guard_kw, "quarter_add_kw": self.quarter_add_kw(),
-                        "quarter_add_learned": self._calib.get("quarter_add_kw") is not None},
+                        "guard_kw": guard_kw, "quarter_add": self._add_model.summary(), "quarter_add_default_kw": POTENTIAL_QUARTER_ADD_KW},
         })
         v.potential = result
         return result
@@ -449,9 +461,16 @@ class Plugwhen:
 
     # ---------- learned house-specific numbers ----------
 
-    def quarter_add_kw(self) -> float:
-        """How far a quarter hour lies above its hour's mean: learned from the 5-minute statistics of the grid import, else the default."""
-        return float(self._calib.get("quarter_add_kw") or POTENTIAL_QUARTER_ADD_KW)
+    def quarter_add_fn(self):
+        """How far a quarter hour lies above its hour's mean, as a function of the house load: learned for the house alone (hours without
+        wallbox charging) by load level; the default applies for a level that has too few hours."""
+        model = self._add_model
+
+        def add(house_kw: float) -> float:
+            v = model.value(house_kw)
+            return POTENTIAL_QUARTER_ADD_KW if v is None else v
+
+        return add
 
     def solar_deduct_kw(self) -> float:
         """What the house takes off the solar forecast first: the setting if given, else the learned night-time base load, else the default."""
@@ -488,7 +507,7 @@ class Plugwhen:
             self._save_calib()
 
     def _save_calib(self) -> None:
-        self._calib_store.async_delay_save(lambda: {"calib": self._calib, "solar": self._solar_acc.to_dict()}, 30)
+        self._calib_store.async_delay_save(lambda: {"calib": self._calib, "solar": self._solar_acc.to_dict(), "add": self._add_model.to_dict()}, 30)
 
     def _waechter_cfg(self) -> dict[str, Any]:
         wid = self.entry.options.get(O_WAECHTER)
@@ -529,9 +548,22 @@ class Plugwhen:
                 scale = 0.001 if unit == "w" else 1.0
                 series = [(dt_util.as_local(dt_util.utc_from_timestamp(r["start"])), (float(r["mean"]) * scale) if r.get("mean") is not None else None)
                           for r in stats.get(grid_power, [])]
-                q = quarter_add_from_5min(series)
-                if q is not None:
-                    self._calib["quarter_add_kw"], changed = q, True
+                wb_ids = {x.cfg.get(V_WALLBOX_ENERGY) for x in self.vehicles.values()} - {None, ""}
+                wb_hourly = None
+                if wb_ids:   # hours without wallbox energy are the house alone
+                    wstats = await rec.async_add_executor_job(
+                        statistics_during_period, self.hass, now - timedelta(days=10), now, wb_ids, "hour", None, {"change"})
+                    wb_hourly = {}
+                    for wid in wb_ids:
+                        wunit = self._unit(wid)
+                        for r in wstats.get(wid, []):
+                            if r.get("change") is not None:
+                                k = dt_util.as_local(dt_util.utc_from_timestamp(r["start"]))
+                                wb_hourly[k] = wb_hourly.get(k, 0.0) + (to_kwh(float(r["change"]), wunit) or 0.0)
+                samples = quarter_add_samples(series, wb_hourly)
+                if samples:
+                    self._add_model.merge(samples, house_only=wb_hourly is not None)
+                    changed = True
             if grid_energy:
                 stats = await rec.async_add_executor_job(
                     statistics_during_period, self.hass, now - timedelta(days=14), now, {grid_energy}, "hour", None, {"change"})
@@ -643,6 +675,7 @@ class Plugwhen:
         if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
             v.charge_plan = {"status": "unknown_soc", "windows": [], "needed_kwh": None, "planned_kwh": None}
             v.notice = None
+            v.horizon = None
             v.load_used = v.availability_used = False
             return
         load, target_kw = self._load_inputs(now)
@@ -653,6 +686,7 @@ class Plugwhen:
             load=load, target_kw=target_kw if load is not None else None, available_kw=avail,
             pref_kw=float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)),
         )
+        v.horizon = self._horizon(v, now, avail, max_kw)
         hours = (v.departure - now).total_seconds() / 3600.0 if v.departure else None
         planned = v.charge_plan["planned_kwh"] if v.charge_plan["status"] == "planned" else None
         v.notice = check_ready(
@@ -660,9 +694,85 @@ class Plugwhen:
             planned_kwh=planned,
         )
 
+    # ---------- the look-ahead ----------
+
+    def _trips(self, v: Vehicle, now: datetime, capacity: float) -> list[Trip]:
+        """The coming departures (learned, the early hour; an entity departure wins for its day) with the expected and the planned range."""
+        def trip_for(departure: datetime, weekday: int) -> Trip:
+            p = v.model.plan(weekday)
+            need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km)
+            return Trip(departure, float(p.km_typical or 0.0), need.km)
+
+        out: list[Trip] = []
+        for d in range(HORIZON_DAYS + 1):
+            day = (now + timedelta(days=d)).date()
+            p = v.model.plan(day.weekday())
+            target = p.departure_early if p.departure_early is not None else p.departure_hour
+            if target is None or p.samples < MIN_SAMPLES or (p.drive_share or 0.0) < MIN_DRIVE_SHARE:
+                continue
+            hour = int(target)
+            dep = datetime.combine(day, time(hour, int(round((target - hour) * 60)) % 60), tzinfo=now.tzinfo)
+            if dep > now:
+                out.append(trip_for(dep, day.weekday()))
+        if v.departure is not None and v.departure_source == "entity":
+            out = [t for t in out if t.departure.date() != v.departure.date()]
+            out.append(trip_for(v.departure, v.departure.weekday()))
+        out.sort(key=lambda t: t.departure)
+        return out[:HORIZON_TRIPS]
+
+    def _horizon(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None, max_kw: float) -> dict[str, Any] | None:
+        """Where the energy for the next departures comes from and whether charging with the sun in advance saves grid energy. Works without
+        a solar plant (then nothing is pre-charged). It recommends only."""
+        if v.soc is None:
+            return None
+        capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
+        try:
+            return horizon_plan(
+                now, v.soc / 100.0 * capacity, capacity, v.consumption, self._trips(v, now, capacity), avail, max_kw,
+                efficiency=v.efficiency or DEFAULT_EFFICIENCY, pref_kw=float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
+        except Exception as err:  # noqa: BLE001 - a look-ahead that fails must never disturb the plan
+            _LOGGER.debug("Plugwhen: look-ahead of %s failed: %s", v.name, err)
+            return None
+
     # ---------- the warning ----------
 
     async def _maybe_send(self, v: Vehicle, now: datetime) -> None:
+        await self._send_ready(v, now)
+        await self._send_ahead(v, now)
+
+    async def _deliver(self, v: Vehicle, services: list[str], title: str, message: str, key: str) -> bool:
+        sent = self._sent.setdefault(v.sub_id, [])
+        delivered = 0
+        for service in services:
+            domain, name = service.split(".", 1)
+            try:
+                await self.hass.services.async_call(domain, name, {"title": title, "message": message}, blocking=False)
+                delivered += 1
+            except Exception as err:  # noqa: BLE001 - a wrong service name must not stop the planner or the other phones
+                _LOGGER.warning("Plugwhen: the warning for %s could not be sent through %s: %s", v.name, service, err)
+        if not delivered:
+            return False
+        sent.append(key)
+        del sent[:-SENT_KEEP]
+        self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
+        return True
+
+    async def _send_ahead(self, v: Vehicle, now: datetime) -> None:
+        """The heads-up of the evening before the day on which charging has to happen (or pays with the sun)."""
+        services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
+        if not services or not v.notice_enabled or v.horizon is None:
+            return
+        a = check_ahead(v.horizon, now, float(v.cfg.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)))
+        if a is None:
+            return
+        key = ahead_key(a)
+        if key in self._sent.setdefault(v.sub_id, []):
+            return
+        title, message = ahead_text(self.hass.config.language, a, v.name, float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
+        if await self._deliver(v, services, title, message, key):
+            _LOGGER.info("Plugwhen: heads-up '%s' for tomorrow sent for %s", a.kind, v.name)
+
+    async def _send_ready(self, v: Vehicle, now: datetime) -> None:
         n = v.notice
         services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
         if n is None or not v.notice_enabled or v.departure is None or not services:
@@ -675,17 +785,5 @@ class Plugwhen:
         if key in sent:
             return
         title, message = notice_text(self.hass.config.language, n, v.name, v.departure)
-        delivered = 0
-        for service in services:
-            domain, name = service.split(".", 1)
-            try:
-                await self.hass.services.async_call(domain, name, {"title": title, "message": message}, blocking=False)
-                delivered += 1
-            except Exception as err:  # noqa: BLE001 - a wrong service name must not stop the planner or the other phones
-                _LOGGER.warning("Plugwhen: the warning for %s could not be sent through %s: %s", v.name, service, err)
-        if not delivered:
-            return
-        sent.append(key)
-        del sent[:-SENT_KEEP]
-        self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
-        _LOGGER.info("Plugwhen: warning '%s' sent for %s", n.kind, v.name)
+        if await self._deliver(v, services, title, message, key):
+            _LOGGER.info("Plugwhen: warning '%s' sent for %s", n.kind, v.name)

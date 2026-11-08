@@ -132,6 +132,29 @@ class ShadowLogTest(unittest.TestCase):
         self.assertEqual(again.journal, log.journal)
         ShadowLog({"journal": "kaputt", "days": {"x": 1}})       # damaged data must not break the start
 
+    def test_energy_delivered_although_nothing_was_needed_is_recorded(self):
+        log = ShadowLog()
+        none = Decision("none", "not_needed")
+        log.update(NOW, none, True, 100.0)                                          # plugged in, charging with the sun, nothing needed
+        log.update(NOW + timedelta(minutes=10), none, True, 101.8)
+        s = log.summary(NOW + timedelta(minutes=10))
+        self.assertEqual(s["kwh_needless"], 1.8)
+        self.assertAlmostEqual(s["needless_h"], 0.2, places=1)
+        self.assertIsNone(s["agree_pct"])                                           # it does not count as agreement or disagreement
+        self.assertEqual(s["kwh_in_pause"] + s["kwh_in_charge"], 0.0)
+
+    def test_other_no_decisions_are_still_not_compared(self):
+        log = ShadowLog()
+        for reason in ("not_plugged", "unknown_soc", "no_plan"):
+            log.update(NOW, Decision("none", reason), True, 10.0)
+            log.update(NOW + timedelta(minutes=10), Decision("none", reason), True, 12.0)
+        self.assertEqual(log.summary(NOW + timedelta(minutes=10))["kwh_needless"], 0.0)
+
+    def test_old_saved_data_without_the_new_keys_still_loads(self):
+        old = {"journal": [], "days": {NOW.date().isoformat(): {"charge_charging": 60.0, "pause_idle": 30.0, "kwh_charge": 1.0}}}
+        s = ShadowLog(old).summary(NOW)
+        self.assertEqual(s["kwh_needless"], 0.0)
+        self.assertEqual(s["agree_pct"], 100)
     def test_old_days_are_dropped(self):
         log = ShadowLog()
         t = NOW

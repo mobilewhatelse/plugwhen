@@ -18,7 +18,8 @@ Nothing is sent if the shortfall is small, if the car is charging or (plugged in
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta
+from typing import Any
 
 try:  # inside Home Assistant the module lives in a package, the tests import it flat
     from .need import Need
@@ -73,6 +74,54 @@ def check_ready(
     if plugged is None:
         return notice("low")
     return None  # plugged in, nothing charging yet and no plan: the charging itself is the plan's job, not a warning
+
+
+@dataclass(frozen=True)
+class Ahead:
+    """The heads-up for the day after today: charging will be needed (`charge`) or charging with the sun in advance is recommended (`sun`)."""
+
+    kind: str                      # "charge" or "sun"
+    day: date                      # the day on which to charge (tomorrow)
+    departure: datetime            # the departure the energy is for
+    kwh: float                     # wallbox energy (charge: still from the grid, sun: to charge with the sun)
+    latest_start: datetime | None  # at full power
+    latest_start_pref: datetime | None  # at the preferred power
+    sun_from: datetime | None = None
+    sun_to: datetime | None = None
+
+
+def _dt(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value)) if value else None
+    except ValueError:
+        return None
+
+
+def check_ahead(horizon: dict[str, Any] | None, now: datetime, from_hour: float, min_kwh: float = 1.0) -> Ahead | None:
+    """The heads-up of this evening for tomorrow, from the look-ahead (`horizon.horizon_plan`). Only from `from_hour` on, like the other
+    warning. A recommended pre-charge with the sun tomorrow comes first, otherwise a departure that needs grid energy and whose home window
+    begins tomorrow. Charging that has to happen today is the job of the plug-in warning, not of this one."""
+    if not horizon or horizon.get("status") != "ok":
+        return None
+    if now.hour + now.minute / 60.0 < from_hour:
+        return None
+    tomorrow = (now + timedelta(days=1)).date()
+    for p in horizon.get("precharge") or []:
+        start, dep = _dt(p.get("sun_from")), _dt(p.get("for_departure"))
+        if start is not None and dep is not None and start.date() == tomorrow and float(p.get("kwh") or 0) >= max(2.0, min_kwh):
+            return Ahead("sun", tomorrow, dep, float(p["kwh"]), None, None, start, _dt(p.get("sun_to")))
+    for d in horizon.get("days") or []:
+        start, dep = _dt(d.get("window_start")), _dt(d.get("departure"))
+        if start is not None and dep is not None and start.date() == tomorrow and float(d.get("grid_kwh") or 0) >= min_kwh:
+            return Ahead("charge", tomorrow, dep, float(d["grid_kwh"]), _dt(d.get("latest_start")), _dt(d.get("latest_start_pref")))
+    return None
+
+
+def ahead_key(a: Ahead) -> str:
+    """Once per day of charging and kind."""
+    return f"ahead:{a.day.isoformat()}:{a.kind}"
 
 
 def dedupe_key(n: Notice, departure_day: date) -> str:

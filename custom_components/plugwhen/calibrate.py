@@ -2,7 +2,10 @@
 
 Every number here has a default that works everywhere and an override in the settings. What is learned:
 
-* `quarter_add_kw`: how far the highest quarter hour of an hour lies above the hour's mean. From the 5-minute means of the
+* `QuarterAddModel`: how far the highest quarter hour of an hour lies above the hour's mean, **for the house alone** (hours in which the
+  wallbox delivered no energy) and **by load level** (quiet, medium, high hours). A single value is wrong: quiet hours need about 0.1 kW,
+  loaded hours several. The hours are collected for good (the recorder keeps 5-minute values for about ten days).
+* (older) `quarter_add_kw`: how far the highest quarter hour of an hour lies above the hour's mean. From the 5-minute means of the
   grid import (short-term statistics, about 10 days). Used by the potential calculator instead of a fixed 0.7 kW.
 * `base_load_kw`: the night-time base load of the house (median of the hours 1 to 5). Taken off the solar forecast instead of a
   fixed 0.5 kW: what the house itself uses before the car can have the surplus.
@@ -26,6 +29,10 @@ try:  # inside Home Assistant the module lives in a package, the tests import it
 except ImportError:  # pragma: no cover
     from learning import DayRecord, quantile_high
 
+ADD_BINS = (0.8, 2.5)              # hourly house mean (kW): quiet below the first, medium below the second, else high
+MIN_BIN_HOURS = 12               # hours a load level needs before its value is trusted (else the default applies there)
+HOUSE_ONLY_MAX_KWH = 0.05        # an hour with at most this wallbox energy counts as house only
+MAX_ADD_SAMPLES = 2500           # about 100 days of hours
 MIN_HOURS_QUARTER = 48           # hours with complete 5-minute data before the quarter add is trusted
 MIN_DAYS_BASE = 5
 MIN_DAYS_EFFICIENCY = 5
@@ -129,3 +136,71 @@ class SolarAccuracy:
     def summary(self) -> dict[str, Any]:
         return {"days": len(self.days), "factor": self.factor(),
                 "last": [{"day": k, "predicted_kwh": v[0], "measured_kwh": v[1]} for k, v in sorted(self.days.items())[-7:]]}
+
+
+def quarter_add_samples(series: list[tuple[datetime, float | None]], wallbox_hourly: dict[datetime, float] | None = None) -> list[tuple[str, float, float]]:
+    """Per full hour `(hour, mean kW, add kW)` from 5-minute means (kW). With `wallbox_hourly` (kWh per local hour start) only hours in
+    which the wallbox delivered next to nothing count (house only); an hour the wallbox does not know is left out. Without it
+    every hour counts (the add then includes the car; the model says so)."""
+    by_hour: dict[datetime, list[float]] = defaultdict(list)
+    for t, kw in sorted(series, key=lambda x: x[0]):
+        if kw is not None:
+            by_hour[t.replace(minute=0, second=0, microsecond=0)].append(max(0.0, float(kw)))
+    out = []
+    for hour, vals in sorted(by_hour.items()):
+        if len(vals) < 9:
+            continue
+        if wallbox_hourly is not None:
+            wb = wallbox_hourly.get(hour)
+            if wb is None or wb > HOUSE_ONLY_MAX_KWH:
+                continue
+        mean = sum(vals) / len(vals)
+        quarters = [sum(vals[i:i + 3]) / len(vals[i:i + 3]) for i in range(0, len(vals), 3) if vals[i:i + 3]]
+        out.append((hour.isoformat(), round(mean, 3), round(max(quarters) - mean, 3)))
+    return out
+
+
+class QuarterAddModel:
+    """Collected hours (mean, add) of the house; `value(house_kw)` is the add for that load level or None until the level has enough hours."""
+
+    def __init__(self, data: dict[str, Any] | None = None) -> None:
+        d = data if isinstance(data, dict) else {}
+        self.samples: dict[str, list[float]] = {}
+        raw = d.get("samples") if isinstance(d.get("samples"), dict) else {}
+        for k, v in raw.items():
+            try:
+                self.samples[str(k)] = [float(v[0]), float(v[1])]
+            except (TypeError, ValueError, IndexError):
+                continue
+        self.house_only = bool(d.get("house_only", False))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"samples": self.samples, "house_only": self.house_only}
+
+    def merge(self, samples: list[tuple[str, float, float]], house_only: bool) -> None:
+        if self.samples and house_only != self.house_only:
+            self.samples = {}                       # the kind of measurement changed (a wallbox energy entity was added): start again
+        self.house_only = house_only
+        for iso, mean, add in samples:
+            self.samples[iso] = [mean, add]
+        for old in sorted(self.samples)[:-MAX_ADD_SAMPLES]:
+            del self.samples[old]
+
+    @staticmethod
+    def _level(mean_kw: float) -> int:
+        return 0 if mean_kw < ADD_BINS[0] else 1 if mean_kw < ADD_BINS[1] else 2
+
+    def value(self, house_kw: float) -> float | None:
+        level = self._level(house_kw)
+        adds = [a for m, a in self.samples.values() if self._level(m) == level]
+        if len(adds) < MIN_BIN_HOURS:
+            return None
+        return round(min(4.0, max(0.0, quantile_high(adds))), 2)
+
+    def summary(self) -> dict[str, Any]:
+        names = ("quiet", "medium", "high")
+        levels = []
+        for i, name in enumerate(names):
+            adds = [a for m, a in self.samples.values() if self._level(m) == i]
+            levels.append({"level": name, "hours": len(adds), "add_kw": self.value((0.0, ADD_BINS[0], ADD_BINS[1])[i])})
+        return {"hours": len(self.samples), "house_only": self.house_only, "levels": levels}

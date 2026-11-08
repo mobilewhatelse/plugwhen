@@ -1,0 +1,98 @@
+"""Tests for the heads-up 'tomorrow charging is needed' (the look-ahead notice) and its texts."""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+
+from horizon import Trip, horizon_plan  # noqa: E402
+from messages import ahead_text  # noqa: E402
+from notice import ahead_key, check_ahead  # noqa: E402
+
+TZ = timezone(timedelta(hours=1))
+SAT = datetime(2027, 1, 9, 9, 0, tzinfo=TZ)
+
+
+def at(day, h, m=0):
+    return SAT.replace(hour=0, minute=0) + timedelta(days=day, hours=h, minutes=m)
+
+
+def week():
+    return [Trip(at(0, 13), 22, 100), Trip(at(1, 13), 10, 100), Trip(at(2, 8), 78, 100), Trip(at(3, 7), 41, 100), Trip(at(4, 7), 67, 100)]
+
+
+def sun():
+    return {at(d, h) + timedelta(minutes=m): 4.0 for d in (0, 1) for h in range(10, 13) for m in (0, 15, 30, 45)}
+
+
+def horizon(**kw):
+    args = dict(now=SAT, soc_kwh=30.0, capacity_kwh=60.0, consumption=0.2, trips=week(), sun_kw=sun(), max_kw=11.0, pref_kw=4.0)
+    args.update(kw)
+    return horizon_plan(**args)
+
+
+class AheadTest(unittest.TestCase):
+    def test_on_friday_evening_it_recommends_charging_with_the_sun_on_saturday(self):
+        friday = at(-1, 19, 30)
+        h = horizon(now=friday, trips=[Trip(at(0, 13), 22, 100), *week()[1:]], sun_kw=sun())
+        a = check_ahead(h, friday, 19)
+        self.assertIsNotNone(a)
+        self.assertEqual(a.kind, "sun")
+        self.assertEqual(a.day, SAT.date())
+        self.assertGreaterEqual(a.kwh, 2)
+        self.assertEqual(ahead_key(a), f"ahead:{SAT.date().isoformat()}:sun")
+
+    def test_without_sun_it_says_when_charging_is_needed_tomorrow_and_the_latest_start(self):
+        monday_evening_before = at(1, 19, 30)                                       # Sunday evening
+        h = horizon(now=monday_evening_before, sun_kw=None, soc_kwh=23.6, trips=week()[2:])
+        a = check_ahead(h, monday_evening_before, 19)
+        self.assertIsNotNone(a)
+        self.assertEqual(a.kind, "charge")
+        self.assertEqual(a.day, (monday_evening_before + timedelta(days=1)).date())
+        self.assertGreater(a.latest_start, a.latest_start_pref)                     # at full power it can start later than at 4 kW
+        self.assertLess(a.latest_start_pref, a.departure)
+
+    def test_not_before_the_evening_hour(self):
+        early = at(-1, 12)
+        h = horizon(now=early, trips=[Trip(at(0, 13), 22, 100), *week()[1:]])
+        self.assertIsNone(check_ahead(h, early, 19))
+
+    def test_nothing_to_announce_when_nothing_is_needed_or_it_is_unknown(self):
+        self.assertIsNone(check_ahead(None, SAT, 0))
+        self.assertIsNone(check_ahead({"status": "unknown_soc"}, SAT, 0))
+        full = horizon(soc_kwh=60.0, trips=week()[:2])
+        self.assertIsNone(check_ahead(full, at(-1, 20), 19))
+
+    def test_charging_that_has_to_happen_today_is_not_a_heads_up(self):
+        h = horizon(sun_kw=None, soc_kwh=5.0, trips=[Trip(at(0, 20), 20, 100)])     # the window begins now, today
+        self.assertIsNone(check_ahead(h, SAT.replace(hour=19), 0))
+
+    def test_texts_in_both_languages(self):
+        friday = at(-1, 19, 30)
+        h = horizon(now=friday, trips=[Trip(at(0, 13), 22, 100), *week()[1:]])
+        sun_a = check_ahead(h, friday, 19)
+        title, msg = ahead_text("de", sun_a, "Auto")
+        self.assertIn("morgen laden", title)
+        self.assertIn("Sa", msg)
+        self.assertIn("Sonne", msg)
+        title_en, msg_en = ahead_text("en", sun_a, "Car")
+        self.assertIn("charge tomorrow", title_en)
+        self.assertIn("Sat", msg_en)
+        h2 = horizon(now=at(1, 19, 30), sun_kw=None, soc_kwh=23.6, trips=week()[2:])
+        charge_a = check_ahead(h2, at(1, 19, 30), 19)
+        _, m = ahead_text("de", charge_a, "Auto", pref_kw=4.0)
+        self.assertIn("Spätestens ab", m)
+        self.assertIn("4 kW", m)
+        _, m2 = ahead_text("en", charge_a, "Car", pref_kw=4.0)
+        self.assertIn("Latest start", m2)
+        from notice import Ahead
+        bare = Ahead("charge", SAT.date(), at(2, 7), 5.0, None, None)
+        self.assertIn("Morgen", ahead_text("de", bare, "Auto")[1])
+
+
+if __name__ == "__main__":
+    unittest.main()

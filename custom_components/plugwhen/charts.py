@@ -7,6 +7,8 @@
 * `chart_plan`: the charge plan as a timeline from now to the departure: charging windows as bars (yellow = sun, blue = grid).
 * `chart_potential`: per way of charging the highest quarter hour of a month and the demand charge per year.
 * `chart_plugs`: the last 14 days, when the car was plugged in (one strip per day, 0 to 24 h).
+* `chart_habit`: when the car is charged, per weekday: energy during the day, at night and in between.
+* `chart_horizon`: the next departures: where the energy comes from (sun in the same window, sun charged in advance, grid) and the latest start.
 
 The sensors hand the SVG over as an attribute; a markdown card shows it with `![](data:image/svg+xml;utf8,...)`, so no custom card
 is needed. Colours are mid tones that read on a dark and a light background.
@@ -19,6 +21,7 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 GREEN, RED, BLUE, GREY, SUN = "#2fbf71", "#e5534b", "#5b8def", "#8a94a6", "#f2b632"
+ORANGE = "#f0883e"
 
 T = {
     "de": dict(
@@ -33,6 +36,11 @@ T = {
         w_as_is="wie bisher", w_guard="nur Spitzenwächter", w_fixed="Wallbox fertig-bis", w_spread="verteilt (Plugwhen)",
         pot_few="Potenzial: noch zu wenig Daten", pot_missing="Potenzial: es fehlen Daten",
         plugs_title="Angesteckt in den letzten 14 Tagen", no_plugs="Noch keine Steckzeiten mitgeschrieben",
+        habit_title="Wann laden Sie? kWh je Wochentag im Durchschnitt", habit_day="tagsüber (9–17 Uhr)", habit_night="nachts (20–7 Uhr)", habit_rest="sonst",
+        latest="spätestens ab", hz_title="Die nächsten Abfahrten: woher kommt der Strom?", hz_sun="Sonne im selben Fenster", hz_pre="mit Sonne vorgeladen",
+        hz_grid="Netz", hz_none="Für die nächsten Abfahrten ist nichts nachzuladen", hz_unknown="Ladestand unbekannt: keine Vorschau",
+        hz_trips="Keine Abfahrten gelernt: keine Vorschau", hz_saved="Vorladen mit Sonne spart {x} kWh Netzstrom", hz_nosun="Ohne Solarprognose kommt alles aus dem Netz, verteilt",
+        habit_few="Ladegewohnheit: noch zu wenig Daten (28 Tage nötig)", habit_foot="nachts {n} % · tagsüber {d} % · Wochenende {w} % der Energie",
     ),
     "en": dict(
         cover="Days on which the range would have been enough", only_reserve="fixed reserve only ({km} km)", with_learning="reserve plus learned",
@@ -46,6 +54,11 @@ T = {
         w_as_is="as it was", w_guard="peak guard only", w_fixed="wallbox ready-by", w_spread="spread (Plugwhen)",
         pot_few="Potential: too little data yet", pot_missing="Potential: data missing",
         plugs_title="Plugged in over the last 14 days", no_plugs="No plug-in times recorded yet",
+        habit_title="When do you charge? kWh per weekday on average", habit_day="during the day (9 to 17 h)", habit_night="at night (20 to 7 h)", habit_rest="otherwise",
+        latest="latest start", hz_title="The next departures: where does the energy come from?", hz_sun="sun in the same window", hz_pre="charged ahead with the sun",
+        hz_grid="grid", hz_none="Nothing to charge for the next departures", hz_unknown="State of charge unknown: no preview",
+        hz_trips="No departures learned: no preview", hz_saved="Charging ahead with the sun saves {x} kWh of grid energy", hz_nosun="Without a solar forecast everything comes from the grid, spread",
+        habit_few="Charging habit: too little data yet (28 days needed)", habit_foot="night {n} % · day {d} % · weekend {w} % of the energy",
     ),
 }
 
@@ -209,6 +222,11 @@ def chart_plan(plan: dict[str, Any] | None, now: datetime, max_kw: float, lang: 
             body.append(f"<rect x='{x1:.1f}' y='{top + ph - hh * sun:.1f}' width='{max(2.0, x2 - x1):.1f}' height='{hh * sun:.1f}' fill='{SUN}'/>")
         if x2 - x1 > 34:
             body.append(_text((x1 + x2) / 2, y0 - 5, f"{energy:.1f} kWh", "middle", size=10))
+    ls = _as_dt((plan or {}).get("latest_start"))
+    if ls is not None and start <= ls < end and status in ("planned", "infeasible"):          # the latest start at full power
+        xl = x(ls)
+        body.append(f"<line x1='{xl:.1f}' y1='{top}' x2='{xl:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='1.5' stroke-dasharray='5 4'/>")
+        body.append(_text(xl - 5, top + 14, f"{t['latest']} {t['wd'][ls.weekday()]} {ls:%H:%M}", "end", fill=RED, size=11))
     xd = x(end)
     body.append(f"<line x1='{xd:.1f}' y1='{top - 8}' x2='{xd:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='2'/>")
     body.append(_text(min(xd, W - R), top - 12, f"{t['departure_at']} {t['wd'][dep.weekday()]} {dep:%H:%M}", "end", fill=RED, weight="700"))
@@ -281,4 +299,96 @@ def chart_plugs(intervals: list[tuple[datetime, datetime | None]] | None, now: d
                 x1 = L + pw * (lo - d0).total_seconds() / 86400
                 x2 = L + pw * (hi - d0).total_seconds() / 86400
                 body.append(f"<rect x='{x1:.1f}' y='{y + 2}' width='{max(1.5, x2 - x1):.1f}' height='{rh - 4}' fill='{BLUE}'/>")
+    return _svg(W, H, "".join(body))
+
+
+def chart_habit(habit: dict[str, Any] | None, lang: str | None = None) -> str:
+    """Stacked bars per weekday (kWh on an average day of that weekday): night at the bottom (blue), in between (grey), during the day
+    on top (yellow)."""
+    t = _t(lang)
+    if not habit or habit.get("status") != "ok" or not habit.get("weekday"):
+        return _msg(t["habit_few"])
+    W, H, L, R, top, ph = 640, 290, 40, 16, 40, 170
+    days = habit["weekday"]
+    vmax = max(4.0, max(d["kwh_per_day"] for d in days))
+    vmax = float(int(vmax) + 1)
+    step = max(1, int(vmax) // 4)
+    body = [_text(10, 20, t["habit_title"], weight="700", size=13)]
+    for k in range(0, int(vmax) + 1, step):
+        y = top + ph - ph * k / vmax
+        body.append(f"<line x1='{L}' y1='{y:.1f}' x2='{W - R}' y2='{y:.1f}' stroke='{GREY}' stroke-opacity='0.2'/>")
+        body.append(_text(L - 6, y + 4, f"{k}", "end", size=10))
+    bw = (W - L - R) / 7
+    for i, d in enumerate(days):
+        x = L + i * bw
+        base = top + ph
+        for key, colour in (("night_kwh_per_day", BLUE), ("rest_kwh_per_day", GREY), ("day_kwh_per_day", SUN)):
+            h = ph * d[key] / vmax
+            if h > 0.5:
+                base -= h
+                body.append(f"<rect x='{x + 8:.1f}' y='{base:.1f}' width='{bw - 16:.1f}' height='{h:.1f}' fill='{colour}'/>")
+        if d["kwh_per_day"] > 0:
+            body.append(_text(x + bw / 2, base - 5, f"{d['kwh_per_day']:.1f}", "middle", size=11))
+        body.append(_text(x + bw / 2, top + ph + 16, t["wd"][d["weekday"]], "middle"))
+        body.append(_text(x + bw / 2, top + ph + 29, f"n={d['days']}", "middle", size=10))
+    ly = H - 28
+    for j, (key, colour) in enumerate((("habit_day", SUN), ("habit_night", BLUE), ("habit_rest", GREY))):
+        x = L + j * 190
+        body.append(f"<rect x='{x}' y='{ly - 9}' width='10' height='10' fill='{colour}'/>" + _text(x + 15, ly, t[key], size=11))
+    foot = t["habit_foot"].format(n=habit.get("night_share_pct"), d=habit.get("day_share_pct"), w=habit.get("weekend_share_pct"))
+    body.append(_text(L, H - 8, foot, size=11))
+    return _svg(W, H, "".join(body))
+
+
+def chart_horizon(horizon: dict[str, Any] | None, lang: str | None = None) -> str:
+    """Per coming departure one stacked bar of the energy it needs from the wallbox: sun in the same window (yellow), sun charged in
+    advance (orange), grid (blue); below the bar the latest start at the preferred power. Without a solar forecast everything is grid."""
+    t = _t(lang)
+    status = (horizon or {}).get("status")
+    if horizon is None or status == "unknown_soc":
+        return _msg(t["hz_unknown"])
+    if status == "no_trips":
+        return _msg(t["hz_trips"])
+    if status == "no_need":
+        return _msg(f"✓ {t['hz_none']}", GREEN)
+    days = (horizon.get("days") or [])[:8]                      # the first eight departures fit the chart, the numbers cover more
+    if not days:
+        return _msg(t["hz_trips"])
+    W, L, R, top, ph = 640, 40, 16, 40, 150
+    H = 300
+    vmax = float(int(max(4.0, max(float(d.get("need_kwh") or 0) for d in days))) + 1)
+    step = max(1, int(vmax) // 4)
+    body = [_text(10, 20, t["hz_title"], weight="700", size=13)]
+    for k in range(0, int(vmax) + 1, step):
+        y = top + ph - ph * k / vmax
+        body.append(f"<line x1='{L}' y1='{y:.1f}' x2='{W - R}' y2='{y:.1f}' stroke='{GREY}' stroke-opacity='0.2'/>")
+        body.append(_text(L - 6, y + 4, f"{k}", "end", size=10))
+    bw = (W - L - R) / len(days)
+    for i, d in enumerate(days):
+        dep = _as_dt(d.get("departure"))
+        x = L + i * bw
+        base = top + ph
+        for key, colour in (("sun_direct_kwh", SUN), ("precharge_kwh", ORANGE), ("grid_kwh", BLUE)):
+            h = ph * float(d.get(key) or 0) / vmax
+            if h > 0.5:
+                base -= h
+                body.append(f"<rect x='{x + 14:.1f}' y='{base:.1f}' width='{bw - 28:.1f}' height='{h:.1f}' fill='{colour}'/>")
+        need = float(d.get("need_kwh") or 0)
+        if need > 0:
+            body.append(_text(x + bw / 2, base - 5, f"{need:.1f} kWh", "middle", size=11))
+        if dep is not None:
+            body.append(_text(x + bw / 2, top + ph + 16, f"{t['wd'][dep.weekday()]} {dep:%H:%M}", "middle"))
+        ls = _as_dt(d.get("latest_start_pref"))
+        if ls is not None and float(d.get("grid_kwh") or 0) > 0:
+            body.append(_text(x + bw / 2, top + ph + 30, f"{t['latest']}", "middle", size=10))
+            body.append(_text(x + bw / 2, top + ph + 42, f"{t['wd'][ls.weekday()]} {ls:%H:%M}", "middle", size=10, weight="700"))
+    ly = H - 30
+    for j, (key, colour) in enumerate((("hz_sun", SUN), ("hz_pre", ORANGE), ("hz_grid", BLUE))):
+        xx = L + j * 200
+        body.append(f"<rect x='{xx}' y='{ly - 9}' width='10' height='10' fill='{colour}'/>" + _text(xx + 15, ly, t[key], size=11))
+    saved = float(horizon.get("saved_grid_kwh") or 0)
+    if saved > 0:
+        body.append(_text(L, H - 8, t["hz_saved"].format(x=f"{saved:.0f}"), fill=ORANGE, weight="700", size=12))
+    elif not horizon.get("sun_used"):
+        body.append(_text(L, H - 8, t["hz_nosun"], size=11))
     return _svg(W, H, "".join(body))

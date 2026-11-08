@@ -177,7 +177,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 14, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 15, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
@@ -255,6 +255,13 @@ def main():
             la = state(lc["entity_id"])["attributes"]
             log(bool(ok) and state(lc["entity_id"])["state"] == "too_little_data" and str(la.get("chart", "")).startswith("<svg"),
                 "no history yet: too little data, and the chart says so (valid SVG)", f"{state(lc['entity_id'])['state']} / {str(la.get('chart'))[:40]}")
+        pa_h = state(pid)["attributes"]
+        log("horizon" in pa_h and str(pa_h.get("horizon_chart", "")).startswith("<svg"),
+            "the charge plan carries the look-ahead and its chart (valid SVG), also without a solar plant", f"{(pa_h.get('horizon') or {}).get('status')} / {str(pa_h.get('horizon_chart'))[:30]}")
+        hb = find("sensor", "charging_habit")
+        hba = state(hb["entity_id"])["attributes"] if hb else {}
+        log(bool(hb) and hba.get("status") in ("too_little_data", "ok", "no_data") and str(hba.get("chart", "")).startswith("<svg"),
+            "the charging habit sensor exists and delivers a chart (valid SVG), also without any history", f"{hba.get('status')} / {str(hba.get('chart'))[:30]}")
         wa0 = state(wid)["attributes"] if would_s else {}
         log(str(wa0.get("chart", "")).startswith("<svg"), "learn mode: the chart of plan against reality is delivered as SVG", str(wa0.get("chart"))[:40])
         ok = wait_for(lambda: state(wid)["state"] in ("charge", "pause"), 30)
@@ -324,6 +331,14 @@ def main():
     text = json.dumps(dash.get("config") or {})
     log(s_d == 200 and "views" in (dash.get("config") or {}) and rdid in text and pid in text and "yaml" in dash,
         "the dashboard service builds the dashboard with this installation's entities", f"{s_d} {len(text)} chars")
+    cards_md = [c for v in (dash.get("config") or {}).get("views", []) for sec in v.get("sections", []) for c in sec.get("cards", [])
+                if c.get("type") == "markdown"]
+    bad = []
+    for c in cards_md:
+        sc, body = api("POST", "/api/template", {"template": c["content"]})
+        if sc != 200 or "Error" in str(body)[:60] or "UndefinedError" in str(body):
+            bad.append(f"{c['content'][:50]!r}: {str(body)[-160:]}")
+    log(len(cards_md) >= 12 and not bad, f"all {len(cards_md)} markdown cards of the dashboard render in Home Assistant", "; ".join(bad)[:1200])
 
     # plug-in times are written down (short flickers under 2 minutes are dropped, the open one counts)
     ok = wait_for(lambda: ((state(rdid)["attributes"].get("plugging") or {}).get("plugged_now") is True), 30)

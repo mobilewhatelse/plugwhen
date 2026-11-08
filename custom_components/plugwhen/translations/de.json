@@ -180,6 +180,9 @@
           "unknown_soc": "Ladestand unbekannt"
         }
       },
+      "habit": {
+        "name": "Ladegewohnheit"
+      },
       "learning_check": {
         "name": "Bringt das Lernen etwas?",
         "state": {

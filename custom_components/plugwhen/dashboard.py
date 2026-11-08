@@ -13,7 +13,7 @@ from typing import Any
 ENTITY_KEYS = {
     "departure": "sensor", "need_charge": "sensor", "need_range": "sensor", "target_soc": "sensor", "charge_plan": "sensor",
     "readiness": "sensor", "potential": "sensor", "week_plan": "sensor", "reserve_km": "number", "learn_km": "switch",
-    "mode": "select", "would_switch": "sensor", "learning_check": "sensor",
+    "mode": "select", "would_switch": "sensor", "learning_check": "sensor", "habit": "sensor",
     "notice_enabled": "switch",
 }
 
@@ -39,6 +39,12 @@ TEXT = {
         cal_sun="Sonne", cal_factor="Prognose ×", cal_learned="bei Ihnen gelernt", cal_unchecked="Prognose noch ungeprüft",
         cal_deduct="Abzug fürs Haus", cal_src_learned="gelernt", cal_src_setting="eingestellt", cal_src_default="Vorgabe",
         cal_loss="Ladeverluste", cal_floor="verteilt ab",
+        hb_h="Wann laden Sie?", hb_tile="Nachts geladen", hb_a="Nachts (20–7 Uhr) wurden", hb_b="Prozent der Energie geladen, tagsüber (9–17 Uhr)",
+        hb_c="Prozent, am Wochenende", hb_d="Prozent. Mo bis Fr nachts:", hb_few="Noch zu wenig Daten für die Ladegewohnheit (28 Tage nötig).",
+        hz_covered="Bei normalem Verhalten reicht der Ladestand bis", hz_must="Danach muss geladen werden: spätestens ab", hz_all="Bei normalem Verhalten reicht der Ladestand für alle Abfahrten der nächsten", hz_days="Tage",
+        hz_sun_ok="die Sonne kann es decken", hz_forecast="Die Sonnenprognose reicht nur so weit, wie Ihr Anbieter sie liefert.",
+        hz_h="Die nächsten Abfahrten", hz_next="Nächstes nötiges Laden", hz_for="für", hz_latest="spätestens ab", hz_at="bei", hz_pre="Mit Sonne vorladen",
+        hz_replaces="ersetzt Netzstrom vor", hz_note="Eine Empfehlung: Plugwhen schaltet nichts. Ohne Solaranlage zeigt die Grafik nur den Bedarf je Abfahrt.",
         learn_h="Lernmodus", mode_name="Betriebsart", would="Würde schalten",
         w_charge="Laden", w_pause="Pausieren", w_none="Keine Entscheidung", w_off="Aus",
         r_in_window="im geplanten Fenster", r_waiting_for_window="wartet auf das nächste Fenster", r_plan_done="der Plan ist abgearbeitet",
@@ -48,6 +54,7 @@ TEXT = {
         lm_pause_ch="Stunden, in denen die Wallbox lud, obwohl Plugwhen pausiert hätte", lm_kwh_pause="kWh in diesen Zeiten",
         lm_charge_idle="Stunden ohne Laden im geplanten Fenster", lm_kwh_charge="kWh in den geplanten Fenstern",
         lm_journal="Letzte Entscheidungen", lm_none="Noch keine Entscheidungen.", lm_off="Der Lernmodus ist aus.",
+        lm_needless="Ohne Bedarf geladen (zum Beispiel mit Sonne)", lm_needless_in="kWh in den letzten 7 Tagen",
         lm_note="Im Lernmodus wird nichts geschaltet: Plugwhen schreibt nur auf, was es tun würde, und vergleicht das mit dem, was die Wallbox wirklich getan hat. Die Wallbox läuft weiter wie bisher.",
         soc="Ladestand jetzt", plugged="angesteckt", yes="ja", no="nein", unknown="unbekannt", goal="Ziel bei Abfahrt",
         basis="Grundlage", b_learned="gelernter hoher Wert des Wochentags (länger als die Reserve)",
@@ -96,6 +103,12 @@ TEXT = {
         cal_sun="Sun", cal_factor="forecast ×", cal_learned="learned here", cal_unchecked="forecast not checked yet",
         cal_deduct="deduction for the house", cal_src_learned="learned", cal_src_setting="setting", cal_src_default="default",
         cal_loss="charging losses", cal_floor="spread from",
+        hb_h="When do you charge?", hb_tile="Charged at night", hb_a="At night (20 to 7 h)", hb_b="percent of the energy were charged, during the day (9 to 17 h)",
+        hb_c="percent, at the weekend", hb_d="percent. Mon to Fri at night:", hb_few="Too little data for the charging habit yet (28 days needed).",
+        hz_covered="With normal behaviour the charge lasts until", hz_must="After that charging is needed: latest start", hz_all="With normal behaviour the charge is enough for all departures of the next", hz_days="days",
+        hz_sun_ok="the sun can cover it", hz_forecast="The solar forecast only reaches as far as your provider delivers it.",
+        hz_h="The next departures", hz_next="Next charging needed", hz_for="for", hz_latest="latest start", hz_at="at", hz_pre="Charge ahead with the sun",
+        hz_replaces="replaces grid energy before", hz_note="A recommendation: Plugwhen switches nothing. Without a solar plant the chart only shows the need per departure.",
         learn_h="Learn mode", mode_name="Mode", would="Would switch",
         w_charge="Charge", w_pause="Pause", w_none="No decision", w_off="Off",
         r_in_window="in a planned window", r_waiting_for_window="waiting for the next window", r_plan_done="the plan is done",
@@ -105,6 +118,7 @@ TEXT = {
         lm_pause_ch="hours the wallbox charged although Plugwhen would have paused", lm_kwh_pause="kWh in those times",
         lm_charge_idle="hours without charging in a planned window", lm_kwh_charge="kWh in the planned windows",
         lm_journal="Latest decisions", lm_none="No decisions yet.", lm_off="Learn mode is off.",
+        lm_needless="Charged although nothing was needed (for example with the sun)", lm_needless_in="kWh in the last 7 days",
         lm_note="Nothing is switched in learn mode: Plugwhen only writes down what it would do and compares it with what the wallbox really did. The wallbox keeps working as before.",
         soc="State of charge now", plugged="plugged in", yes="yes", no="no", unknown="unknown", goal="Target at departure",
         basis="Based on", b_learned="the weekday's learned high value (longer than the reserve)",
@@ -158,8 +172,8 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
     )
     pot_line = (
         "{% set a = " + _s(ids["potential"]) + ".attributes %}"
-        f"{{% if a.saving_spread_per_year is not none %}}**{t['saving']}:** {{{{ a.saving_spread_per_year | int }}}} {t['per_year']}"
-        f"{{% if a.saving_spread_vs_guard_per_year is not none %}}, {{{{ a.saving_spread_vs_guard_per_year | int }}}} {t['vs_guard']}{{% endif %}}{{% endif %}}"
+        f"{{% if a.get('saving_spread_per_year') is not none %}}**{t['saving']}:** {{{{ a.saving_spread_per_year | int }}}} {t['per_year']}"
+        f"{{% if a.get('saving_spread_vs_guard_per_year') is not none %}}, {{{{ a.saving_spread_vs_guard_per_year | int }}}} {t['vs_guard']}{{% endif %}}{{% endif %}}"
     )
     plugs_line = (
         "{% set p = state_attr('" + ids["readiness"] + "', 'plugging') %}"
@@ -175,6 +189,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"{{% if st == 'off' %}}{t['lm_off']}{{% else %}}"
         f"**{t['would']}:** {{{{ wn.get(st, st) }}}} · {{{{ rs.get(a.reason, a.reason) }}}}"
         f"{{% if a.until %}} · {t['until_t']} {{{{ (a.until | as_datetime | as_local).strftime('%H:%M') }}}}{{% endif %}}{{% endif %}}"
+        f"{{% if a.summary and a.summary.kwh_needless %}}\n\n{t['lm_needless']}: **{{{{ a.summary.kwh_needless }}}}** {t['lm_needless_in']}{{% endif %}}"
     )
     lc_id = ids["learning_check"]
     lc_line = (
@@ -193,6 +208,32 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"{t['cal_loss']} {{{{ ((1 - (n.efficiency or 0.9)) * 100) | round(0) | int }}}} % ({{{{ '{t['cal_src_learned']}' if n.efficiency_learned else '{t['cal_src_default']}' }}}})"
         f"{{% if a.spread_floor_kw %}} · {t['cal_floor']} {{{{ a.spread_floor_kw }}}} kW{{% endif %}}{{% endif %}}"
     )
+    hz_tpl = (
+        "{% set wd = " + t["wd"] + " %}{% set a = " + _s(ids["charge_plan"]) + ".attributes %}{% set h = a.horizon %}"
+        "{% if h and h.status == 'ok' %}"
+        "{% set fn = h.first_need %}"
+        "{% if fn %}"
+        "{% if h.lasts_until %}{% set lu = h.lasts_until | as_datetime | as_local %}**@COVERED@** {{ wd[lu.weekday()] }} {{ lu.strftime('%H:%M') }}. {% endif %}"
+        "{% set dp = fn.departure | as_datetime | as_local %}{% set ls = (fn.latest_start_pref or fn.latest_start) | as_datetime | as_local %}"
+        "**@MUST@** {{ wd[ls.weekday()] }} {{ ls.strftime('%H:%M') }}"
+        "{% if fn.latest_start_pref %} @AT@ {{ a.pref_kw }} kW{% endif %} (@FOR@ {{ wd[dp.weekday()] }} {{ dp.strftime('%H:%M') }}: {{ fn.need_kwh }} kWh"
+        "{% if fn.covered_by_sun %}, @SUNOK@{% endif %})"
+        "{% else %}@ALL@ {{ h.trips_looked_at }} @DAYS@."
+        "{% endif %}"
+        "{% for p in h.precharge %}{% set sf = p.sun_from | as_datetime | as_local %}{% set st = p.sun_to | as_datetime | as_local %}{% set fd = p.for_departure | as_datetime | as_local %}"
+        "\n\n**@PRE@:** {{ wd[sf.weekday()] }} {{ sf.strftime('%H:%M') }}–{{ st.strftime('%H:%M') }}: {{ p.kwh }} kWh (@REPL@ {{ wd[fd.weekday()] }} {{ fd.strftime('%H:%M') }})"
+        "{% endfor %}"
+        "{% endif %}"
+    )
+    for key, text in (("@COVERED@", t["hz_covered"]), ("@MUST@", t["hz_must"]), ("@ALL@", t["hz_all"]), ("@DAYS@", t["hz_days"]), ("@SUNOK@", t["hz_sun_ok"]), ("@NEXT@", t["hz_next"]), ("@FOR@", t["hz_for"]), ("@LATEST@", t["hz_latest"]), ("@AT@", t["hz_at"]), ("@PRE@", t["hz_pre"]), ("@REPL@", t["hz_replaces"])):
+        hz_tpl = hz_tpl.replace(key, text)
+    hb_id = ids["habit"]
+    habit_line = (
+        "{% set a = " + _s(hb_id) + ".attributes %}"
+        f"{{% if a.status == 'ok' %}}{t['hb_a']} **{{{{ a.night_share_pct }}}}** {t['hb_b']} **{{{{ a.day_share_pct }}}}**"
+        f" {t['hb_c']} **{{{{ a.weekend_share_pct }}}}** {t['hb_d']} **{{{{ a.weekdays_night_share_pct }}}} %**."
+        f"{{% else %}}{t['hb_few']}{{% endif %}}"
+    )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
     return [
         {"type": "grid", "cards": [
@@ -204,6 +245,9 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "heading", "heading": head(t["plan_h"]), "icon": "mdi:calendar-clock"},
             {"type": "markdown", "content": _chart(ids["charge_plan"])},
             {"type": "markdown", "content": calib_line},
+            {"type": "heading", "heading": head(t["hz_h"]), "icon": "mdi:calendar-arrow-right"},
+            {"type": "markdown", "content": _chart(ids["charge_plan"], "horizon_chart")},
+            {"type": "markdown", "content": hz_tpl},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["pot_h"]), "icon": "mdi:chart-bell-curve-cumulative"},
@@ -213,6 +257,12 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "heading", "heading": head(t["plugs_h"]), "icon": "mdi:ev-plug-type2"},
             {"type": "markdown", "content": _chart(ids["readiness"], "plug_chart")},
             {"type": "markdown", "content": plugs_line},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["hb_h"]), "icon": "mdi:chart-bar-stacked"},
+            {"type": "tile", "entity": hb_id, "name": t["hb_tile"]},
+            {"type": "markdown", "content": _chart(hb_id)},
+            {"type": "markdown", "content": habit_line},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["learn_h"]), "icon": "mdi:school-outline"},
