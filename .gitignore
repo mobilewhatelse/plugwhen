@@ -4,3 +4,4 @@ __pycache__/
 tests/install/run/
 tests/install/report.txt
 tests/install/report_both.txt
+tests/install/run_both/
