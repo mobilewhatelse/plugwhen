@@ -100,7 +100,11 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 - Kilometerstand und Ladestand bleiben die Sensoren des Autos: ohne sie kann Plugwhen nicht rechnen.
 - Beim Hinzufügen eines Fahrzeugs werden die Autos aus evcc angeboten (Name, Akkugröße, Ladeleistung). „Angesteckt“ und „lädt“ kommen aus
   evcc, solange dafür kein Sensor eingetragen ist.
-- Karte **„Plan für evcc“**: welchen Plan Plugwhen in evcc schreiben würde (Ziel-Ladestand und Uhrzeit), daneben der aktuelle Plan in evcc.
+- Karte **„Plan für evcc“**: welchen Plan Plugwhen in evcc schreiben würde, und zwar **für die erste Abfahrt, für die geladen werden muss**
+  (aus der Vorausschau, also früh, z. B. schon am Montag „34 % bis Fr 07:00“). Der Plan wird laufend angepasst: mehr Kilometer heben ihn,
+  Sonne dazwischen lässt ihn wegfallen, danach kommt die nächste nötige Abfahrt. Dazu **Wochenpläne** aus der gelernten Woche (evcc kennt
+  wiederkehrende Pläne je Wochentag; gleiche Zeiten und Ziele werden zusammengefasst, z. B. „Di–Fr 07:00 33 %“). Daneben steht jeweils,
+  was in evcc gerade eingestellt ist.
   Es wird noch nichts geschrieben (Lernmodus). Ein in evcc selbst gesetzter Plan würde nie überschrieben. **Ohne evcc** schaltet Plugwhen
   die Wallbox später selbst; im Lernmodus zeigt „Würde schalten“, was es täte.
 - Karte **„Woher die Daten kommen“**: für jeden Wert, ob er von einem Sensor, aus evcc oder gelernt ist.

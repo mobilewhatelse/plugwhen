@@ -10,8 +10,10 @@
   the guard or an own setting, a local evcc (add-on) is suggested. Adding a vehicle offers evcc's cars (the one at a loadpoint first)
   and fills in name, capacity and the charging power of the loadpoint. Plugged in and charging come from evcc when no sensor is set.
   Odometer and state of charge stay the car's own sensors: Plugwhen cannot calculate without them.
-- **Card "Plan for evcc"** per car (attribute `evcc_plan` of the charge plan): the plan Plugwhen would write into evcc (target state of
-  charge and time of the departure), evcc's current plan next to it, whether both are the same, and that nothing is written yet (learn
+- **Card "Plan for evcc"** per car (attribute `evcc_plan` of the charge plan): the plan Plugwhen would write into evcc for the **first
+  departure of the look-ahead that needs charging** (written early, e.g. "34 % by Friday 07:00" already on Monday, and following what
+  happens: more kilometres raise it, sun in between drops it, then the next needed departure), and **repeating plans per weekday** from
+  the learned week (equal times and targets grouped, e.g. "Tue-Fri 07:00 33 %"), each next to what evcc has now (`plan`, `repeatingPlans`), whether both are the same, and that nothing is written yet (learn
   mode). A plan already set in evcc that differs is shown as the user's own plan, which Plugwhen would never overwrite. Without evcc the
   card says that Plugwhen will switch the wallbox itself later (see "Would switch").
 - **Card "Where the data comes from"** per car (attribute `sources`): sensor, evcc or learned for each value, the evcc connection,

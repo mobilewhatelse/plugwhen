@@ -102,8 +102,9 @@ only kW are shown**; the verdict still works because it depends on kW. It is an 
   while it is plugged in, so it cannot tell the kilometres per day).
 - Adding a vehicle offers evcc's cars (the one at a loadpoint first) and fills in name, capacity and the charging power of the loadpoint.
   Plugged in and charging come from evcc as long as no sensor is set for them; a sensor always wins.
-- Card **Plan for evcc**: the plan Plugwhen would write into evcc (target state of charge and time of the departure), evcc's current plan
-  next to it, and whether both are the same. Nothing is written yet (learn mode). A plan set in evcc by hand that differs is shown as
+- Card **Plan for evcc**: the plan Plugwhen would write into evcc for the **first departure that needs charging** (from the look-ahead,
+  so early, e.g. "34 % by Friday 07:00" already on Monday, and adjusted as things change), plus **repeating plans per weekday** from the
+  learned week (evcc's `repeatingPlans`, equal times and targets grouped), each next to what evcc has now and whether they are the same. Nothing is written yet (learn mode). A plan set in evcc by hand that differs is shown as
   your own plan, which Plugwhen would never overwrite. **Without evcc** Plugwhen will switch the wallbox itself later; in learn mode
   *Would switch* shows what it would do.
 - Card **Where the data comes from**: for every value whether it is a sensor, evcc or learned, the evcc connection, and what the car
