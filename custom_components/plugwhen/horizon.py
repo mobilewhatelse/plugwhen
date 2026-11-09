@@ -60,11 +60,10 @@ def _sun_in(start: datetime, end: datetime, sun_kw: dict[datetime, float] | None
         nxt = t + QUARTER
         frac = (min(nxt, end) - max(t, start)).total_seconds() / 900.0
         kw = min(max_kw, max(0.0, sun_kw.get(t, 0.0)))
-        if frac > 0 and kw > 0:
+        if frac > 0 and kw >= MIN_SUN_KW:  # weaker sun cannot be charged (a wallbox needs more than that), so it does not count
             total += kw * QUARTER_H * frac
-            if kw >= MIN_SUN_KW:
-                first = first or t
-                last = nxt
+            first = first or t
+            last = nxt
         t = nxt
     return total, first, last
 

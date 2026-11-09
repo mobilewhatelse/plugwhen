@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.4 (unreleased) - weak sun
+
+- Sun that never reaches 1 kW in a quarter hour is not counted in the look-ahead any more: a wallbox cannot charge with it. Before,
+  a pre-charge could be recommended without a sun window, and the text card *The next departures* broke on it.
+
 ## 0.7.3 (unreleased) - any sensor with the right unit
 
 - **Odometer, state of charge, wallbox energy counter and grid energy can be any sensor**, also a template sensor without a device class.

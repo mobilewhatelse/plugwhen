@@ -220,7 +220,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% if fn.covered_by_sun %}, @SUNOK@{% endif %})"
         "{% else %}@ALL@ {{ h.trips_looked_at }} @DAYS@."
         "{% endif %}"
-        "{% for p in h.precharge %}{% set sf = p.sun_from | as_datetime | as_local %}{% set st = p.sun_to | as_datetime | as_local %}{% set fd = p.for_departure | as_datetime | as_local %}"
+        "{% for p in h.precharge if p.sun_from and p.sun_to and p.for_departure %}{% set sf = p.sun_from | as_datetime | as_local %}{% set st = p.sun_to | as_datetime | as_local %}{% set fd = p.for_departure | as_datetime | as_local %}"
         "\n\n**@PRE@:** {{ wd[sf.weekday()] }} {{ sf.strftime('%H:%M') }}–{{ st.strftime('%H:%M') }}: {{ p.kwh }} kWh (@REPL@ {{ wd[fd.weekday()] }} {{ fd.strftime('%H:%M') }})"
         "{% endfor %}"
         "{% endif %}"

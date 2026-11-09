@@ -34,6 +34,16 @@ def plan(**kw):
     return horizon_plan(**args)
 
 
+class WeakSunTest(unittest.TestCase):
+    def test_sun_below_one_kw_is_not_counted_and_never_a_pre_charge_without_window(self):
+        r = plan(sun_kw=sun(kw=0.5))
+        self.assertEqual(r["precharge"], [])
+        self.assertEqual(r["saved_grid_kwh"], 0.0)
+        for p in plan()["precharge"]:
+            self.assertIsNotNone(p["sun_from"])
+            self.assertIsNotNone(p["sun_to"])
+
+
 class HorizonTest(unittest.TestCase):
     def test_deficits_come_in_order(self):
         r = plan(sun_kw=None)
