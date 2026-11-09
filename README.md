@@ -94,6 +94,22 @@ above its hourly mean) plus the car in that way of charging. The prices come fro
 year up to the threshold, above it, the threshold; 0 = one price) or, if empty, from the chosen peak guard. **Without any prices
 only kW are shown**; the verdict still works because it depends on kW. It is an estimate from hourly values, not a bill.
 
+## With evcc (optional)
+
+- evcc is **optional** and only **read**, through its address (evcc may run anywhere on the network). The address comes from the
+  quarter-hour peak guard or is entered in Plugwhen's settings; an evcc on the same machine (add-on) is suggested.
+- Odometer and state of charge stay the car's own sensors: Plugwhen cannot calculate without them (evcc usually asks the car only
+  while it is plugged in, so it cannot tell the kilometres per day).
+- Adding a vehicle offers evcc's cars (the one at a loadpoint first) and fills in name, capacity and the charging power of the loadpoint.
+  Plugged in and charging come from evcc as long as no sensor is set for them; a sensor always wins.
+- Card **Plan for evcc**: the plan Plugwhen would write into evcc (target state of charge and time of the departure), evcc's current plan
+  next to it, and whether both are the same. Nothing is written yet (learn mode). A plan set in evcc by hand that differs is shown as
+  your own plan, which Plugwhen would never overwrite. **Without evcc** Plugwhen will switch the wallbox itself later; in learn mode
+  *Would switch* shows what it would do.
+- Card **Where the data comes from**: for every value whether it is a sensor, evcc or learned, the evcc connection, and what the car
+  was set up with (guard, evcc, by hand).
+- Several cars: each car has its own plan and its own proposal for evcc. Two cars sharing one wallbox are not planned together yet.
+
 ## Together with the quarter-hour peak guard
 
 Both stay fully usable alone. Choosing the other integration in the settings is enough, no entities have to be picked:
