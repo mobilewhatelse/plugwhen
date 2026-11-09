@@ -6,6 +6,12 @@
   power (the car's own, else computed from the wallbox currents), plug sensor and notify services, plus the odometer next to the state
   of charge and the energy counter next to the wallbox power (same device, counters win over measurements such as the range). Copied
   once: Plugwhen keeps working without the guard. The departure is not taken over (it would replace the learned departures).
+- **evcc as an optional source** (read only, through its API; evcc may run anywhere on the network): address and password come from
+  the guard or an own setting, a local evcc (add-on) is suggested. Adding a vehicle offers evcc's cars (the one at a loadpoint first)
+  and fills in name, capacity and the charging power of the loadpoint. Plugged in and charging come from evcc when no sensor is set.
+  Odometer and state of charge stay the car's own sensors: Plugwhen cannot calculate without them.
+- **Card "Where the data comes from"** per car (attribute `sources`): sensor, evcc or learned for each value, the evcc connection,
+  whether the plan is only a recommendation, and what the car was set up with.
 - **An installed guard is connected when Plugwhen is set up**, so its grid counter, prices, limit and load forecast follow without a setting.
 
 ## 0.7.5 (unreleased) - the plan says that it is not executed

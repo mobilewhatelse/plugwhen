@@ -5,3 +5,7 @@ tests/install/run/
 tests/install/report.txt
 tests/install/report_both.txt
 tests/install/run_both/
+tests/install/run_evcc/
+tests/install/report_evcc.txt
+tests/install/run_local/
+tests/install/report_local_evcc.txt

@@ -10,15 +10,17 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
-    BooleanSelector, ConfigEntrySelector, ConfigEntrySelectorConfig, EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode, TextSelector,
+    BooleanSelector, ConfigEntrySelector, ConfigEntrySelectorConfig, EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode,
+    SelectOptionDict, SelectSelector, SelectSelectorConfig, SelectSelectorMode, TextSelector, TextSelectorConfig, TextSelectorType,
 )
 
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
-    O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
+    O_EVCC_PASSWORD, O_EVCC_URL, V_EVCC_VEHICLE, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
+from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, match_vehicle, parse_vehicles, vehicle_from_evcc
 from .takeover import guard_wallbox, next_vehicle, pick_by_unit, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
 
@@ -45,8 +47,16 @@ def find_waechter_entry(hass: HomeAssistant) -> str | None:
     return entries[0].entry_id if len(entries) == 1 else None
 
 
-def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
-    return vol.Schema({
+def _vehicle_schema(d: dict[str, Any], evcc_vehicles: list[dict[str, Any]] | None = None) -> vol.Schema:
+    extra: dict[Any, Any] = {}
+    if evcc_vehicles:   # only while evcc answers; otherwise the field is left out and a stored value is kept
+        extra[_opt(V_EVCC_VEHICLE, d)] = SelectSelector(SelectSelectorConfig(
+            options=[SelectOptionDict(value=x["key"], label=x["title"]) for x in evcc_vehicles], mode=SelectSelectorMode.DROPDOWN))
+    return vol.Schema({**_vehicle_fields(d), **extra})
+
+
+def _vehicle_fields(d: dict[str, Any]) -> dict[Any, Any]:
+    return ({
         vol.Required(V_NAME, default=d.get(V_NAME, vol.UNDEFINED)): TextSelector(),
         vol.Required(V_ODOMETER, default=d.get(V_ODOMETER, vol.UNDEFINED)): _ent("sensor"),
         vol.Required(V_SOC, default=d.get(V_SOC, vol.UNDEFINED)): _ent("sensor"),
@@ -64,6 +74,33 @@ def _vehicle_schema(d: dict[str, Any]) -> vol.Schema:
         _opt(V_NOTIFY, d): TextSelector(),
         vol.Required(V_NOTIFY_HOUR, default=d.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)): _num(0, 23, 1, "h"),
     })
+
+
+async def evcc_state(hass: HomeAssistant, url: str, password: str | None) -> dict[str, Any]:
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+    return await EvccClient(async_get_clientsession(hass), url, password).state()
+
+
+async def find_local_evcc(hass: HomeAssistant) -> str | None:
+    """The address of an evcc on the same machine (add-on), if one answers there within two seconds; offered, never forced."""
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+    for url in LOCAL_URLS:
+        try:
+            await EvccClient(async_get_clientsession(hass), url, None, timeout=PROBE_TIMEOUT_S).state()
+            return url
+        except EvccAuthError:
+            return url   # it is there, it only wants a password
+        except EvccError:
+            continue
+    return None
+
+
+def _guard_cfg(hass: HomeAssistant, entry: ConfigEntry | None) -> dict[str, Any]:
+    wid = (entry.options if entry else {}).get(O_WAECHTER) or find_waechter_entry(hass)
+    guard = hass.config_entries.async_get_entry(wid) if wid else None
+    return {**guard.data, **guard.options} if guard is not None and guard.domain == WAECHTER_DOMAIN else {}
 
 
 def vehicle_title(d: dict[str, Any]) -> str:
@@ -104,6 +141,13 @@ class PlugwhenOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = unit_errors(self.hass.states.get, user_input, OPTION_UNITS)
+            if not errors and str(user_input.get(O_EVCC_URL) or "").strip():   # an own evcc address is tried right away
+                try:
+                    await evcc_state(self.hass, user_input[O_EVCC_URL], user_input.get(O_EVCC_PASSWORD))
+                except EvccAuthError:
+                    errors[O_EVCC_PASSWORD] = "evcc_auth"
+                except EvccError:
+                    errors[O_EVCC_URL] = "evcc_unreachable"
             if not errors:
                 return self.async_create_entry(data={k: v for k, v in user_input.items() if v not in (None, "")})
         current = dict(self.config_entry.options) if user_input is None else dict(user_input)
@@ -111,6 +155,10 @@ class PlugwhenOptionsFlow(OptionsFlow):
             found = find_waechter_entry(self.hass)  # offered, not forced
             if found:
                 current[O_WAECHTER] = found
+        if user_input is None and not current.get(O_EVCC_URL) and not _guard_cfg(self.hass, self.config_entry).get("evcc_site_url"):
+            local = await find_local_evcc(self.hass)   # offered, not forced: saved only if the form is saved with it
+            if local:
+                current[O_EVCC_URL] = local
         return self.async_show_form(step_id="init", errors=errors, data_schema=vol.Schema({
             _opt(O_WAECHTER, current): ConfigEntrySelector(ConfigEntrySelectorConfig(integration=WAECHTER_DOMAIN)),
             _opt(O_LOAD, current): _ent("sensor"),
@@ -121,6 +169,8 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_PRICE_LOW, current): _num(0, 5000, 0.01, "/kW/a"),
             _opt(O_PRICE_HIGH, current): _num(0, 5000, 0.01, "/kW/a"),
             _opt(O_PRICE_THRESHOLD, current): _num(0, 100, 0.1, "kW"),
+            _opt(O_EVCC_URL, current): TextSelector(),
+            _opt(O_EVCC_PASSWORD, current): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
         }))
 
 
@@ -174,15 +224,47 @@ def _beside(hass: HomeAssistant, entity_id: str | None, units: tuple[str, ...]) 
     return pick_by_unit(cands, units)
 
 
+TAKEN_EVCC = {"de": "Von evcc übernommen: {name}.", "en": "Taken from evcc: {name}."}
+
+
 class VehicleFlow(ConfigSubentryFlow):
+    _evcc: list[dict[str, Any]] | None = None
+    _taken: list[str] | None = None   # "guard", "evcc": where the form was filled in from (shown on the dashboard)
+
+    async def _evcc_vehicles(self) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        """evcc's state and vehicles if an address is known (Plugwhen's own or the guard's) and evcc answers; else (None, [])."""
+        entry = self._get_entry()
+        conn = connection(entry.options.get(O_EVCC_URL), entry.options.get(O_EVCC_PASSWORD), _guard_cfg(self.hass, entry))
+        if conn is None:
+            return None, []
+        try:
+            state = await evcc_state(self.hass, conn[0], conn[1])
+        except EvccError:
+            return None, []
+        return state, parse_vehicles(state)
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         if user_input is None:
+            lang = self.hass.config.language[:2]
             proposal, name = guard_proposal(self.hass, self._get_entry())
-            note = TAKEN_OVER.get(self.hass.config.language[:2], TAKEN_OVER["en"]).format(name=name) if name else ""
-            return await self._form(None, proposal, note)
+            notes = [TAKEN_OVER.get(lang, TAKEN_OVER["en"]).format(name=name)] if name else []
+            self._taken = ["guard"] if name else []
+            state, self._evcc = await self._evcc_vehicles()
+            if self._evcc:
+                taken = {sub.data.get(V_EVCC_VEHICLE) for sub in self._get_entry().subentries.values() if sub.subentry_type == SUBENTRY_VEHICLE}
+                key = match_vehicle(state, proposal.get(V_NAME), {t for t in taken if t})
+                if key:
+                    found = vehicle_from_evcc(state, key)
+                    for k, val in found.items():   # the guard's values (sensors of Home Assistant) win
+                        proposal.setdefault(k, val)
+                    notes.append(TAKEN_EVCC.get(lang, TAKEN_EVCC["en"]).format(name=found.get(V_NAME, key)))
+                    self._taken.append("evcc")
+            return await self._form(None, proposal, " ".join(notes))
         return await self._form(user_input, {})
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        if user_input is None:
+            _, self._evcc = await self._evcc_vehicles()
         return await self._form(user_input, dict(self._get_reconfigure_subentry().data))
 
     async def _form(self, user_input: dict[str, Any] | None, current: dict[str, Any], note: str = "") -> SubentryFlowResult:
@@ -200,11 +282,19 @@ class VehicleFlow(ConfigSubentryFlow):
                 errors[V_NOTIFY] = "notify_format"
             else:
                 data = {k: (v.strip() if isinstance(v, str) else v) for k, v in user_input.items() if v not in (None, "")}
+                if self.source == "user" and self._taken:
+                    data["taken_from"] = list(self._taken)
+                elif self.source != "user" and self._get_reconfigure_subentry().data.get("taken_from"):
+                    data["taken_from"] = self._get_reconfigure_subentry().data["taken_from"]
+                if self.source != "user" and not self._evcc and V_EVCC_VEHICLE not in user_input:   # evcc not reachable: keep the car
+                    old = self._get_reconfigure_subentry().data.get(V_EVCC_VEHICLE)
+                    if old:
+                        data[V_EVCC_VEHICLE] = old
                 title = vehicle_title(data)
                 if self.source == "user":
                     return self.async_create_entry(title=title, data=data)
                 return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=title, data=data)
             current = user_input
         step = "user" if self.source == "user" else "reconfigure"
-        return self.async_show_form(step_id=step, data_schema=_vehicle_schema(current), errors=errors,
+        return self.async_show_form(step_id=step, data_schema=_vehicle_schema(current, self._evcc), errors=errors,
                                     description_placeholders={"taken_over": note})

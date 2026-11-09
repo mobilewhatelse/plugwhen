@@ -77,6 +77,12 @@ TEXT = {
         nights="Nächte", typ_in="Typisch angesteckt um", typ_out="abgezogen um", since="Mitgeschrieben seit",
         plugs_note="Normal anstecken genügt: „Bitte anstecken“ kommt nur, wenn die Reserve nicht reicht.",
         no_plug="Kein Stecker-Sensor eingetragen.",
+        src_h="Woher die Daten kommen", src_soc="Ladestand", src_odo="Kilometerstand", src_plug="Angesteckt", src_chg="Lädt",
+        src_wb="Energiezähler Wallbox", src_dep="Abfahrt", src_plan="Ladeplan", src_evcc="evcc", src_set="Eingerichtet mit Werten aus",
+        src_sensor="Sensor", src_from_evcc="evcc (Ladepunkt)", src_none="nicht bekannt", src_learned="gelernt",
+        src_rec="nur Empfehlung, es wird nichts geschaltet", src_exec="wird ausgeführt", src_own="eigene Adresse",
+        src_guard_addr="Adresse aus dem Wächter", src_ok="antwortet", src_fail="antwortet nicht", src_unused="kein Auto in evcc gewählt",
+        src_guard="Wächter", src_manual="von Hand",
         wd="['Mo','Di','Mi','Do','Fr','Sa','So']", day="Tag", samples="Tage", km_typ="typisch km", km_high="hoch km", drives="fährt",
         dep="Abfahrt", home="zu Hause geladen",
         week_note="Grundlage: die letzten 8 Tage je Wochentag aus der Langzeitstatistik. „hoch“ = 80. Perzentil.",
@@ -141,6 +147,12 @@ TEXT = {
         nights="nights", typ_in="Typically plugged in at", typ_out="unplugged at", since="Recorded since",
         plugs_note="Plug in as usual: \"plug in\" only comes when the reserve would not last.",
         no_plug="No plug sensor set.",
+        src_h="Where the data comes from", src_soc="State of charge", src_odo="Odometer", src_plug="Plugged in", src_chg="Charging",
+        src_wb="Wallbox energy counter", src_dep="Departure", src_plan="Charge plan", src_evcc="evcc", src_set="Set up with values from",
+        src_sensor="sensor", src_from_evcc="evcc (loadpoint)", src_none="not known", src_learned="learned",
+        src_rec="recommendation only, nothing is switched", src_exec="executed", src_own="own address",
+        src_guard_addr="address of the guard", src_ok="answers", src_fail="does not answer", src_unused="no car chosen in evcc",
+        src_guard="guard", src_manual="by hand",
         wd="['Mon','Tue','Wed','Thu','Fri','Sat','Sun']", day="Day", samples="days", km_typ="typical km", km_high="high km", drives="drives",
         dep="Departure", home="charged at home",
         week_note="Based on the last 8 days per weekday from the long-term statistics. \"high\" = 80th percentile.",
@@ -234,6 +246,23 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f" {t['hb_c']} **{{{{ a.weekend_share_pct }}}}** {t['hb_d']} **{{{{ a.weekdays_night_share_pct }}}} %**."
         f"{{% else %}}{t['hb_few']}{{% endif %}}"
     )
+    src = (
+        "{% set s = " + need + ".sources %}{% if s %}"
+        "{% macro row(label, x) %}| " + "{{ label }}" + " | {% if x['from'] == 'sensor' %}" + t["src_sensor"] + " `{{ x.entity }}`"
+        "{% elif x['from'] == 'evcc' %}" + t["src_from_evcc"] + "{% elif x['from'] == 'learned' %}" + t["src_learned"]
+        + "{% else %}" + t["src_none"] + "{% endif %} |\n{% endmacro %}"
+        "| | |\n|---|---|\n"
+        "{{ row('" + t["src_soc"] + "', s.soc) }}{{ row('" + t["src_odo"] + "', s.odometer) }}"
+        "{{ row('" + t["src_plug"] + "', s.plugged) }}{{ row('" + t["src_chg"] + "', s.charging) }}"
+        "{{ row('" + t["src_wb"] + "', s.wallbox_energy) }}{{ row('" + t["src_dep"] + "', s.departure) }}"
+        "| " + t["src_plan"] + " | {{ '" + t["src_exec"] + "' if s.plan == 'executed' else '" + t["src_rec"] + "' }} |\n"
+        "{% if s.evcc %}| " + t["src_evcc"] + " | {{ '" + t["src_own"] + "' if s.evcc.address == 'own' else '" + t["src_guard_addr"] + "' }}"
+        "{% if s.evcc.vehicle %} · {{ s.evcc.vehicle }}{% endif %} · "
+        "{% if s.evcc.ok is none %}" + t["src_unused"] + "{% elif s.evcc.ok %}" + t["src_ok"] + "{% else %}" + t["src_fail"] + "{% endif %} |\n{% endif %}"
+        "| " + t["src_set"] + " | {% set tf = s.taken_from %}{% if tf %}{{ tf | map('replace', 'guard', '" + t["src_guard"]
+        + "') | join(', ') }}{% else %}" + t["src_manual"] + "{% endif %} |"
+        "{% endif %}"
+    )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
     return [
         {"type": "grid", "cards": [
@@ -277,6 +306,10 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "tile", "entity": ids["learning_check"], "name": t["lc_tile"]},
             {"type": "markdown", "content": lc_line},
             {"type": "markdown", "content": _chart(lc_id)},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["src_h"]), "icon": "mdi:source-branch"},
+            {"type": "markdown", "content": src},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["settings"]), "icon": "mdi:tune"},

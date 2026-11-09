@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 from . import PlugwhenEntry
 from .charts import (chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow,
                      chart_sun_windows)
+from .sources import data_sources
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
 
@@ -65,6 +66,10 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "soc_stale": v.soc_stale,
             "soc_age_h": round(v.soc_age_s / 3600.0, 2) if v.soc_age_s is not None else None,
             "plugged": v.plugged,
+            "plugged_source": "entity" if v.cfg.get("plugged_entity") else ("evcc" if v.evcc_live else None),
+            "evcc_vehicle": v.cfg.get("evcc_vehicle"),
+            "evcc": self.plug.evcc_info or None,
+            "sources": data_sources(v.cfg, v.evcc_live is not None, self.plug.evcc_info, executed=False),
             "reserve_km": v.reserve_km,
             "learn_km": v.learn_km,
             "efficiency": v.efficiency or 0.9, "efficiency_learned": v.efficiency is not None,
@@ -181,7 +186,7 @@ class ReadinessSensor(PlugwhenEntity, SensorEntity):
         v = self.vehicle
         out = {"shortfall_kwh": n.shortfall_kwh if n else 0.0, "max_possible_kwh": n.max_possible_kwh if n else None,
                "soc_stale": v.soc_stale}
-        if v.cfg.get("plugged_entity"):   # how the car was actually plugged in over the last four weeks
+        if v.cfg.get("plugged_entity") or v.cfg.get("evcc_vehicle"):   # how the car was actually plugged in over the last four weeks
             out["plugging"] = v.plug_log.summary(dt_util.now())
             out["plug_chart"] = chart_plugs(v.plug_log.intervals(), dt_util.now(), self.hass.config.language)
         return out

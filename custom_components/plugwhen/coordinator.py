@@ -18,10 +18,11 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_MODE, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
-    O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    O_EVCC_PASSWORD, O_EVCC_URL, V_EVCC_VEHICLE, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
 )
+from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
 from .habit import charging_habit
@@ -87,6 +88,7 @@ class Vehicle:
     mode: str = DEFAULT_MODE                 # "off" or "learn" (nothing is switched in either)
     decision: Decision | None = None         # what would be switched now (learn mode)
     shadow: ShadowLog = field(default_factory=ShadowLog)
+    evcc_live: dict | None = None            # plugged in / charging of this car at its evcc loadpoint (None = not known)
 
 
 class Plugwhen:
@@ -109,6 +111,8 @@ class Plugwhen:
         self._add_model = QuarterAddModel()
         self._solar: dict[datetime, float] | None = None
         self._solar_at: datetime | None = None
+        self.evcc_state: dict[str, Any] | None = None   # last state read from evcc (only while a vehicle names its evcc car)
+        self.evcc_info: dict[str, Any] = {}             # where evcc is, whether it answered (for the sensors)
         for sub in entry.subentries.values():
             if sub.subentry_type == SUBENTRY_VEHICLE:
                 d = dict(sub.data)
@@ -178,6 +182,7 @@ class Plugwhen:
         if self._calib_at is None or now - self._calib_at >= CALIBRATE_INTERVAL:
             self._calib_at = now
             self.entry.async_create_background_task(self.hass, self._calibrate(now), f"{DOMAIN} calibrate")
+        await self._refresh_evcc(now)
         for v in self.vehicles.values():
             if v.history_at is None or now - v.history_at >= HISTORY_INTERVAL:
                 await self._load_history(v, now)
@@ -188,6 +193,28 @@ class Plugwhen:
         async_dispatcher_send(self.hass, self.signal)
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
+
+    # ---------- evcc (optional, read only) ----------
+
+    def evcc_connection(self) -> tuple[str, str | None, str] | None:
+        """(url, password, source) of evcc: Plugwhen's own setting, else the guard's, else None."""
+        return evcc_connection(self.entry.options.get(O_EVCC_URL), self.entry.options.get(O_EVCC_PASSWORD), self._waechter_cfg())
+
+    async def _refresh_evcc(self, now: datetime) -> None:
+        """Read evcc's state once per run, only if a vehicle names its evcc car. A failure leaves the cars as without evcc."""
+        conn = self.evcc_connection()
+        if conn is None or not any(v.cfg.get(V_EVCC_VEHICLE) for v in self.vehicles.values()):
+            self.evcc_state, self.evcc_info = None, ({"source": conn[2], "used": False} if conn else {})
+            return
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        try:
+            self.evcc_state = await EvccClient(async_get_clientsession(self.hass), conn[0], conn[1]).state()
+            self.evcc_info = {"source": conn[2], "used": True, "ok": True, "at": now.isoformat()}
+        except EvccError as err:
+            self.evcc_state = None
+            self.evcc_info = {"source": conn[2], "used": True, "ok": False, "error": str(err)[:120]}
+            _LOGGER.debug("Plugwhen: evcc not readable: %s", err)
 
     # ---------- reading ----------
 
@@ -617,9 +644,14 @@ class Plugwhen:
 
     def _track_plug(self, v: Vehicle, now: datetime) -> None:
         st = self._state(v.cfg.get(V_PLUGGED))
-        if v.plug_seeding or st is None or v.plugged is None or v.plugged == v.plug_log.open:
+        if v.plug_seeding or v.plugged is None or v.plugged == v.plug_log.open:
             return
-        when = dt_util.as_local(st.last_changed) if st.last_changed <= now else now
+        if st is not None:
+            when = dt_util.as_local(st.last_changed) if st.last_changed <= now else now
+        elif v.evcc_live is not None:   # from evcc: known to the minute of the run
+            when = now
+        else:
+            return
         if v.plug_log.change(v.plugged, when):
             v.plug_log.trim(now)
             self._save_plugs()
@@ -644,7 +676,8 @@ class Plugwhen:
             v.decision = None
             return
         v.decision = decide(v.charge_plan, now, v.plugged, v.soc is not None)
-        charging = self._is_on(v.cfg.get(V_CHARGING)) if v.cfg.get(V_CHARGING) else None
+        charging = (self._is_on(v.cfg.get(V_CHARGING)) if v.cfg.get(V_CHARGING)
+                    else (v.evcc_live["charging"] if v.evcc_live else None))
         energy = None
         wb = v.cfg.get(V_WALLBOX_ENERGY)
         if wb:
@@ -654,9 +687,11 @@ class Plugwhen:
                 lambda: {"vehicles": {x.sub_id: x.shadow.to_dict() for x in self.vehicles.values()}}, 30)
 
     def _compute_plan(self, v: Vehicle, now: datetime) -> None:
-        v.plugged = self._is_on(v.cfg.get(V_PLUGGED))
+        v.evcc_live = live_vehicle(self.evcc_state, v.cfg[V_EVCC_VEHICLE]) if v.cfg.get(V_EVCC_VEHICLE) else None
+        # a sensor wins; evcc only fills in what no sensor says (and only while evcc has the car at a loadpoint)
+        v.plugged = self._is_on(v.cfg.get(V_PLUGGED)) if v.cfg.get(V_PLUGGED) else (v.evcc_live["plugged"] if v.evcc_live else None)
         self._track_plug(v, now)
-        v.charging = self._is_on(v.cfg.get(V_CHARGING)) is True
+        v.charging = (self._is_on(v.cfg.get(V_CHARGING)) is True) if v.cfg.get(V_CHARGING) else bool(v.evcc_live and v.evcc_live["charging"])
         v.soc = self._float(v.cfg.get(V_SOC))
         v.soc_age_s = self._age_s(v.cfg.get(V_SOC), now) if v.soc is not None else None
         v.soc_stale = soc_is_stale(v.soc_age_s, float(v.cfg.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)), v.charging)
