@@ -68,7 +68,8 @@ def main():
         "the vehicle form is filled in from evcc (name, capacity, power of the loadpoint, evcc vehicle)",
         json.dumps({k: vals.get(k) for k in ("name", "capacity_kwh", "charge_kw_min", "charge_kw_max", "evcc_vehicle")}) + " | " + note)
     car = {"name": vals.get("name", "blue e-Golf"), "odometer_entity": "sensor.auto_kilometerstand", "soc_entity": "sensor.auto_ladestand",
-           "capacity_kwh": 44, "reserve_km": 100, "consumption_kwh_100": 20, "charge_kw_max": 11, "charge_kw_min": 4.1, "evcc_vehicle": "vehicle_1"}
+           "capacity_kwh": 44, "reserve_km": 100, "consumption_kwh_100": 20, "charge_kw_max": 11, "charge_kw_min": 4.1, "evcc_vehicle": "vehicle_1",
+           "departure_entity": "input_datetime.abfahrt"}   # a fresh installation has no learned departures yet
     s, d = it.api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", car)
     log(s == 200 and d.get("type") == "create_entry", "the vehicle is added with its evcc car and without a plug sensor", f"{d.get('type')} {d.get('errors')}")
 
@@ -98,6 +99,7 @@ def main():
 
     # ---------- the plan Plugwhen would write into evcc: shown, never written ----------
     it.svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 10})   # low charge: a plan is needed
+    it.svc("input_datetime", "set_datetime", {"entity_id": "input_datetime.abfahrt", "time": "07:00:00"})   # the next 07:00
     ep = None
 
     def has_proposal():
