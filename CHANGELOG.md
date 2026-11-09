@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.5 (unreleased) - the plan says that it is not executed
+
+- The charge plan has a new attribute **`executed`** (`false`: Plugwhen recommends, it does not switch the wallbox). The quarter-hour
+  peak guard reads it: before, a plan "not needed" took the car out of the guard's forecast although the car charged whenever it
+  was plugged in (expected peak 2.5 kW, real 9.1 kW in one house).
+
 ## 0.7.4 (unreleased) - weak sun
 
 - Sun that never reaches 1 kW in a quarter hour is not counted in the look-ahead any more: a wallbox cannot charge with it. Before,

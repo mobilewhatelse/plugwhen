@@ -38,7 +38,7 @@ baut: ob evcc oder die HACS-Integrationen das inzwischen anbieten (Releases anse
 ## 4. Schnittstelle zum Wächter (nur Entitäten, keine Code-Abhängigkeit)
 | Von | Nach | Was |
 |---|---|---|
-| Planer | Wächter | Sensor **Ladeplan** mit Zustand (Geplant, Nicht nötig, Ziel nicht erreichbar, Keine Abfahrt) und Attributen `windows` (Beginn, Ende, kW), `needed_kwh`, `planned_kwh`, `departure`, `target_soc`. Der Wächter nutzt `windows` als erwartete Autolast in seiner Prognose |
+| Planer | Wächter | Sensor **Ladeplan** mit Zustand (Geplant, Nicht nötig, Ziel nicht erreichbar, Keine Abfahrt) und Attributen `windows` (Beginn, Ende, kW), `needed_kwh`, `planned_kwh`, `departure`, `target_soc`, `executed` (`false`, solange Plugwhen nicht schaltet). Der Wächter nutzt `windows` als erwartete Autolast in seiner Prognose |
 | Wächter | Planer | Sensor **Prognose** (typisch und hoch je Viertelstunde, 24 h), **erlaubter Bezug jetzt**, **greift ein**. Der Planer nimmt sie statt seiner eigenen Prognose, wenn der Nutzer sie auswählt |
 | beide | Wallbox | **Genau ein Schreiber je Wallbox.** Ist der Wächter eingerichtet, setzt er den Strom; der Planer gibt nur den **Wunschstrom** und Erlauben/Pausieren vor. Der Wächter begrenzt nur nach unten, der kleinere Wert gilt. Ohne Wächter schreibt der Planer selbst |
 

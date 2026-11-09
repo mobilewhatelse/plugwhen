@@ -116,7 +116,7 @@ class DepartureSensor(PlugwhenEntity, SensorEntity):
 
 class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
-    (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`."""
+    (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`, `executed`."""
 
     _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart"})
     _attr_device_class = SensorDeviceClass.ENUM
@@ -141,6 +141,9 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "needed_kwh": p.get("needed_kwh"), "planned_kwh": p.get("planned_kwh"),
             "available_kwh": p.get("available_kwh"), "grid_kwh": p.get("grid_kwh"), "shortfall_kwh": p.get("shortfall_kwh"),
             "departure": iso(v.departure), "departure_source": v.departure_source,
+            # Plugwhen does not switch the wallbox (modes off and learn): readers must not take the plan as what the car will do.
+            # Becomes True with a mode that executes the plan.
+            "executed": False,
             "target_soc": v.need.target_soc if v.need else None,
             "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
             "load_forecast_used": v.load_used, "load_entity": self.plug._load_entity(), "availability_used": v.availability_used,
