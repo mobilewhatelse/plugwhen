@@ -69,7 +69,7 @@
       "step": {
         "user": {
           "title": "Fahrzeug",
-          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n{taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Kilometerstand",
@@ -108,7 +108,7 @@
         },
         "reconfigure": {
           "title": "Fahrzeug",
-          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n{taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Kilometerstand",

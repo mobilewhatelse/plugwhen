@@ -69,7 +69,7 @@
       "step": {
         "user": {
           "title": "Vehicle",
-          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n{taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Odometer",
@@ -108,7 +108,7 @@
         },
         "reconfigure": {
           "title": "Vehicle",
-          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n{taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Odometer",

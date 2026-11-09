@@ -98,6 +98,12 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 Beide laufen auch allein. Es genügt, die andere Integration in den Einstellungen zu wählen, Entitäten müssen nicht ausgesucht werden:
 
 - Plugwhen liest die **Last-Prognose** des Wächters (erwarteter Bezug, Spitzenziel), seinen Zähler, die Preise und die Grenze.
+  Diese Werte laufen mit: Ändern Sie die Grenze im Wächter, rechnet Plugwhen sofort damit.
+- **Wenig einzustellen:** Ist der Wächter schon installiert, wenn Plugwhen eingerichtet wird, ist er sofort verbunden. Beim Hinzufügen eines
+  Fahrzeugs füllt Plugwhen das Formular mit dem, was der Wächter über das Auto und die Wallbox weiß: Name, Ladestand, Akkugröße,
+  Ladeleistung, Stecker-Sensor, Benachrichtigung, dazu Kilometerstand und Energiezähler vom selben Gerät. Diese Werte werden einmal kopiert,
+  Plugwhen läuft also auch weiter, wenn der Wächter später entfernt wird. Die Abfahrtszeit wird bewusst nicht übernommen: Eine feste
+  Abfahrtszeit der Wallbox würde die gelernten Abfahrten ersetzen.
 - Der Wächter liest die **Ladepläne** von Plugwhen (Attribut `windows`) in seine Prognose ein und zeigt sie ab Version 0.14 in seinem Dashboard
   statt seines eigenen Plans. Den eigenen Ladeplan des Wächters dann ausschalten, damit nicht zwei Pläne nebeneinander stehen.
 - **Der Wächter hat immer das letzte Wort:** Käme trotzdem eine Spitze, drosselt er wie gewohnt. Plugwhen vergleicht, was wirklich angekommen

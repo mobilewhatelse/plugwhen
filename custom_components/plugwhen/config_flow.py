@@ -19,6 +19,7 @@ from .const import (
     O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
+from .takeover import guard_wallbox, next_vehicle, pick_by_unit, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
 
 WAECHTER_DOMAIN = "viertelstunden_waechter"
@@ -74,7 +75,10 @@ class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="Plugwhen", data={})
+            # an installed guard is connected right away: its grid counter, prices, limit and load forecast are then read at
+            # run time without a setting (it can be removed in the options; Plugwhen works without it)
+            found = find_waechter_entry(self.hass)
+            return self.async_create_entry(title="Plugwhen", data={}, options={O_WAECHTER: found} if found else {})
         return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
 
     @staticmethod
@@ -120,14 +124,68 @@ class PlugwhenOptionsFlow(OptionsFlow):
         }))
 
 
+TAKEN_OVER = {
+    "de": "Vorausgefüllt aus dem Viertelstunden-Wächter ({name}). Bitte prüfen und ergänzen, was fehlt.",
+    "en": "Filled in from the quarter-hour peak guard ({name}). Please check and add what is missing.",
+}
+
+
+def guard_proposal(hass: HomeAssistant, entry: ConfigEntry) -> tuple[dict[str, Any], str | None]:
+    """What the guard already knows about the next car Plugwhen does not have yet: (prefilled values, name) or ({}, None).
+    The odometer and the wallbox energy counter are looked up on the same devices as the state of charge and the wallbox
+    power. Copied once; nothing here is needed later."""
+    wid = entry.options.get(O_WAECHTER) or find_waechter_entry(hass)
+    guard = hass.config_entries.async_get_entry(wid) if wid else None
+    if guard is None or guard.domain != WAECHTER_DOMAIN:
+        return {}, None
+    devices = [{**sub.data, "kind": sub.subentry_type, "name": sub.data.get("name") or sub.title} for sub in guard.subentries.values()]
+    taken = {sub.data.get(V_SOC) for sub in entry.subentries.values() if sub.subentry_type == SUBENTRY_VEHICLE}
+    car = next_vehicle(devices, {t for t in taken if t})
+    if car is None:
+        return {}, None
+    out = vehicle_from_guard(car, devices, {**guard.data, **guard.options}.get("notify_services"))
+    odo = _beside(hass, out.get(V_SOC), DISTANCE_UNITS)
+    if odo:
+        out[V_ODOMETER] = odo
+    wb = guard_wallbox(devices) or {}
+    counter = _beside(hass, wb.get("power_entity"), ENERGY_UNITS)
+    if counter:
+        out[V_WALLBOX_ENERGY] = counter
+    return out, str(car.get("name") or guard.title)
+
+
+def _beside(hass: HomeAssistant, entity_id: str | None, units: tuple[str, ...]) -> str | None:
+    """A counter sensor with one of `units` on the same device as `entity_id`, or None."""
+    if not entity_id:
+        return None
+    from homeassistant.helpers import entity_registry as er
+
+    reg = er.async_get(hass)
+    ent = reg.async_get(entity_id)
+    if ent is None or not ent.device_id:
+        return None
+    cands = []
+    for e in er.async_entries_for_device(reg, ent.device_id):
+        if e.domain != "sensor" or e.entity_id == entity_id:
+            continue
+        st = hass.states.get(e.entity_id)
+        attrs = st.attributes if st else {}
+        cands.append((e.entity_id, attrs.get("unit_of_measurement") or e.unit_of_measurement, attrs.get("state_class")))
+    return pick_by_unit(cands, units)
+
+
 class VehicleFlow(ConfigSubentryFlow):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        if user_input is None:
+            proposal, name = guard_proposal(self.hass, self._get_entry())
+            note = TAKEN_OVER.get(self.hass.config.language[:2], TAKEN_OVER["en"]).format(name=name) if name else ""
+            return await self._form(None, proposal, note)
         return await self._form(user_input, {})
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         return await self._form(user_input, dict(self._get_reconfigure_subentry().data))
 
-    async def _form(self, user_input: dict[str, Any] | None, current: dict[str, Any]) -> SubentryFlowResult:
+    async def _form(self, user_input: dict[str, Any] | None, current: dict[str, Any], note: str = "") -> SubentryFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             if user_input[V_ODOMETER] == user_input[V_SOC]:
@@ -148,4 +206,5 @@ class VehicleFlow(ConfigSubentryFlow):
                 return self.async_update_and_abort(self._get_entry(), self._get_reconfigure_subentry(), title=title, data=data)
             current = user_input
         step = "user" if self.source == "user" else "reconfigure"
-        return self.async_show_form(step_id=step, data_schema=_vehicle_schema(current), errors=errors)
+        return self.async_show_form(step_id=step, data_schema=_vehicle_schema(current), errors=errors,
+                                    description_placeholders={"taken_over": note})

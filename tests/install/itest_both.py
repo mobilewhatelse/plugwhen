@@ -119,6 +119,25 @@ def main():
     ptext = json.dumps(((d_p or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_p, dict) else ""
     log(s_p == 200 and pid in ptext and "zweitauto" in ptext.lower(), "Plugwhen's dashboard has both vehicles", f"{s_p} {len(ptext)} chars")
 
+    # ---------- taking over from the guard: a car the guard knows is filled in when it is added to Plugwhen ----------
+    gcar = {"name": "Gastauto", "soc_entity": "sensor.test_last", "target_soc": 80, "capacity_kwh": 77, "departure_entity": "input_datetime.abfahrt",
+            "charge_kw_max": 7.4, "charge_kw_min": 1.4, "house_base_kw": 0.5, "charge_efficiency": 90}
+    res, err = it.flow_finish("/api/config/config_entries/subentries/flow", {"handler": [wa_id, "vehicle"]}, gcar)
+    log(res is not None, "the guard gets a car that Plugwhen does not have yet", err)
+    s, d = it.api("POST", "/api/config/config_entries/subentries/flow", {"handler": [pw_id, "vehicle"]})
+    sugg = {}
+    for f in (d or {}).get("data_schema", []) if isinstance(d, dict) else []:
+        v = f.get("default", (f.get("description") or {}).get("suggested_value"))
+        if v is not None:
+            sugg[f["name"]] = v
+    note = ((d or {}).get("description_placeholders") or {}).get("taken_over", "") if isinstance(d, dict) else ""
+    log(s == 200 and sugg.get("name") == "Gastauto" and sugg.get("soc_entity") == "sensor.test_last" and sugg.get("capacity_kwh") == 77
+        and sugg.get("charge_kw_max") == 7.4 and "departure_entity" not in sugg and "Gastauto" in note,
+        "adding a vehicle to Plugwhen is filled in from the guard (name, state of charge, capacity, power; not the departure)",
+        json.dumps({k: sugg.get(k) for k in ("name", "soc_entity", "capacity_kwh", "charge_kw_max", "departure_entity")}) + " | " + note)
+    if isinstance(d, dict) and d.get("flow_id"):
+        it.api("DELETE", f"/api/config/config_entries/subentries/flow/{d['flow_id']}")
+
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if ("plugwhen" in ln.lower() or "viertelstunden" in ln.lower()) and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of either integration in the log", "; ".join(errs[:3]))

@@ -98,7 +98,12 @@ only kW are shown**; the verdict still works because it depends on kW. It is an 
 
 Both stay fully usable alone. Choosing the other integration in the settings is enough, no entities have to be picked:
 
-- Plugwhen reads the guard's **load forecast** (expected import and peak target), its grid counter, prices and limit.
+- Plugwhen reads the guard's **load forecast** (expected import and peak target), its grid counter, prices and limit. These follow the
+  guard: change the limit there and Plugwhen uses it at once.
+- **Little to set:** if the guard is installed when Plugwhen is set up, it is connected right away. Adding a vehicle fills in the form
+  with what the guard knows about the car and the wallbox (name, state of charge, capacity, charging power, plug sensor, notification, plus
+  the odometer and energy counter on the same device). These are copied once, so Plugwhen keeps working if the guard is removed later.
+  The departure is not taken over on purpose: a fixed departure time of the wallbox would replace the learned departures.
 - The guard reads Plugwhen's **charge plans** (attribute `windows`) into its forecast and, from version 0.14, shows them on its
   dashboard instead of its own plan.
 - **The guard always has the last word:** if a peak would come anyway, it throttles as usual. Plugwhen compares what really

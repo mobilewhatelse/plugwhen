@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 (unreleased) - little to set with the guard
+
+- **Adding a vehicle is filled in from the quarter-hour peak guard** when it knows the car: name, state of charge, capacity, charging
+  power (the car's own, else computed from the wallbox currents), plug sensor and notify services, plus the odometer next to the state
+  of charge and the energy counter next to the wallbox power (same device, counters win over measurements such as the range). Copied
+  once: Plugwhen keeps working without the guard. The departure is not taken over (it would replace the learned departures).
+- **An installed guard is connected when Plugwhen is set up**, so its grid counter, prices, limit and load forecast follow without a setting.
+
 ## 0.7.5 (unreleased) - the plan says that it is not executed
 
 - The charge plan has a new attribute **`executed`** (`false`: Plugwhen recommends, it does not switch the wallbox). The quarter-hour
