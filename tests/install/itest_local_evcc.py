@@ -103,6 +103,49 @@ def main():
     log(s == 200 and vals.get("evcc_vehicle") == "vehicle_1" and vals.get("name") == "blue e-Golf",
         "adding a vehicle offers the evcc cars through the guard's address", json.dumps({k: vals.get(k) for k in ("name", "evcc_vehicle", "capacity_kwh")}))
 
+    # ---------- 4) everything set up with evcc, then evcc is removed: both keep working ----------
+    car = {"name": "blue e-Golf", "odometer_entity": "sensor.auto_kilometerstand", "soc_entity": "sensor.auto_ladestand", "capacity_kwh": 44,
+           "reserve_km": 100, "consumption_kwh_100": 20, "charge_kw_max": 11, "charge_kw_min": 1.4, "evcc_vehicle": "vehicle_1"}
+    res, err = it.flow_finish("/api/config/config_entries/subentries/flow", {"handler": [pw_id, "vehicle"]}, car)
+    log(res is not None, "a vehicle linked to evcc is added (no plug sensor: plugged in comes from evcc)", err)
+    need = None
+
+    def evcc_read():
+        nonlocal need
+        need = (it.find("sensor", "energy_to_charge") or {}).get("attributes", {})
+        return (need.get("evcc") or {}).get("ok") is True and need.get("plugged_source") == "evcc"
+    ok = it.wait_for(evcc_read, 400, step=10)
+    log(bool(ok), "with evcc: plugged in is read from evcc", json.dumps({k: need.get(k) for k in ("plugged", "plugged_source", "evcc")}))
+
+    subprocess.run(["docker", "rm", "-f", EVCC_CONTAINER], capture_output=True)   # evcc is gone (add-on removed or stopped)
+    log(True, "evcc is removed")
+
+    def evcc_gone():
+        nonlocal need
+        need = (it.find("sensor", "energy_to_charge") or {}).get("attributes", {})
+        return (need.get("evcc") or {}).get("ok") is False
+    ok = it.wait_for(evcc_gone, 420, step=10)
+    plan = it.find("sensor", "blue_e_golf_charge_plan") or {}   # Plugwhen's plan (the guard has a charge plan sensor too)
+    ep = (plan.get("attributes") or {}).get("evcc_plan") or {}
+    log(bool(ok) and need.get("plugged") is None and need.get("plugged_source") is None and plan.get("state") not in (None, "unavailable", "unknown")
+        and ep.get("evcc_known") is False and ep.get("written") is False,
+        "without evcc Plugwhen keeps planning: evcc marked as not answering, plugged in unknown, the proposal stays visible",
+        json.dumps({"plan": plan.get("state"), "plugged": need.get("plugged"), "evcc": need.get("evcc"), "evcc_known": ep.get("evcc_known")}))
+    st = it.state("sensor.viertelstunden_wachter_status") or {}
+    log(st.get("state") not in (None, "unavailable", "unknown") and (st.get("attributes") or {}).get("grid_source") == "sensor",
+        "without evcc the guard keeps regulating with its own sensor", json.dumps({"state": st.get("state"), "grid_source": (st.get("attributes") or {}).get("grid_source")}))
+    # a restart of both while evcc is gone (Home Assistant restarts, evcc is still uninstalled)
+    for eid in (pw_id, wa_id):
+        it.api("POST", f"/api/config/config_entries/entry/{eid}/reload")
+    time.sleep(20)
+    s, lst = it.api("GET", "/api/config/config_entries/entry")
+    states = {e["domain"]: e["state"] for e in (lst if isinstance(lst, list) else []) if e["domain"] in ("plugwhen", "viertelstunden_waechter")}
+    log(states.get("plugwhen") == "loaded" and states.get("viertelstunden_waechter") == "loaded",
+        "both start again without evcc (reload while evcc is gone)", json.dumps(states))
+    s, d, vals = open_form("/api/config/config_entries/subentries/flow", {"handler": [pw_id, "vehicle"]})
+    log(s == 200 and isinstance(d, dict) and d.get("type") == "form", "adding a vehicle still works without evcc (no evcc field, no error)",
+        json.dumps({"evcc_field": "evcc_vehicle" in [f["name"] for f in d.get("data_schema", [])] if isinstance(d, dict) else None}))
+
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if ("plugwhen" in ln.lower() or "viertelstunden" in ln.lower()) and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of either integration in the log", "; ".join(errs[:3]))

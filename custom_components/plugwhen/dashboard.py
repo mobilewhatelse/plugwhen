@@ -87,6 +87,9 @@ TEXT = {
         ep_until="bis", ep_unreach="evcc antwortet nicht", ep_same="gleich wie in evcc", ep_own="eigener Plan in evcc, würde nicht überschrieben",
         ep_not_written="Noch nicht geschrieben (Lernmodus).", ep_no_evcc="Ohne evcc schaltet Plugwhen die Wallbox später selbst; im Lernmodus siehe „Würde schalten“.",
         ep_r_not_needed="Ladung reicht", ep_r_unknown_soc="Ladestand unbekannt", ep_r_no_departure="keine Abfahrt", ep_r_no_target="kein Ziel",
+        ep_r_covered="Ladung reicht bis", ep_r_covered_all="Ladung reicht für alle gelernten Abfahrten", ep_next="nächste nötige Ladung",
+        ep_week="Wochenpläne (Vorschlag)", ep_week_now="Wochenpläne in evcc", ep_week_none="noch zu wenig gelernt", ep_week_same="gleich wie in evcc",
+        ep_follow="Der Plan wird laufend angepasst (mehr Kilometer, Sonne, nächste Abfahrt).",
         wd="['Mo','Di','Mi','Do','Fr','Sa','So']", day="Tag", samples="Tage", km_typ="typisch km", km_high="hoch km", drives="fährt",
         dep="Abfahrt", home="zu Hause geladen",
         week_note="Grundlage: die letzten 8 Tage je Wochentag aus der Langzeitstatistik. „hoch“ = 80. Perzentil.",
@@ -161,6 +164,9 @@ TEXT = {
         ep_until="until", ep_unreach="evcc does not answer", ep_same="same as in evcc", ep_own="own plan in evcc, would not be overwritten",
         ep_not_written="Not written yet (learn mode).", ep_no_evcc="Without evcc Plugwhen will switch the wallbox itself later; in learn mode see \u201cWould switch\u201d.",
         ep_r_not_needed="charge is enough", ep_r_unknown_soc="state of charge unknown", ep_r_no_departure="no departure", ep_r_no_target="no target",
+        ep_r_covered="charge lasts until", ep_r_covered_all="charge lasts for all learned departures", ep_next="next charging needed",
+        ep_week="Repeating plans (proposal)", ep_week_now="Repeating plans in evcc", ep_week_none="too little learned yet", ep_week_same="same as in evcc",
+        ep_follow="The plan follows what happens (more kilometres, sun, the next departure).",
         wd="['Mon','Tue','Wed','Thu','Fri','Sat','Sun']", day="Day", samples="days", km_typ="typical km", km_high="high km", drives="drives",
         dep="Departure", home="charged at home",
         week_note="Based on the last 8 days per weekday from the long-term statistics. \"high\" = 80th percentile.",
@@ -272,17 +278,26 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% endif %}"
     )
     ep_reasons = "{" + ", ".join(f"'{k}': '{t['ep_r_' + k]}'" for k in ("not_needed", "unknown_soc", "no_departure", "no_target")) + "}"
+    week_tpl = ("{% for p in @LIST@ %}{% if not loop.first %} · {% endif %}{% set d = p.weekdays %}"
+                "{% if d | length > 2 and d[-1] - d[0] == d | length - 1 %}{{ wd[d[0]] }}–{{ wd[d[-1]] }}"
+                "{% else %}{% for x in d %}{{ wd[x] }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}"
+                " {{ p.time }} {{ p.soc }} %{% endfor %}")
     ep = (
         "{% set wd = " + t["wd"] + " %}{% set e = state_attr('" + ids["charge_plan"] + "', 'evcc_plan') %}{% set rs = " + ep_reasons + " %}"
         "{% if e %}"
-        "**" + t["ep_would"] + ":** {% if e.would_write %}{% set w = e.would_write.time | as_datetime | as_local %}"
-        "{{ e.would_write.soc }} % " + t["ep_until"] + " {{ wd[w.weekday()] }} {{ w.strftime('%H:%M') }}"
+        "**" + t["ep_would"] + "** (" + t["ep_next"] + "): {% if e.would_write %}{% set w = e.would_write.time | as_datetime | as_local %}"
+        "{{ e.would_write.soc }} % " + t["ep_until"] + " {{ wd[w.weekday()] }} {{ w.strftime('%d.%m. %H:%M') }}"
+        "{% elif e.reason == 'covered' %}{% if e.lasts_until %}{% set lu = e.lasts_until | as_datetime | as_local %}" + t["ep_r_covered"]
+        + " {{ wd[lu.weekday()] }} {{ lu.strftime('%d.%m.') }}{% else %}" + t["ep_r_covered_all"] + "{% endif %}"
         "{% else %}" + t["ep_nothing"] + " ({{ rs.get(e.reason, e.reason) }}){% endif %}\n\n"
         "**" + t["ep_now"] + ":** {% if e.current %}{% set c = e.current.time | as_datetime | as_local %}"
         "{{ e.current.soc }} % " + t["ep_until"] + " {{ wd[c.weekday()] }} {{ c.strftime('%H:%M') }}"
         "{% elif e.evcc_known %}" + t["ep_none"] + "{% else %}" + t["ep_unreach"] + "{% endif %}"
         "{% if e.same %} · " + t["ep_same"] + "{% elif e.own_plan %} · " + t["ep_own"] + "{% endif %}\n\n"
-        "{% if not e.written %}_" + t["ep_not_written"] + "_{% endif %}"
+        "**" + t["ep_week"] + ":** {% if e.weekly %}" + week_tpl.replace("@LIST@", "e.weekly") + "{% else %}" + t["ep_week_none"] + "{% endif %}\n\n"
+        "{% if e.evcc_known %}**" + t["ep_week_now"] + ":** {% if e.weekly_current %}" + week_tpl.replace("@LIST@", "e.weekly_current")
+        + "{% else %}" + t["ep_none"] + "{% endif %}{% if e.weekly_same %} · " + t["ep_week_same"] + "{% endif %}\n\n{% endif %}"
+        "{% if not e.written %}_" + t["ep_not_written"] + " " + t["ep_follow"] + "_{% endif %}"
         "{% else %}" + t["ep_no_evcc"] + "{% endif %}"
     )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)

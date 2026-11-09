@@ -128,4 +128,5 @@ template:
         unit_of_measurement: W
         device_class: power
         state_class: measurement
-        state: "500"
+        # changes by 1 W every minute: a value that never changes counts as stale for the guard after two minutes
+        state: "{{ 500 + (now().minute % 2) }}"

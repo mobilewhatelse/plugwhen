@@ -200,6 +200,34 @@ class Plugwhen:
         """(url, password, source) of evcc: Plugwhen's own setting, else the guard's, else None."""
         return evcc_connection(self.entry.options.get(O_EVCC_URL), self.entry.options.get(O_EVCC_PASSWORD), self._waechter_cfg())
 
+    def evcc_plan_inputs(self, v: Vehicle, now: datetime) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str, str | None]:
+        """For the card "Plan for evcc": (first needed departure with its target, learned week, reason, lasts until).
+        The target of a departure is the one Plugwhen plans for that weekday (reserve or learned kilometres)."""
+        capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
+
+        def target(weekday: int) -> float:
+            return compute_need(v.model.plan(weekday), v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km).target_soc
+
+        week = []
+        for wd in range(7):
+            p = v.model.plan(wd)
+            hour = p.departure_early if p.departure_early is not None else p.departure_hour
+            if hour is None or p.samples < MIN_SAMPLES or (p.drive_share or 0.0) < MIN_DRIVE_SHARE:
+                continue
+            week.append({"weekday": wd, "hour": hour, "target_soc": target(wd)})
+        h = v.horizon or {}
+        if v.soc is None:
+            return None, week, "unknown_soc", None
+        if h.get("status") != "ok":
+            return None, week, "no_departure", None
+        fn = h.get("first_need")
+        if not fn:
+            return None, week, "covered", h.get("lasts_until")
+        dep = dt_util.parse_datetime(str(fn.get("departure") or ""))
+        if dep is None:
+            return None, week, "no_departure", None
+        return {"departure": dep, "target_soc": target(dt_util.as_local(dep).weekday())}, week, "planned", None
+
     async def _refresh_evcc(self, now: datetime) -> None:
         """Read evcc's state once per run, only if a vehicle names its evcc car. A failure leaves the cars as without evcc."""
         conn = self.evcc_connection()
