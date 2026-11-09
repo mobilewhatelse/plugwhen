@@ -83,6 +83,10 @@ TEXT = {
         src_rec="nur Empfehlung, es wird nichts geschaltet", src_exec="wird ausgeführt", src_own="eigene Adresse",
         src_guard_addr="Adresse aus dem Wächter", src_ok="antwortet", src_fail="antwortet nicht", src_unused="kein Auto in evcc gewählt",
         src_guard="Wächter", src_manual="von Hand",
+        ep_h="Plan für evcc", ep_would="Plugwhen würde schreiben", ep_now="In evcc jetzt", ep_none="kein Plan", ep_nothing="nichts",
+        ep_until="bis", ep_unreach="evcc antwortet nicht", ep_same="gleich wie in evcc", ep_own="eigener Plan in evcc, würde nicht überschrieben",
+        ep_not_written="Noch nicht geschrieben (Lernmodus).", ep_no_evcc="Ohne evcc schaltet Plugwhen die Wallbox später selbst; im Lernmodus siehe „Würde schalten“.",
+        ep_r_not_needed="Ladung reicht", ep_r_unknown_soc="Ladestand unbekannt", ep_r_no_departure="keine Abfahrt", ep_r_no_target="kein Ziel",
         wd="['Mo','Di','Mi','Do','Fr','Sa','So']", day="Tag", samples="Tage", km_typ="typisch km", km_high="hoch km", drives="fährt",
         dep="Abfahrt", home="zu Hause geladen",
         week_note="Grundlage: die letzten 8 Tage je Wochentag aus der Langzeitstatistik. „hoch“ = 80. Perzentil.",
@@ -153,6 +157,10 @@ TEXT = {
         src_rec="recommendation only, nothing is switched", src_exec="executed", src_own="own address",
         src_guard_addr="address of the guard", src_ok="answers", src_fail="does not answer", src_unused="no car chosen in evcc",
         src_guard="guard", src_manual="by hand",
+        ep_h="Plan for evcc", ep_would="Plugwhen would write", ep_now="In evcc now", ep_none="no plan", ep_nothing="nothing",
+        ep_until="until", ep_unreach="evcc does not answer", ep_same="same as in evcc", ep_own="own plan in evcc, would not be overwritten",
+        ep_not_written="Not written yet (learn mode).", ep_no_evcc="Without evcc Plugwhen will switch the wallbox itself later; in learn mode see \u201cWould switch\u201d.",
+        ep_r_not_needed="charge is enough", ep_r_unknown_soc="state of charge unknown", ep_r_no_departure="no departure", ep_r_no_target="no target",
         wd="['Mon','Tue','Wed','Thu','Fri','Sat','Sun']", day="Day", samples="days", km_typ="typical km", km_high="high km", drives="drives",
         dep="Departure", home="charged at home",
         week_note="Based on the last 8 days per weekday from the long-term statistics. \"high\" = 80th percentile.",
@@ -263,6 +271,20 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         + "') | join(', ') }}{% else %}" + t["src_manual"] + "{% endif %} |"
         "{% endif %}"
     )
+    ep_reasons = "{" + ", ".join(f"'{k}': '{t['ep_r_' + k]}'" for k in ("not_needed", "unknown_soc", "no_departure", "no_target")) + "}"
+    ep = (
+        "{% set wd = " + t["wd"] + " %}{% set e = state_attr('" + ids["charge_plan"] + "', 'evcc_plan') %}{% set rs = " + ep_reasons + " %}"
+        "{% if e %}"
+        "**" + t["ep_would"] + ":** {% if e.would_write %}{% set w = e.would_write.time | as_datetime | as_local %}"
+        "{{ e.would_write.soc }} % " + t["ep_until"] + " {{ wd[w.weekday()] }} {{ w.strftime('%H:%M') }}"
+        "{% else %}" + t["ep_nothing"] + " ({{ rs.get(e.reason, e.reason) }}){% endif %}\n\n"
+        "**" + t["ep_now"] + ":** {% if e.current %}{% set c = e.current.time | as_datetime | as_local %}"
+        "{{ e.current.soc }} % " + t["ep_until"] + " {{ wd[c.weekday()] }} {{ c.strftime('%H:%M') }}"
+        "{% elif e.evcc_known %}" + t["ep_none"] + "{% else %}" + t["ep_unreach"] + "{% endif %}"
+        "{% if e.same %} · " + t["ep_same"] + "{% elif e.own_plan %} · " + t["ep_own"] + "{% endif %}\n\n"
+        "{% if not e.written %}_" + t["ep_not_written"] + "_{% endif %}"
+        "{% else %}" + t["ep_no_evcc"] + "{% endif %}"
+    )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
     return [
         {"type": "grid", "cards": [
@@ -293,6 +315,10 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "tile", "entity": hb_id, "name": t["hb_tile"]},
             {"type": "markdown", "content": _chart(hb_id)},
             {"type": "markdown", "content": habit_line},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["ep_h"]), "icon": "mdi:calendar-sync"},
+            {"type": "markdown", "content": ep},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["learn_h"]), "icon": "mdi:school-outline"},

@@ -93,6 +93,18 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 - „Höchste Spitze“ ist der schlechteste Monat, die Kosten sind der Durchschnitt der Monate – deshalb passen die zwei Spalten nicht 1:1 zusammen.
 - Eine Schätzung aus Stundenwerten, keine Rechnung.
 
+## Mit evcc
+
+- evcc ist **optional** und wird nur **gelesen** (über seine Adresse, evcc kann irgendwo im Netz laufen). Die Adresse kommt aus dem Wächter
+  oder wird in den Einstellungen von Plugwhen eingetragen; ein evcc auf demselben Rechner (Add-on) wird vorgeschlagen.
+- Kilometerstand und Ladestand bleiben die Sensoren des Autos: ohne sie kann Plugwhen nicht rechnen.
+- Beim Hinzufügen eines Fahrzeugs werden die Autos aus evcc angeboten (Name, Akkugröße, Ladeleistung). „Angesteckt“ und „lädt“ kommen aus
+  evcc, solange dafür kein Sensor eingetragen ist.
+- Karte **„Plan für evcc“**: welchen Plan Plugwhen in evcc schreiben würde (Ziel-Ladestand und Uhrzeit), daneben der aktuelle Plan in evcc.
+  Es wird noch nichts geschrieben (Lernmodus). Ein in evcc selbst gesetzter Plan würde nie überschrieben. **Ohne evcc** schaltet Plugwhen
+  die Wallbox später selbst; im Lernmodus zeigt „Würde schalten“, was es täte.
+- Karte **„Woher die Daten kommen“**: für jeden Wert, ob er von einem Sensor, aus evcc oder gelernt ist.
+
 ## Zusammen mit dem Viertelstunden-Wächter
 
 Beide laufen auch allein. Es genügt, die andere Integration in den Einstellungen zu wählen, Entitäten müssen nicht ausgesucht werden:

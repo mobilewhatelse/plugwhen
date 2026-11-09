@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 from . import PlugwhenEntry
 from .charts import (chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow,
                      chart_sun_windows)
+from .evcc_plan import evcc_plan
 from .sources import data_sources
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
@@ -123,7 +124,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
     (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`, `executed`."""
 
-    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart"})
+    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart", "evcc_plan"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = PLAN_STATES
     _attr_icon = "mdi:calendar-clock"
@@ -156,6 +157,9 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "solar_factor": self.plug.solar_factor(), "solar_deduct_kw": self.plug.solar_deduct_kw(),
             "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
             "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
+            # what Plugwhen would write into evcc (learn mode: nothing is written); None without an evcc car
+            "evcc_plan": evcc_plan(self.plug.evcc_state, v.cfg.get("evcc_vehicle"), v.need.target_soc if v.need else None,
+                                   v.soc, v.departure, dt_util.now()),
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
             "sun_chart": chart_sun_windows(v.horizon, dt_util.now(), self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),

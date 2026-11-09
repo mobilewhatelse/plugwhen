@@ -201,6 +201,9 @@ def main():
 
     ok = wait_for(lambda: num(cid) is not None, 60)
     log(bool(ok), "first computation done", str((state(cid) or {}).get("state")))
+    pa0 = (state(pid) or {}).get("attributes") or {}
+    log("evcc_plan" in pa0 and pa0.get("evcc_plan") is None and pa0.get("executed") is False,
+        "without evcc there is no plan for evcc, and the plan says it is not executed", json.dumps({k: pa0.get(k) for k in ("evcc_plan", "executed")}))
     # state of charge 40 %, reserve 100 km, 20 kWh/100 km, 60 kWh: target 33.3 %, nothing to charge
     log(num(cid) == 0.0 and abs((num(tid) or 0) - 33.3) < 0.2 and num(rid) == 100.0,
         "enough charge: 100 km, target 33 %, charge 0 kWh", f"{num(cid)} / {num(tid)} / {num(rid)}")
@@ -338,6 +341,8 @@ def main():
     text = json.dumps(dash.get("config") or {})
     log(s_d == 200 and "views" in (dash.get("config") or {}) and rdid in text and pid in text and "yaml" in dash,
         "the dashboard service builds the dashboard with this installation's entities", f"{s_d} {len(text)} chars")
+    log("evcc_plan" in text and ("Ohne evcc" in text or "Without evcc" in text) and ".sources" in text,
+        "the dashboard has the cards 'plan for evcc' (says what happens without evcc) and 'where the data comes from'")
     cards_md = [c for v in (dash.get("config") or {}).get("views", []) for sec in v.get("sections", []) for c in sec.get("cards", [])
                 if c.get("type") == "markdown"]
     bad = []

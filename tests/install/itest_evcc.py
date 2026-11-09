@@ -96,6 +96,26 @@ def main():
         "a second vehicle is offered the next evcc car", json.dumps({k: vals.get(k) for k in ("name", "evcc_vehicle")}))
     it.api("DELETE", f"/api/config/config_entries/subentries/flow/{d.get('flow_id')}")
 
+    # ---------- the plan Plugwhen would write into evcc: shown, never written ----------
+    it.svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 10})   # low charge: a plan is needed
+    ep = None
+
+    def has_proposal():
+        nonlocal ep
+        it.api("POST", "/api/services/homeassistant/update_entity", {"entity_id": (plan or {}).get("entity_id")})
+        ep = ((it.find("sensor", "charge_plan") or {}).get("attributes") or {}).get("evcc_plan")
+        return isinstance(ep, dict) and ep.get("would_write") is not None
+    ok = it.wait_for(has_proposal, 360, step=10)
+    log(bool(ok) and ep.get("written") is False and ep.get("evcc_known") is True and ep["would_write"].get("soc", 0) > 10,
+        "the plan for evcc is shown (target and time) and nothing is written", json.dumps(ep))
+    st = subprocess.run(["curl", "-s", "-m", "5", "http://localhost:17070/api/state"], capture_output=True, text=True).stdout
+    try:
+        demo_plan = ((json.loads(st).get("result", json.loads(st)).get("vehicles") or {}).get("vehicle_1") or {}).get("plan")
+    except ValueError:
+        demo_plan = "?"
+    log(not demo_plan or (ep or {}).get("current") == demo_plan or not (demo_plan or {}).get("soc"),
+        "evcc's own plan is untouched (Plugwhen only reads)", json.dumps(demo_plan))
+
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of Plugwhen in the log", "; ".join(errs[:3]))
