@@ -197,7 +197,7 @@ TEXT = {
         rd_ready="Ready: Plugwhen decided like reality often enough. The mode \u201cdirect\u201d (Plugwhen switches the wallbox) can be chosen as soon as it exists.",
         rd_wait="Not ready yet. Until then Plugwhen plans and warns, and in the mode \u201cvia evcc\u201d evcc charges by the plan.",
         rd_low="The decisions do not match reality well enough yet (tab Learning).",
-        rd_wb="Wallbox control found", rd_wb_trip="the wallbox's next-trip mode (time and energy, the sun stays first)",
+        rd_wb="Wallbox control found", rd_wb_trip="the next-trip mode of the wallbox (time and energy, the sun stays first)",
         rd_wb_mode="mode change (grid in the planned windows, else the sun mode)", rd_wb_buttons="start and stop in the planned windows",
         rd_wb_none="none (the wallbox needs a charging mode or start/stop in Home Assistant)",
         tr_how="**How to enter a trip:** tap the day in the calendar, title with destination and kilometres (\u201cLinz 200 km\u201d), "

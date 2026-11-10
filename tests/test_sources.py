@@ -65,5 +65,27 @@ class CalendarCardTest(unittest.TestCase):
         self.assertIn("Local Calendar", text)
 
 
+class TemplateSyntaxTest(unittest.TestCase):
+    """Every markdown card must be a valid template in both languages (an apostrophe in a text once broke the English card)."""
+
+    def test_all_cards_parse(self):
+        try:
+            import jinja2
+        except ImportError:
+            self.skipTest("jinja2 not installed")
+        env = jinja2.Environment()
+        ids = {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}
+        for lang in ("de", "en"):
+            views = build_views([{"name": "Car", "ids": ids, "calendar": "calendar.trips", "evcc": True}], lang)
+            for v in views:
+                for sec in v["sections"]:
+                    for card in sec["cards"]:
+                        if card.get("type") == "markdown":
+                            try:
+                                env.parse(card["content"])
+                            except jinja2.TemplateSyntaxError as err:
+                                self.fail(f"{lang}: {err}: {card['content'][:120]}")
+
+
 if __name__ == "__main__":
     unittest.main()
