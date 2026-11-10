@@ -204,8 +204,9 @@ def main():
     pa0 = (state(pid) or {}).get("attributes") or {}
     log("evcc_plan" in pa0 and pa0.get("evcc_plan") is None and pa0.get("executed") is False,
         "without evcc there is no plan for evcc, and the plan says it is not executed", json.dumps({k: pa0.get(k) for k in ("evcc_plan", "executed")}))
-    log(not [e for e in states_like("write_plan_into_evcc") if e["entity_id"].startswith("switch.")],
-        "without evcc there is no switch 'write plan into evcc'")
+    modes = [e for e in states_like("_mode") if e["entity_id"].startswith("select.")]
+    log(bool(modes) and all("evcc" not in ((e.get("attributes") or {}).get("options") or []) for e in modes),
+        "without evcc the mode 'via evcc' is not offered", json.dumps([(e.get("attributes") or {}).get("options") for e in modes]))
     # state of charge 40 %, reserve 100 km, 20 kWh/100 km, 60 kWh: target 33.3 %, nothing to charge
     log(num(cid) == 0.0 and abs((num(tid) or 0) - 33.3) < 0.2 and num(rid) == 100.0,
         "enough charge: 100 km, target 33 %, charge 0 kWh", f"{num(cid)} / {num(tid)} / {num(rid)}")

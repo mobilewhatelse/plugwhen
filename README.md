@@ -115,7 +115,7 @@ only kW are shown**; the verdict still works because it depends on kW. It is an 
   learned week (evcc's `repeatingPlans`, equal times and targets grouped), each next to what evcc has now and whether they are the same. Nothing is written yet (learn mode). A plan set in evcc by hand that differs is shown as
   your own plan, which Plugwhen would never overwrite. **Without evcc** Plugwhen will switch the wallbox itself later; in learn mode
   *Would switch* shows what it would do.
-- **Write plan into evcc** (a switch per car on the dashboard, only for a car linked to evcc, default off, kept over a restart): the plan for the first needed departure is written into evcc and kept up to date;
+- **Mode "Via evcc"** (per car, next to off and learn, only for a car linked to evcc; kept over a restart; only one ever switches, evcc or later Plugwhen directly, you choose): the plan for the first needed departure is written into evcc and kept up to date;
   only plans Plugwhen wrote itself are changed, a plan set in evcc by hand is never touched.
 - Card **Where the data comes from**: for every value whether it is a sensor, evcc or learned, the evcc connection, and what the car
   was set up with (guard, evcc, by hand).

@@ -155,9 +155,10 @@ def main():
     own_t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 3 * 86400))
     subprocess.run(["curl", "-s", "-m", "5", "-X", "POST", f"http://localhost:17070/api/vehicles/vehicle_1/plan/soc/90/{own_t}"], capture_output=True)
     own_before = evcc_vehicle("vehicle_1").get("plan")
-    sw = it.find("switch", "kalenderauto_write_plan_into_evcc") or {}
-    log(sw.get("state") == "off", "the car linked to evcc has the switch 'write plan into evcc', off by default", str(sw.get("entity_id")))
-    it.svc("switch", "turn_on", {"entity_id": sw.get("entity_id")})
+    sw = it.find("select", "kalenderauto_mode") or {}
+    log(sw.get("state") == "learn" and "evcc" in ((sw.get("attributes") or {}).get("options") or []),
+        "the car linked to evcc offers the mode 'via evcc' (default: learn)", json.dumps({"state": sw.get("state"), "options": (sw.get("attributes") or {}).get("options")}))
+    it.svc("select", "select_option", {"entity_id": sw.get("entity_id"), "option": "evcc"})
     written = {}
 
     def plan_written():
@@ -178,7 +179,7 @@ def main():
     it.api("POST", f"/api/config/config_entries/entry/{pw_id}/reload")
     time.sleep(15)
     sw = it.state(sw.get("entity_id")) or {}
-    log(sw.get("state") == "on", "after a reload the switch is still on", str(sw.get("state")))
+    log(sw.get("state") == "evcc", "after a reload the mode is still 'via evcc'", str(sw.get("state")))
 
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]

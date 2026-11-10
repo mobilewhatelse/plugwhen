@@ -256,9 +256,6 @@
       },
       "notice_enabled": {
         "name": "Warn when the car will not be ready"
-      },
-      "evcc_write": {
-        "name": "Write plan into evcc"
       }
     },
     "number": {
@@ -271,7 +268,8 @@
         "name": "Mode",
         "state": {
           "off": "Off",
-          "learn": "Learn"
+          "learn": "Learn",
+          "evcc": "Via evcc (write plan)"
         }
       }
     }

@@ -287,14 +287,14 @@ class WouldSwitchSensor(PlugwhenEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         d = self.vehicle.decision
-        return "off" if self.vehicle.mode != "learn" or d is None else d.action
+        return "off" if self.vehicle.mode not in ("learn", "evcc") or d is None else d.action
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         v = self.vehicle
         d = v.decision
         iso = lambda t: t.isoformat() if t else None  # noqa: E731
-        if v.mode != "learn" or d is None:
+        if v.mode not in ("learn", "evcc") or d is None:
             return {"mode": v.mode}
         return {
             "mode": v.mode, "reason": d.reason, "planned_kw": d.kw, "until": iso(d.until),

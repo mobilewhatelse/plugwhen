@@ -1,4 +1,4 @@
-"""Select per vehicle: the mode (off or learn; the last choice is restored, default learn)."""
+"""Select per vehicle: the mode (off, learn, evcc; the last choice is restored after a restart, default learn)."""
 
 from __future__ import annotations
 
@@ -20,24 +20,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
 
 class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
     """off: Plugwhen only plans and warns. learn: it also writes down what it WOULD switch and compares that with what really
-    happened. Nothing is switched in either mode; after a restart the mode is the last one chosen."""
+    happened. evcc (only for a car linked to evcc): like learn, and the plan for the next needed departure is written into evcc,
+    evcc charges; only plans Plugwhen wrote itself are changed. Only one of the two ever switches: you choose. After a restart the
+    mode is the last one chosen."""
 
-    _attr_options = MODES
     _attr_icon = "mdi:school-outline"
 
     def __init__(self, plug, vehicle) -> None:
         super().__init__(plug, vehicle, "mode")
+        self._attr_options = [m for m in MODES if m != "evcc" or vehicle.cfg.get("evcc_vehicle")]
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
-        self.vehicle.mode = last.state if last is not None and last.state in MODES else DEFAULT_MODE
+        self.vehicle.mode = last.state if last is not None and last.state in self._attr_options else DEFAULT_MODE
 
     @property
     def current_option(self) -> str:
         return self.vehicle.mode
 
     async def async_select_option(self, option: str) -> None:
-        self.vehicle.mode = option if option in MODES else DEFAULT_MODE
+        self.vehicle.mode = option if option in self._attr_options else DEFAULT_MODE
         self.async_write_ha_state()
-        await self.plug.async_recompute(self.vehicle)
+        if self.vehicle.mode == "evcc":
+            await self.plug.async_write_evcc_now(self.vehicle)
+        else:
+            await self.plug.async_recompute(self.vehicle)

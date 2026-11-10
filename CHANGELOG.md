@@ -7,7 +7,7 @@
   integration (switch, default off; home and destination go to Waze), there and back unless the event says "einfach"/"one way". The range
   to have is the trip plus 15 %, at least the reserve. A trip replaces the learned departure of its day, in the plan and in the look-ahead.
   All-day events are ignored. Card **Planned trips**.
-- **Write plans into evcc** (a switch per car, only for a car linked to an evcc car, default off, its state is kept over a restart): the plan for the first departure that needs charging is written into evcc and kept up
+- **Mode "Via evcc"** (the mode per car gets a third choice, only for a car linked to an evcc car; the chosen mode is kept over a restart): the plan for the first departure that needs charging is written into evcc and kept up
   to date; when it is not needed any more it is removed. Only plans Plugwhen wrote itself are changed: a plan set in evcc by hand is never
   touched. The card says whether it is written. Repeating plans are still only proposed.
 - **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, so the car is ready for an unplanned trip.

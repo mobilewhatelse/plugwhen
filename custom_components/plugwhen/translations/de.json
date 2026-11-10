@@ -256,9 +256,6 @@
       },
       "notice_enabled": {
         "name": "Warnen, wenn das Auto nicht bereit sein wird"
-      },
-      "evcc_write": {
-        "name": "Plan in evcc schreiben"
       }
     },
     "number": {
@@ -271,7 +268,8 @@
         "name": "Betriebsart",
         "state": {
           "off": "Aus",
-          "learn": "Lernen"
+          "learn": "Lernen",
+          "evcc": "Über evcc (Plan schreiben)"
         }
       }
     }

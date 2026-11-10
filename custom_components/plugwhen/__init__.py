@@ -87,8 +87,8 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
             if entity_id is None:
                 raise ServiceValidationError(f"Entity '{key}' of {sub.title} not found - restart Home Assistant after the update")
             ids[key] = entity_id
-        evcc_write = registry.async_get_entity_id("switch", DOMAIN, f"{sub.subentry_id}_evcc_write")   # only cars linked to evcc
-        vehicles.append({"name": sub.data.get("name", sub.title), "ids": ids, "calendar": sub.data.get("trip_calendar"), "evcc_write": evcc_write})
+        vehicles.append({"name": sub.data.get("name", sub.title), "ids": ids, "calendar": sub.data.get("trip_calendar"),
+                         "evcc": bool(sub.data.get("evcc_vehicle"))})
     if not vehicles:
         raise ServiceValidationError("Add a vehicle first (integration page: Add vehicle)")
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency)}
