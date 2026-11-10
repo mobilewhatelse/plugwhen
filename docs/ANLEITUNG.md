@@ -119,7 +119,7 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
   was in evcc gerade eingestellt ist.
   Es wird noch nichts geschrieben (Lernmodus). Ein in evcc selbst gesetzter Plan würde nie überschrieben. **Ohne evcc** schaltet Plugwhen
   die Wallbox später selbst; im Lernmodus zeigt „Würde schalten“, was es täte.
-- **Pläne in evcc schreiben** (Schalter, Standard aus): Plugwhen schreibt den Plan für die erste nötige Abfahrt in evcc und hält ihn aktuell
+- **Plan in evcc schreiben** (Schalter je Auto im Dashboard bei „Plan für evcc“, nur bei einem Auto mit evcc-Fahrzeug, Standard aus, behält seinen Zustand nach einem Neustart): Plugwhen schreibt den Plan für die erste nötige Abfahrt in evcc und hält ihn aktuell
   (evcc lädt dann); wird er nicht mehr gebraucht, wird er entfernt. Geändert werden **nur Pläne, die Plugwhen selbst geschrieben hat**,
   einen in evcc selbst gesetzten Plan fasst es nie an. Wochenpläne werden vorerst nur vorgeschlagen.
 - Karte **„Woher die Daten kommen“**: für jeden Wert, ob er von einem Sensor, aus evcc oder gelernt ist.

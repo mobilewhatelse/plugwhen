@@ -18,7 +18,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_MODE, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
-    O_EVCC_PASSWORD, O_EVCC_URL, O_EVCC_WRITE, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
 )
@@ -62,6 +62,7 @@ class Vehicle:
     reserve_km: float = DEFAULT_RESERVE_KM
     learn_km: bool = True
     notice_enabled: bool = True
+    evcc_write_on: bool = False              # switch: write the plan into evcc (restored after a restart)
     model: MobilityModel = field(default_factory=MobilityModel)
     plan: WeekdayPlan | None = None
     need: Need | None = None
@@ -181,6 +182,14 @@ class Plugwhen:
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
             await self._write_evcc(v, now)
+
+    async def async_write_evcc_now(self, vehicle: Vehicle) -> None:
+        """The write switch was turned on: read evcc, write at once (not only at the next run) and show it."""
+        now = dt_util.now()
+        await self._refresh_evcc(now)
+        self._compute(vehicle, now)
+        await self._write_evcc(vehicle, now)
+        async_dispatcher_send(self.hass, self.signal)
 
     async def async_recompute(self, vehicle: Vehicle) -> None:
         """A setting of the vehicle changed (reserve, switch): compute again and tell the entities."""
@@ -304,13 +313,13 @@ class Plugwhen:
         ahead, week, reason, lasts = self.evcc_plan_inputs(v, now)
         key = v.cfg[V_EVCC_VEHICLE]
         return evcc_plan(self.evcc_state, key, ahead, week, now, reason, lasts, last_written=self._written.get(key),
-                         write_enabled=bool(self.entry.options.get(O_EVCC_WRITE)))
+                         write_enabled=v.evcc_write_on)
 
     async def _write_evcc(self, v: Vehicle, now: datetime) -> None:
         """Write the plan for the next needed departure into evcc (only when switched on, only plans Plugwhen wrote itself)."""
         key = v.cfg.get(V_EVCC_VEHICLE)
         conn = self.evcc_connection()
-        if not key or not self.entry.options.get(O_EVCC_WRITE) or conn is None or self.evcc_state is None:
+        if not key or not v.evcc_write_on or conn is None or self.evcc_state is None:
             return
         plan = self.evcc_plan_for(v, now) or {}
         action, why = decide_write(plan.get("would_write"), plan.get("current"), self._written.get(key))

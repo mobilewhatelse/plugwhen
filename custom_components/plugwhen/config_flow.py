@@ -17,7 +17,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
-    O_EVCC_PASSWORD, O_EVCC_URL, O_EVCC_WRITE, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
+    O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, match_vehicle, parse_vehicles, vehicle_from_evcc
@@ -184,7 +184,6 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_PRICE_THRESHOLD, current): _num(0, 100, 0.1, "kW"),
             _opt(O_EVCC_URL, current): TextSelector(),
             _opt(O_EVCC_PASSWORD, current): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
-            vol.Required(O_EVCC_WRITE, default=bool(current.get(O_EVCC_WRITE, False))): BooleanSelector(),
             **({vol.Required(O_ROUTE_WAZE, default=bool(current.get(O_ROUTE_WAZE, False))): BooleanSelector()}
                if waze_ready(self.hass) else {}),
         }), description_placeholders={"waze": "" if waze_ready(self.hass) else WAZE_HINT.get(self.hass.config.language[:2], WAZE_HINT["en"])})

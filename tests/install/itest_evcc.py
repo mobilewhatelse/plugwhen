@@ -155,10 +155,9 @@ def main():
     own_t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 3 * 86400))
     subprocess.run(["curl", "-s", "-m", "5", "-X", "POST", f"http://localhost:17070/api/vehicles/vehicle_1/plan/soc/90/{own_t}"], capture_output=True)
     own_before = evcc_vehicle("vehicle_1").get("plan")
-    s, d = it.api("POST", "/api/config/config_entries/options/flow", {"handler": pw_id})
-    s, d = it.api("POST", f"/api/config/config_entries/options/flow/{d['flow_id']}", {"use_solar_forecast": True, "evcc_url": EVCC, "evcc_write_plans": True})
-    log(s == 200 and d.get("type") == "create_entry", "writing plans into evcc is switched on", f"{d.get('type')} {d.get('errors')}")
-    it.api("POST", f"/api/config/config_entries/entry/{pw_id}/reload")
+    sw = it.find("switch", "kalenderauto_write_plan_into_evcc") or {}
+    log(sw.get("state") == "off", "the car linked to evcc has the switch 'write plan into evcc', off by default", str(sw.get("entity_id")))
+    it.svc("switch", "turn_on", {"entity_id": sw.get("entity_id")})
     written = {}
 
     def plan_written():
@@ -174,6 +173,12 @@ def main():
     ep1 = ((it.state("sensor.blue_e_golf_charge_plan") or {}).get("attributes") or {}).get("evcc_plan") or {}
     log(bool(own_before) and own_after == own_before and ep1.get("own_plan") is True,
         "the own plan in evcc of the first car is left alone", json.dumps({"before": own_before, "after": own_after}))
+
+    # the switch keeps its state over a reload (restart), and a car without evcc has no switch
+    it.api("POST", f"/api/config/config_entries/entry/{pw_id}/reload")
+    time.sleep(15)
+    sw = it.state(sw.get("entity_id")) or {}
+    log(sw.get("state") == "on", "after a reload the switch is still on", str(sw.get("state")))
 
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]

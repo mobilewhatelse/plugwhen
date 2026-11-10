@@ -90,7 +90,7 @@ TEXT = {
         ep_r_covered="Ladung reicht bis", ep_r_covered_all="Ladung reicht für alle gelernten Abfahrten", ep_next="nächste nötige Ladung",
         ep_week="Wochenpläne (Vorschlag)", ep_week_now="Wochenpläne in evcc", ep_week_none="noch zu wenig gelernt", ep_week_same="gleich wie in evcc",
         ep_follow="Der Plan wird laufend angepasst (mehr Kilometer, Sonne, nächste Abfahrt).",
-        ep_written="In evcc geschrieben.", ep_write_off="Schreiben ist aus (Einstellungen: „Pläne in evcc schreiben“).",
+        ep_written="In evcc geschrieben.", ep_write_off="Schreiben ist aus (Schalter oben).", ep_switch="Plan in evcc schreiben",
         ep_write_err="Schreiben fehlgeschlagen", ep_mine="von Plugwhen geschrieben",
         tr_h="Eingetragene Fahrten", tr_none="Keine Fahrten im Kalender.", tr_nocal="Kein Kalender eingetragen. Fahrten können Sie in einem Kalender von Home Assistant eintragen (Titel z. B. „Linz 200 km“).",
         tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
@@ -178,7 +178,7 @@ TEXT = {
         ep_r_covered="charge lasts until", ep_r_covered_all="charge lasts for all learned departures", ep_next="next charging needed",
         ep_week="Repeating plans (proposal)", ep_week_now="Repeating plans in evcc", ep_week_none="too little learned yet", ep_week_same="same as in evcc",
         ep_follow="The plan follows what happens (more kilometres, sun, the next departure).",
-        ep_written="Written into evcc.", ep_write_off="Writing is off (settings: \u201cWrite plans into evcc\u201d).",
+        ep_written="Written into evcc.", ep_write_off="Writing is off (switch above).", ep_switch="Write plan into evcc",
         ep_write_err="Writing failed", ep_mine="written by Plugwhen",
         tr_h="Planned trips", tr_none="No trips in the calendar.", tr_nocal="No calendar set. Trips can be entered in a calendar of Home Assistant (title e.g. \u201cLinz 200 km\u201d).",
         tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
@@ -208,7 +208,8 @@ def _chart(entity_id: str, attribute: str = "chart") -> str:
             "{% if c %}![](data:image/svg+xml;utf8,{{ c | urlencode }}){% endif %}")
 
 
-def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: bool, calendar: str | None = None) -> list[dict[str, Any]]:
+def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: bool, calendar: str | None = None,
+                     evcc_write: str | None = None) -> dict[str, list[dict[str, Any]]]:
     """Graphics first, one short line of text where a number needs words; settings stay on the dashboard."""
     need = _s(ids["need_charge"]) + ".attributes"
     status = (
@@ -358,6 +359,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["ep_h"]), "icon": "mdi:calendar-sync"},
+            *([{"type": "entities", "show_header_toggle": False, "entities": [{"entity": evcc_write, "name": t["ep_switch"]}]}] if evcc_write else []),
             {"type": "markdown", "content": ep},
         ]},
     ]
@@ -423,7 +425,7 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
     t["cur"] = cur
     tabs: dict[str, list[dict[str, Any]]] = {"overview": [], "learning": [], "details": []}
     for v in vehicles:
-        parts = _vehicle_section(v["ids"], t, v["name"], len(vehicles) > 1, v.get("calendar"))
+        parts = _vehicle_section(v["ids"], t, v["name"], len(vehicles) > 1, v.get("calendar"), v.get("evcc_write"))
         for key in tabs:
             tabs[key] += parts[key]
     return [

@@ -48,7 +48,6 @@
           "price_threshold": "Schwelle",
           "evcc_url": "Adresse von evcc (optional)",
           "evcc_password": "Passwort von evcc",
-          "evcc_write_plans": "Pläne in evcc schreiben",
           "route_waze": "Kilometer von Kalender-Fahrten über Waze"
         },
         "data_description": {
@@ -63,7 +62,6 @@
           "price_threshold": "kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
           "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt (leer = Adresse aus dem Wächter). evcc kann irgendwo im Netz laufen, z. B. http://192.168.1.20:7070. Ein evcc auf diesem Rechner wird vorgeschlagen.",
           "evcc_password": "Nur wenn evcc eines verlangt.",
-          "evcc_write_plans": "Schreibt den Plan für die nächste Abfahrt, für die geladen werden muss, in evcc und hält ihn aktuell (evcc lädt dann). Geändert werden nur Pläne, die Plugwhen selbst geschrieben hat; einen Plan, den Sie in evcc gesetzt haben, überschreibt es nie. Standard aus.",
           "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen; Zuhause und Ziel gehen an Waze). Im Termin eingetragene Kilometer gelten immer zuerst."
         }
       }
@@ -258,6 +256,9 @@
       },
       "notice_enabled": {
         "name": "Warnen, wenn das Auto nicht bereit sein wird"
+      },
+      "evcc_write": {
+        "name": "Plan in evcc schreiben"
       }
     },
     "number": {
