@@ -27,7 +27,7 @@ class DashboardTest(unittest.TestCase):
                 self.assertNotIn(f'"entity": "{eid}"', text, key)
             else:
                 self.assertIn(eid, text, key)
-        self.assertEqual(len(views), 1)
+        self.assertEqual([v["path"] for v in views], ["plugwhen", "lernen", "details"])
         self.assertEqual(views[0]["type"], "sections")
 
     def test_two_vehicles_have_their_names_in_the_headings(self):

@@ -11,6 +11,9 @@
   to date; when it is not needed any more it is removed. Only plans Plugwhen wrote itself are changed: a plan set in evcc by hand is never
   touched. The card says whether it is written. Repeating plans are still only proposed.
 - **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, so the car is ready for an unplanned trip.
+- **Dashboard in three tabs:** *Overview* (ready for the next departure, charge plan, planned trips with a calendar view and a short how-to,
+  the next departures, plan for evcc), *Learning* (learn mode, does learning help, charging habit, plug-in times), *Details* (potential,
+  sun and learned values, where the data comes from, settings). The most important first.
 
 ## 0.8.1 (unreleased) - trips over midnight
 

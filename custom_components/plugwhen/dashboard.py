@@ -95,6 +95,7 @@ TEXT = {
         tr_h="Eingetragene Fahrten", tr_none="Keine Fahrten im Kalender.", tr_nocal="Kein Kalender eingetragen. Fahrten können Sie in einem Kalender von Home Assistant eintragen (Titel z. B. „Linz 200 km“).",
         tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
         tr_range="Reichweite bei Abfahrt", tr_err="Kalender nicht lesbar",
+        v_overview="Übersicht", v_learning="Lernen", v_details="Details", sun_h="Sonne und gelernte Werte",
         tr_how="**So tragen Sie eine Fahrt ein:** im Kalender auf den Tag tippen, Titel mit Ziel und Kilometern („Linz 200 km“), "
                "Beginn = Abfahrtszeit. Ohne Kilometer zählt der **Ort** (über Waze, falls eingeschaltet), hin und zurück; „einfach“ im Titel = nur eine Richtung. "
                "Ganztägige Termine zählen nicht.",
@@ -182,6 +183,7 @@ TEXT = {
         tr_h="Planned trips", tr_none="No trips in the calendar.", tr_nocal="No calendar set. Trips can be entered in a calendar of Home Assistant (title e.g. \u201cLinz 200 km\u201d).",
         tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
         tr_range="range at departure", tr_err="calendar not readable",
+        v_overview="Overview", v_learning="Learning", v_details="Details", sun_h="Sun and learned values",
         tr_how="**How to enter a trip:** tap the day in the calendar, title with destination and kilometres (\u201cLinz 200 km\u201d), "
                "start = departure time. Without kilometres the **location** counts (via Waze, if switched on), there and back; \u201cone way\u201d in the title = one direction. "
                "All-day events are ignored.",
@@ -333,35 +335,15 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% else %} · " + t["tr_km_none"] + "{% endif %}\n{% endfor %}{% endif %}"
     )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
-    return [
-        {"type": "grid", "cards": [
+    overview = [
+        {"type": "grid", "cards": [   # what matters now: ready for the next departure?
             {"type": "heading", "heading": head(t["next"]), "icon": "mdi:car-clock"},
+            {"type": "tile", "entity": ids["readiness"], "name": t["ready"]},
             {"type": "tile", "entity": ids["departure"], "name": t["departure"]},
             {"type": "tile", "entity": ids["need_charge"], "name": t["charge"]},
-            {"type": "tile", "entity": ids["readiness"], "name": t["ready"]},
             {"type": "markdown", "content": status},
             {"type": "heading", "heading": head(t["plan_h"]), "icon": "mdi:calendar-clock"},
             {"type": "markdown", "content": _chart(ids["charge_plan"])},
-            {"type": "markdown", "content": calib_line},
-            {"type": "heading", "heading": head(t["hz_h"]), "icon": "mdi:calendar-arrow-right"},
-            {"type": "markdown", "content": _chart(ids["charge_plan"], "horizon_chart")},
-            {"type": "markdown", "content": _chart(ids["charge_plan"], "sun_chart")},
-            {"type": "markdown", "content": hz_tpl},
-        ]},
-        {"type": "grid", "cards": [
-            {"type": "heading", "heading": head(t["pot_h"]), "icon": "mdi:chart-bell-curve-cumulative"},
-            {"type": "tile", "entity": ids["potential"], "name": t["pot"]},
-            {"type": "markdown", "content": _chart(ids["potential"])},
-            {"type": "markdown", "content": pot_line},
-            {"type": "heading", "heading": head(t["plugs_h"]), "icon": "mdi:ev-plug-type2"},
-            {"type": "markdown", "content": _chart(ids["readiness"], "plug_chart")},
-            {"type": "markdown", "content": plugs_line},
-        ]},
-        {"type": "grid", "cards": [
-            {"type": "heading", "heading": head(t["hb_h"]), "icon": "mdi:chart-bar-stacked"},
-            {"type": "tile", "entity": hb_id, "name": t["hb_tile"]},
-            {"type": "markdown", "content": _chart(hb_id)},
-            {"type": "markdown", "content": habit_line},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["tr_h"]), "icon": "mdi:calendar-month"},
@@ -370,9 +352,16 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "markdown", "content": t["tr_how"] if calendar else t["tr_setup"]},
         ]},
         {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["hz_h"]), "icon": "mdi:calendar-arrow-right"},
+            {"type": "markdown", "content": _chart(ids["charge_plan"], "horizon_chart")},
+            {"type": "markdown", "content": hz_tpl},
+        ]},
+        {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["ep_h"]), "icon": "mdi:calendar-sync"},
             {"type": "markdown", "content": ep},
         ]},
+    ]
+    learning = [
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["learn_h"]), "icon": "mdi:school-outline"},
             {"type": "tile", "entity": ids["would_switch"], "name": t["would"]},
@@ -387,6 +376,30 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "markdown", "content": _chart(lc_id)},
         ]},
         {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["hb_h"]), "icon": "mdi:chart-bar-stacked"},
+            {"type": "tile", "entity": hb_id, "name": t["hb_tile"]},
+            {"type": "markdown", "content": _chart(hb_id)},
+            {"type": "markdown", "content": habit_line},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["plugs_h"]), "icon": "mdi:ev-plug-type2"},
+            {"type": "markdown", "content": _chart(ids["readiness"], "plug_chart")},
+            {"type": "markdown", "content": plugs_line},
+        ]},
+    ]
+    details = [
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["pot_h"]), "icon": "mdi:chart-bell-curve-cumulative"},
+            {"type": "tile", "entity": ids["potential"], "name": t["pot"]},
+            {"type": "markdown", "content": _chart(ids["potential"])},
+            {"type": "markdown", "content": pot_line},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["sun_h"]), "icon": "mdi:white-balance-sunny"},
+            {"type": "markdown", "content": _chart(ids["charge_plan"], "sun_chart")},
+            {"type": "markdown", "content": calib_line},
+        ]},
+        {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["src_h"]), "icon": "mdi:source-branch"},
             {"type": "markdown", "content": src},
         ]},
@@ -399,15 +412,22 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             ]},
         ]},
     ]
+    return {"overview": overview, "learning": learning, "details": details}
 
 
 def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None) -> list[dict[str, Any]]:
+    """Three tabs: Overview (ready for the next departure, plan, trips, look-ahead, plan for evcc), Learning, Details."""
     t = dict(TEXT["de"] if (language or "").lower().startswith("de") else TEXT["en"])
     cur = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "€")
     t = {k: v.replace("{cur}", cur) for k, v in t.items()}
     t["cur"] = cur
-    sections: list[dict[str, Any]] = []
+    tabs: dict[str, list[dict[str, Any]]] = {"overview": [], "learning": [], "details": []}
     for v in vehicles:
-        sections += _vehicle_section(v["ids"], t, v["name"], len(vehicles) > 1, v.get("calendar"))
-    return [{"title": "Plugwhen", "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2,
-             "sections": sections}]
+        parts = _vehicle_section(v["ids"], t, v["name"], len(vehicles) > 1, v.get("calendar"))
+        for key in tabs:
+            tabs[key] += parts[key]
+    return [
+        {"title": t["v_overview"], "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2, "sections": tabs["overview"]},
+        {"title": t["v_learning"], "path": "lernen", "icon": "mdi:school-outline", "type": "sections", "max_columns": 2, "sections": tabs["learning"]},
+        {"title": t["v_details"], "path": "details", "icon": "mdi:tune-variant", "type": "sections", "max_columns": 2, "sections": tabs["details"]},
+    ]
