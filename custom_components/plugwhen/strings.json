@@ -18,12 +18,82 @@
   "config": {
     "step": {
       "user": {
-        "title": "Plugwhen",
-        "description": "Works out when to plug in so that the car is ready when you leave. Vehicles are added afterwards on the integration page."
+        "title": "Set-up 1 of 2: what is there",
+        "description": "Plugwhen works out when to plug in so that the car is ready at departure, and plans the charging with the sun first.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = found and linked: the Wächter gives grid import, prices, limit and load forecast; evcc gives vehicles and the loadpoint. Plugwhen works without both. A solar forecast is taken from the Energy dashboard if there is one.",
+        "data": {
+          "evcc_url": "Address of evcc (optional)",
+          "evcc_password": "Password of evcc"
+        },
+        "data_description": {
+          "evcc_url": "Only if evcc runs and was not found, e.g. http://192.168.1.20:7070. Empty = without evcc."
+        }
+      },
+      "cars": {
+        "title": "Set-up 2 of 2: your cars",
+        "description": "Added so far: {cars}.\n\nEvery car gets its own plan. **Needed per car:** its odometer and its state of charge (from the car's integration). The rest is prefilled from the Wächter and evcc where possible.",
+        "menu_options": {
+          "add_car": "Add a car",
+          "finish": "Finish set-up"
+        }
+      },
+      "add_car": {
+        "title": "Set-up 2 of 2: a car",
+        "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n**Prefilled from:** {taken_over}",
+        "data": {
+          "name": "Name",
+          "odometer_entity": "Odometer",
+          "soc_entity": "State of charge",
+          "soc_max_age_h": "Maximum age of the state of charge",
+          "capacity_kwh": "Battery capacity",
+          "reserve_km": "Reserve",
+          "consumption_kwh_100": "Consumption (until learned)",
+          "charge_kw_max": "Wallbox power (maximum)",
+          "charge_kw_min": "Wallbox power (minimum)",
+          "charge_kw_pref": "Preferred lowest charging power",
+          "plugged_entity": "Plugged in (optional)",
+          "charging_entity": "Charging (optional)",
+          "wallbox_energy_entity": "Wallbox energy counter (optional)",
+          "departure_entity": "Departure (optional)",
+          "notify_service": "Notify service (optional)",
+          "notify_hour": "Warn from this hour",
+          "evcc_vehicle": "Vehicle in evcc (optional)",
+          "trip_calendar": "Calendar with trips (optional)",
+          "stock_soc": "Stock (minimum state of charge)"
+        },
+        "data_description": {
+          "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
+          "soc_entity": "Sensor with the state of charge of the battery in percent.",
+          "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
+          "capacity_kwh": "Usable battery capacity.",
+          "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
+          "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
+          "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
+          "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
+          "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
+          "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
+          "charging_entity": "On while the car is charging. No warning is sent while it charges.",
+          "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
+          "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
+          "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
+          "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
+          "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
+          "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
+          "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
+        }
       }
     },
     "abort": {
       "single_instance_allowed": "Plugwhen is already set up."
+    },
+    "error": {
+      "same_entity": "Odometer and state of charge must be different sensors.",
+      "min_above_max": "The minimum power is above the maximum.",
+      "notify_format": "Enter each service as domain.name, separated by commas, for example notify.mobile_app_phone.",
+      "not_distance": "This sensor has no distance unit (km or mi). Choose the odometer or add unit_of_measurement: km to the template sensor.",
+      "not_percent": "This sensor has no percent unit. Choose the state of charge in % or add unit_of_measurement: \"%\" to the template sensor.",
+      "not_energy": "This sensor has no energy unit (Wh, kWh or MWh). Add unit_of_measurement: kWh to the template sensor or choose another sensor.",
+      "evcc_auth": "evcc wants a password, or the password is wrong.",
+      "evcc_unreachable": "evcc does not answer at this address."
     }
   },
   "options": {
@@ -79,7 +149,7 @@
       "step": {
         "user": {
           "title": "Vehicle",
-          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n{taken_over}",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n**Prefilled from:** {taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Odometer",
@@ -124,7 +194,7 @@
         },
         "reconfigure": {
           "title": "Vehicle",
-          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n{taken_over}",
+          "description": "Plugwhen learns from the history of this car how far it drives, when it leaves and where it is charged.\n\n**Prefilled from:** {taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Odometer",

@@ -109,22 +109,29 @@ def wait_for(pred, timeout, step=3):
 
 
 def flow_finish(path, init_body, user_input):
+    """Runs a flow to its end: every form gets the values of `user_input` it has fields for (the rest stay at their defaults);
+    a menu takes `user_input["_menu"]` or else "finish"."""
     s, d = api("POST", path, init_body)
     if s != 200:
         return None, f"init {s} {d}"
-    for _ in range(4):
+    for _ in range(12):
         if d.get("type") == "create_entry":
             return d, ""
         if d.get("type") == "abort":
             return None, f"abort {d.get('reason')}"
-        if d.get("type") == "form":
-            s, d = api("POST", f"{path}/{d['flow_id']}", user_input)
-            if s != 200:
-                return None, f"step {s} {d}"
-            if d.get("errors"):
-                return None, f"errors {d['errors']}"
+        if d.get("type") == "menu":
+            opts = list(d.get("menu_options") or [])
+            pick = user_input.get("_menu") if user_input.get("_menu") in opts else ("finish" if "finish" in opts else opts[-1])
+            s, d = api("POST", f"{path}/{d['flow_id']}", {"next_step_id": pick})
+        elif d.get("type") == "form":
+            names = {f.get("name") for f in (d.get("data_schema") or [])}
+            s, d = api("POST", f"{path}/{d['flow_id']}", {k: v for k, v in user_input.items() if k in names})
         else:
             return None, f"unexpected {d.get('type')}"
+        if s != 200:
+            return None, f"step {s} {d}"
+        if d.get("errors"):
+            return None, f"errors {d['errors']}"
     return (d if d.get("type") == "create_entry" else None), "no create_entry"
 
 
@@ -154,6 +161,16 @@ def main():
 
     s, d = api("POST", "/api/config/config_entries/flow", {"handler": "plugwhen", "show_advanced_options": False})
     log(s == 200 and d.get("type") == "form" and d.get("step_id") == "user", "integration is offered in the dialog", f"{s} {d.get('type')} {d.get('step_id')}")
+    # the assistant: what is there -> cars (menu) -> a car form with odometer and state of charge
+    log({"guard", "evcc"} <= set((d.get("description_placeholders") or {})), "assistant step 1 says what was found (guard, evcc)", str(d.get("description_placeholders")))
+    s, d = api("POST", f"/api/config/config_entries/flow/{d['flow_id']}", {})
+    opts = list(d.get("menu_options") or [])
+    log(d.get("type") == "menu" and d.get("step_id") == "cars" and {"add_car", "finish"} <= set(opts), "assistant step 2: cars menu (add a car, finish)", f"{d.get('type')} {opts}")
+    s, d = api("POST", f"/api/config/config_entries/flow/{d['flow_id']}", {"next_step_id": "add_car"})
+    car_fields = {f.get("name") for f in (d.get("data_schema") or [])}
+    log(d.get("step_id") == "add_car" and {"odometer_entity", "soc_entity"} <= car_fields or (d.get("step_id") == "add_car" and len(car_fields) > 5),
+        "assistant: car form with odometer and state of charge", str(sorted(car_fields))[:200])
+    api("DELETE", f"/api/config/config_entries/flow/{d['flow_id']}")
     entry, err = flow_finish("/api/config/config_entries/flow", {"handler": "plugwhen", "show_advanced_options": False}, {})
     log(entry is not None, "integration set up from scratch", err)
     if not entry:

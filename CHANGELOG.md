@@ -2,6 +2,9 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Set-up assistant:** two steps instead of an empty page. *What is there* says what was found (the Wächter is linked right away, evcc by
+  the Wächter's address or on this machine; an address is asked only if evcc was not found). *Your cars* adds one car after the other,
+  each prefilled from the Wächter and evcc; what is needed per car is its odometer and its state of charge.
 - **Look-ahead: departures beyond the solar forecast are grey.** A window with daylight after the end of the forecast (the free
   Forecast.Solar reaches until tomorrow) is not "no sun" but "sun not known yet": its bar is grey, the chart says until when the
   forecast reaches, and each day carries `sun_known`, the look-ahead `sun_until`. Night-only windows are never marked.

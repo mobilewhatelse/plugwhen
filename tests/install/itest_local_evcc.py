@@ -31,8 +31,11 @@ def form_values(d):
 
 
 def open_form(path, body):
-    """Starts a flow, returns (status, answer, values shown) and cancels it again."""
+    """Starts a flow, returns (status, answer, values shown) and cancels it again. A first page that only asks which evcc loadpoint
+    is answered with the first one."""
     s, d = it.api("POST", path, body)
+    if isinstance(d, dict) and d.get("type") == "form" and d.get("step_id") == "loadpoint":
+        s, d = it.api("POST", f"{path}/{d['flow_id']}", {})
     vals = form_values(d)
     if isinstance(d, dict) and d.get("flow_id") and d.get("type") == "form":
         it.api("DELETE", f"{path}/{d['flow_id']}")

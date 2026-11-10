@@ -29,8 +29,13 @@ z. B. 11 oder 22 kW und 1,4 kW für einphasig 6 A). Eine bestimmte Marke wird ni
 
 ## Einrichten
 
-1. Integration hinzufügen: Einstellungen → Geräte & Dienste → Integration hinzufügen → **Plugwhen**.
-2. Auf der Integrationsseite **Fahrzeug hinzufügen** und die Entitäten oben eintragen.
+1. Integration hinzufügen: Einstellungen → Geräte & Dienste → Integration hinzufügen → **Plugwhen**. Ein Assistent führt in zwei
+   Schritten durch:
+   1. **Was ist da?** Plugwhen zeigt, was es gefunden hat: den Viertelstunden-Wächter (wird gleich verbunden) und evcc (Adresse vom
+      Wächter oder auf diesem Rechner gefunden). Nur wenn evcc woanders läuft und nicht gefunden wurde, tragen Sie die Adresse ein.
+   2. **Ihre Autos:** **Auto hinzufügen**. Das Formular ist aus dem Wächter und evcc vorbefüllt, soweit es geht; nötig sind je Auto
+      Kilometerstand und Ladestand. Mehrere Autos nacheinander, dann **Einrichtung abschließen**.
+2. Weitere Autos später auf der Integrationsseite: **Fahrzeug hinzufügen**.
 3. Optional über das Zahnrad: den **Viertelstunden-Wächter** wählen (wird vorgeschlagen, wenn er installiert ist), Solarprognose an/aus und Abzug,
    Verfügbarkeits-Sensor, Energiezähler Netzbezug und Leistungspreise für den Potenzialrechner.
 4. Dashboard erstellen (siehe unten).

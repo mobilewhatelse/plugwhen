@@ -18,12 +18,82 @@
   "config": {
     "step": {
       "user": {
-        "title": "Plugwhen",
-        "description": "Berechnet, wann man anstecken soll, damit das Auto bei der Abfahrt bereit ist. Fahrzeuge fügen Sie danach auf der Integrationsseite hinzu."
+        "title": "Einrichtung 1 von 2: Was ist da?",
+        "description": "Plugwhen berechnet, wann man anstecken soll, damit das Auto bei der Abfahrt bereit ist, und plant das Laden mit Sonne zuerst.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = gefunden und verbunden: Der Wächter liefert Netzbezug, Preise, Grenze und Lastprognose, evcc die Fahrzeuge und den Ladepunkt. Plugwhen geht auch ohne beide. Eine Solarprognose wird aus dem Energie-Dashboard genommen, wenn eine eingerichtet ist.",
+        "data": {
+          "evcc_url": "Adresse von evcc (optional)",
+          "evcc_password": "Passwort von evcc"
+        },
+        "data_description": {
+          "evcc_url": "Nur wenn evcc läuft und nicht gefunden wurde, z. B. http://192.168.1.20:7070. Leer = ohne evcc."
+        }
+      },
+      "cars": {
+        "title": "Einrichtung 2 von 2: Ihre Autos",
+        "description": "Bisher hinzugefügt: {cars}.\n\nJedes Auto bekommt einen eigenen Plan. **Nötig je Auto:** Kilometerstand und Ladestand (aus der Integration des Autos). Der Rest wird aus dem Wächter und evcc vorbefüllt, wo es geht.",
+        "menu_options": {
+          "add_car": "Auto hinzufügen",
+          "finish": "Einrichtung abschließen"
+        }
+      },
+      "add_car": {
+        "title": "Einrichtung 2 von 2: ein Auto",
+        "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n**Vorbefüllt aus:** {taken_over}",
+        "data": {
+          "name": "Name",
+          "odometer_entity": "Kilometerstand",
+          "soc_entity": "Ladestand",
+          "soc_max_age_h": "Höchstalter des Ladestands",
+          "capacity_kwh": "Batteriekapazität",
+          "reserve_km": "Reserve",
+          "consumption_kwh_100": "Verbrauch (bis gelernt)",
+          "charge_kw_max": "Wallbox-Leistung (höchstens)",
+          "charge_kw_min": "Wallbox-Leistung (mindestens)",
+          "charge_kw_pref": "Bevorzugte kleinste Ladeleistung",
+          "plugged_entity": "Angesteckt (optional)",
+          "charging_entity": "Lädt (optional)",
+          "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+          "departure_entity": "Abfahrt (optional)",
+          "notify_service": "Benachrichtigungsdienst (optional)",
+          "notify_hour": "Warnen ab Uhrzeit",
+          "evcc_vehicle": "Fahrzeug in evcc (optional)",
+          "trip_calendar": "Kalender mit Fahrten (optional)",
+          "stock_soc": "Vorrat (Mindest-Ladestand)"
+        },
+        "data_description": {
+          "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
+          "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
+          "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
+          "capacity_kwh": "Nutzbare Batteriekapazität.",
+          "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
+          "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
+          "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
+          "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
+          "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
+          "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
+          "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
+          "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+          "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
+          "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
+          "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
+          "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
+          "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+          "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
+        }
       }
     },
     "abort": {
       "single_instance_allowed": "Plugwhen ist schon eingerichtet."
+    },
+    "error": {
+      "same_entity": "Kilometerstand und Ladestand müssen verschiedene Sensoren sein.",
+      "min_above_max": "Die kleinste Leistung liegt über der größten.",
+      "notify_format": "Jeden Dienst als domain.name angeben, durch Komma getrennt, zum Beispiel notify.mobile_app_handy.",
+      "not_distance": "Dieser Sensor hat keine Entfernungseinheit (km oder mi). Wählen Sie den Kilometerstand oder ergänzen Sie beim Template-Sensor unit_of_measurement: km.",
+      "not_percent": "Dieser Sensor hat keine Prozent-Einheit. Wählen Sie den Ladestand in % oder ergänzen Sie beim Template-Sensor unit_of_measurement: \"%\".",
+      "not_energy": "Dieser Sensor hat keine Energieeinheit (Wh, kWh oder MWh). Ergänzen Sie beim Template-Sensor unit_of_measurement: kWh oder wählen Sie einen anderen Sensor.",
+      "evcc_auth": "evcc verlangt ein Passwort, oder das Passwort ist falsch.",
+      "evcc_unreachable": "evcc antwortet unter dieser Adresse nicht."
     }
   },
   "options": {
@@ -79,7 +149,7 @@
       "step": {
         "user": {
           "title": "Fahrzeug",
-          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n{taken_over}",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n**Vorbefüllt aus:** {taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Kilometerstand",
@@ -124,7 +194,7 @@
         },
         "reconfigure": {
           "title": "Fahrzeug",
-          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n{taken_over}",
+          "description": "Plugwhen lernt aus dem Verlauf dieses Autos, wie weit es fährt, wann es losfährt und wo es geladen wird.\n\n**Vorbefüllt aus:** {taken_over}",
           "data": {
             "name": "Name",
             "odometer_entity": "Kilometerstand",
