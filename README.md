@@ -170,7 +170,7 @@ at the preferred power and at full power.
 - **Charge ahead with the sun** (with a solar forecast, e.g. of the Energy dashboard): sun that is left over in an earlier window (for
   example the weekend) is used for the grid energy of a later departure (for example Wednesday), as far as the battery stays below
   80 % and the sun lasts. Example: *Saturday 10 to 13 h, 14 kWh, replaces grid energy before Wednesday 07:00.* The chart *The next
-  departures* shows where the energy of each departure comes from: sun in the same window (yellow), sun charged ahead (orange), grid (blue).
+  departures* shows where the energy of each departure comes from: sun in the same window (yellow), sun charged ahead (orange), grid (blue); grey = grid, but the window lies beyond the end of the solar forecast, so the sun is not known yet.
 - **A heads-up on the evening before:** from the evening hour of the warning on, Plugwhen tells you that **tomorrow** charging will be
   needed (with the latest start) or that charging ahead with the sun pays tomorrow. Once per day and kind. Charging that has to happen
   today is the job of the plug-in warning.

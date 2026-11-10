@@ -209,7 +209,9 @@ Leistung und bei voller Leistung nötig ist.
 - **Mit Sonne vorladen** (mit Solarprognose, z. B. aus dem Energie-Dashboard): Sonne, die in einem früheren Fenster übrig ist (zum Beispiel am
   Wochenende), wird für den Netzstrom einer späteren Abfahrt genutzt (zum Beispiel Mittwoch), solange der Akku unter 80 % bleibt und die Sonne reicht.
   Beispiel: *Samstag 10 bis 13 Uhr, 14 kWh, ersetzt Netzstrom vor Mittwoch 07:00.* Die Grafik *Die nächsten Abfahrten* zeigt, woher der Strom jeder
-  Abfahrt kommt: Sonne im selben Fenster (gelb), mit Sonne vorgeladen (orange), Netz (blau).
+  Abfahrt kommt: Sonne im selben Fenster (gelb), mit Sonne vorgeladen (orange), Netz (blau). **Grau** heißt: Netz, aber die Sonne ist noch nicht bekannt, weil das Fenster hinter dem Ende
+  der Solarprognose liegt (die kostenlose Forecast.Solar-Prognose reicht nur bis morgen). Unten steht, bis wann die Prognose reicht.
+  Für eine Woche Vorschau eine Prognose mit mehr Tagen im Energie-Dashboard eintragen, z. B. Open-Meteo Solar Forecast.
 - **Eine Vorwarnung am Vorabend:** Ab der Abendstunde der Warnung sagt Plugwhen, dass **morgen** geladen werden muss (mit dem spätesten Start) oder
   dass sich morgen das Vorladen mit Sonne lohnt. Einmal je Tag und Art. Laden, das heute geschehen muss, ist Sache der Anstecken-Warnung.
 - **Sonnenfenster:** eine Streifengrafik für die nächsten fünf Tage: grau, wo das Auto voraussichtlich zu Hause ist (roter Strich = Abfahrt), gelb, wo in

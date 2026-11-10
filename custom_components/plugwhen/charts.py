@@ -41,7 +41,8 @@ T = {
         habit_title="Wann laden Sie? kWh je Wochentag im Durchschnitt", habit_day="tagsüber (9–17 Uhr)", habit_night="nachts (20–7 Uhr)", habit_rest="sonst",
         latest="spätestens ab", hz_title="Die nächsten Abfahrten: woher kommt der Strom?", hz_sun="Sonne im selben Fenster", hz_pre="mit Sonne vorgeladen",
         hz_grid="Netz", hz_none="Für die nächsten Abfahrten ist nichts nachzuladen", hz_unknown="Ladestand unbekannt: keine Vorschau",
-        hz_trips="Keine Abfahrten gelernt: keine Vorschau", hz_saved="Vorladen mit Sonne spart {x} kWh Netzstrom", hz_nosun="Ohne Solarprognose kommt alles aus dem Netz, verteilt",
+        hz_trips="Keine Abfahrten gelernt: keine Vorschau", hz_saved="Vorladen mit Sonne spart {x} kWh Netzstrom", hz_nosun="Ohne Solarprognose kommt alles aus dem Netz, verteilt", hz_unk="Netz, Sonne noch unbekannt",
+        hz_until="Prognose bis {d}: graue Balken können noch Sonne bekommen",
         habit_few="Ladegewohnheit: noch zu wenig Daten (28 Tage nötig)", habit_foot="nachts {n} % · tagsüber {d} % · Wochenende {w} % der Energie",
         sw_title="Sonnenfenster: wann das Anstecken bei Sonne Sinn macht", sw_home="Auto zu Hause", sw_sun="Sonne verfügbar", sw_rec="empfohlen: Anstecken lohnt",
         sw_nosun="Ohne Solarprognose gibt es keine Sonnenfenster", sw_none="Keine Sonne in den Zeiten, in denen das Auto zu Hause ist",
@@ -63,7 +64,8 @@ T = {
         habit_title="When do you charge? kWh per weekday on average", habit_day="during the day (9 to 17 h)", habit_night="at night (20 to 7 h)", habit_rest="otherwise",
         latest="latest start", hz_title="The next departures: where does the energy come from?", hz_sun="sun in the same window", hz_pre="charged ahead with the sun",
         hz_grid="grid", hz_none="Nothing to charge for the next departures", hz_unknown="State of charge unknown: no preview",
-        hz_trips="No departures learned: no preview", hz_saved="Charging ahead with the sun saves {x} kWh of grid energy", hz_nosun="Without a solar forecast everything comes from the grid, spread",
+        hz_trips="No departures learned: no preview", hz_saved="Charging ahead with the sun saves {x} kWh of grid energy", hz_nosun="Without a solar forecast everything comes from the grid, spread", hz_unk="grid, sun not known yet",
+        hz_until="Forecast until {d}: grey bars may still get sun",
         habit_few="Charging habit: too little data yet (28 days needed)", habit_foot="night {n} % · day {d} % · weekend {w} % of the energy",
         sw_title="Sun windows: when plugging in with the sun makes sense", sw_home="car at home", sw_sun="sun available", sw_rec="recommended: worth plugging in",
         sw_nosun="Without a solar forecast there are no sun windows", sw_none="No sun at the times the car is at home",
@@ -365,7 +367,8 @@ def chart_horizon(horizon: dict[str, Any] | None, lang: str | None = None) -> st
     if not days:
         return _msg(t["hz_trips"])
     W, L, R, top, ph = 640, 40, 16, 40, 150
-    H = 300
+    unknown = any(d.get("sun_known") is False for d in days)
+    H = 316 if unknown else 300
     vmax = float(int(max(4.0, max(float(d.get("need_kwh") or 0) for d in days))) + 1)
     step = max(1, int(vmax) // 4)
     body = [_text(10, 20, t["hz_title"], weight="700", size=13)]
@@ -378,7 +381,8 @@ def chart_horizon(horizon: dict[str, Any] | None, lang: str | None = None) -> st
         dep = _as_dt(d.get("departure"))
         x = L + i * bw
         base = top + ph
-        for key, colour in (("sun_direct_kwh", SUN), ("precharge_kwh", ORANGE), ("grid_kwh", BLUE)):
+        grid_colour = GREY if d.get("sun_known") is False else BLUE      # beyond the solar forecast: the sun is not known yet
+        for key, colour in (("sun_direct_kwh", SUN), ("precharge_kwh", ORANGE), ("grid_kwh", grid_colour)):
             h = ph * float(d.get(key) or 0) / vmax
             if h > 0.5:
                 base -= h
@@ -392,10 +396,15 @@ def chart_horizon(horizon: dict[str, Any] | None, lang: str | None = None) -> st
         if ls is not None and float(d.get("grid_kwh") or 0) > 0:
             body.append(_text(x + bw / 2, top + ph + 30, f"{t['latest']}", "middle", size=10))
             body.append(_text(x + bw / 2, top + ph + 42, f"{t['wd'][ls.weekday()]} {ls:%H:%M}", "middle", size=10, weight="700"))
-    ly = H - 30
+    ly = H - 30 - (16 if unknown else 0)
     for j, (key, colour) in enumerate((("hz_sun", SUN), ("hz_pre", ORANGE), ("hz_grid", BLUE))):
         xx = L + j * 200
         body.append(f"<rect x='{xx}' y='{ly - 9}' width='10' height='10' fill='{colour}'/>" + _text(xx + 15, ly, t[key], size=11))
+    if unknown:
+        until = _as_dt(horizon.get("sun_until"))
+        d_txt = f"{t['wd'][until.weekday()]} {until:%H:%M}" if until is not None else "?"
+        body.append(f"<rect x='{L}' y='{ly + 7}' width='10' height='10' fill='{GREY}'/>" + _text(L + 15, ly + 16, t["hz_unk"], size=11))
+        body.append(_text(L + 200, ly + 16, t["hz_until"].format(d=d_txt), size=11))
     saved = float(horizon.get("saved_grid_kwh") or 0)
     if saved > 0:
         body.append(_text(L, H - 8, t["hz_saved"].format(x=f"{saved:.0f}"), fill=ORANGE, weight="700", size=12))

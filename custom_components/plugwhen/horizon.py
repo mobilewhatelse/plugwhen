@@ -30,6 +30,7 @@ QUARTER_H = 0.25
 DEFAULT_EFFICIENCY = 0.9
 PRECHARGE_CAP = 0.8                  # pre-charging fills the battery up to this share of its capacity
 MIN_AWAY_H, MAX_AWAY_H = 3.0, 10.0
+DAYLIGHT = (7, 19)                   # hours in which a window beyond the forecast could have sun (local time)
 MIN_SUN_KW = 1.0                     # a quarter hour with less available power is not counted as sun slot for the span
 TINY_KWH = 0.2
 
@@ -91,6 +92,23 @@ def _sun_segments(start: datetime, end: datetime, sun_kw: dict[datetime, float] 
     return [{"from": a, "to": b, "kwh": k, "avg_kw": k / max(1e-6, (b - a).total_seconds() / 3600.0)} for a, b, k in segs]
 
 
+def sun_unknown_hours(home_from: datetime, departure: datetime, until: datetime | None) -> float:
+    """Daylight hours of the window [home_from, departure] that lie beyond the end of the forecast `until` (None = no forecast at all:
+    nothing to mark). Night-only windows never count: the sun would not matter there anyway."""
+    if until is None or departure <= until:
+        return 0.0
+    lo = max(home_from, until)
+    hours = 0.0
+    day = lo.replace(hour=0, minute=0, second=0, microsecond=0)
+    while day < departure:
+        a = max(lo, day.replace(hour=DAYLIGHT[0]))
+        b = min(departure, day.replace(hour=DAYLIGHT[1]))
+        if b > a:
+            hours += (b - a).total_seconds() / 3600.0
+        day += timedelta(days=1)
+    return hours
+
+
 def horizon_plan(
     now: datetime,
     soc_kwh: float | None,
@@ -108,6 +126,8 @@ def horizon_plan(
     iso = lambda t: t.isoformat() if t else None  # noqa: E731
     result: dict[str, Any] = {"status": "ok", "days": [], "precharge": [], "grid_without_precharge_kwh": 0.0,
                               "grid_with_precharge_kwh": 0.0, "saved_grid_kwh": 0.0, "sun_used": bool(sun_kw)}
+    sun_until = (max(sun_kw) + QUARTER) if sun_kw else None
+    result["sun_until"] = sun_until.isoformat() if sun_until else None
     if soc_kwh is None:
         result["status"] = "unknown_soc"
         return result
@@ -165,6 +185,7 @@ def horizon_plan(
             "latest_start_pref": (iso(r["trip"].departure - timedelta(hours=r["need"] / min(max_kw, pref_kw)))
                                   if r["need"] >= TINY_KWH and pref_kw else None),
             "sun_direct_kwh": round(r["direct"], 1), "precharge_kwh": round(r["pre_in"], 1), "grid_kwh": round(max(0.0, r["grid"]), 1),
+            "sun_known": sun_unknown_hours(r["home_from"], r["trip"].departure, sun_until) < 1.0,
         })
         for j, m in sorted(r["items"].items()):
             result["precharge"].append({

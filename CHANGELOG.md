@@ -2,6 +2,9 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Look-ahead: departures beyond the solar forecast are grey.** A window with daylight after the end of the forecast (the free
+  Forecast.Solar reaches until tomorrow) is not "no sun" but "sun not known yet": its bar is grey, the chart says until when the
+  forecast reaches, and each day carries `sun_known`, the look-ahead `sun_until`. Night-only windows are never marked.
 - **Trips from a calendar** (per car, optional): every event in a calendar of Home Assistant is a trip. Start = departure; kilometres
   written in the title or description ("Linz 200 km") win, otherwise the route from home to the event's location via the Waze travel time
   integration (switch, default off; home and destination go to Waze), there and back unless the event says "einfach"/"one way". The range
