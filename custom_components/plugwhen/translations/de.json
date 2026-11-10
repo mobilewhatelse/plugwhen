@@ -276,7 +276,8 @@
         "state": {
           "off": "Aus",
           "learn": "Lernen",
-          "evcc": "Über evcc (Plan schreiben)"
+          "evcc": "Über evcc (Plan schreiben)",
+          "direct": "Direkt (Plugwhen steuert die Wallbox)"
         }
       }
     }

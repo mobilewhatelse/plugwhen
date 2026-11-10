@@ -101,6 +101,9 @@ TEXT = {
         rd_ready="Bereit: Plugwhen hat oft genug gleich entschieden wie die Wirklichkeit. Die Betriebsart „Direkt“ (Plugwhen schaltet die Wallbox) kann gewählt werden, sobald es sie gibt.",
         rd_wait="Noch nicht bereit. Bis dahin plant und warnt Plugwhen, und in der Betriebsart „Über evcc“ lädt evcc nach dem Plan.",
         rd_low="Die Entscheidungen passen noch nicht gut genug zur Wirklichkeit (Reiter Lernen).",
+        rd_wb="Wallbox-Steuerung erkannt", rd_wb_trip="Abfahrtsmodus der Wallbox (Zeit und Energie, Sonne bleibt zuerst)",
+        rd_wb_mode="Moduswechsel (Netz in den geplanten Fenstern, sonst Sonnenmodus)", rd_wb_buttons="Start und Stopp in den geplanten Fenstern",
+        rd_wb_none="keine (die Wallbox braucht einen Lademodus oder Start/Stopp in Home Assistant)",
         tr_how="**So tragen Sie eine Fahrt ein:** im Kalender auf den Tag tippen, Titel mit Ziel und Kilometern („Linz 200 km“), "
                "Beginn = Abfahrtszeit. Ohne Kilometer zählt der **Ort** (über Waze, falls eingeschaltet), hin und zurück; „einfach“ im Titel = nur eine Richtung. "
                "Ganztägige Termine zählen nicht.",
@@ -194,6 +197,9 @@ TEXT = {
         rd_ready="Ready: Plugwhen decided like reality often enough. The mode \u201cdirect\u201d (Plugwhen switches the wallbox) can be chosen as soon as it exists.",
         rd_wait="Not ready yet. Until then Plugwhen plans and warns, and in the mode \u201cvia evcc\u201d evcc charges by the plan.",
         rd_low="The decisions do not match reality well enough yet (tab Learning).",
+        rd_wb="Wallbox control found", rd_wb_trip="the wallbox's next-trip mode (time and energy, the sun stays first)",
+        rd_wb_mode="mode change (grid in the planned windows, else the sun mode)", rd_wb_buttons="start and stop in the planned windows",
+        rd_wb_none="none (the wallbox needs a charging mode or start/stop in Home Assistant)",
         tr_how="**How to enter a trip:** tap the day in the calendar, title with destination and kilometres (\u201cLinz 200 km\u201d), "
                "start = departure time. Without kilometres the **location** counts (via Waze, if switched on), there and back; \u201cone way\u201d in the title = one direction. "
                "All-day events are ignored.",
@@ -354,6 +360,8 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{{ row(checks, 'compare_days', '" + t["rd_cmp"] + "', '" + t["rd_days"] + "') }}"
         "{{ row(checks, 'agree', '" + t["rd_agree"] + "', '%') }}"
         "{{ row(checks, 'solar', '" + t["rd_solar"] + "', '" + t["rd_days"] + "') }}"
+        "**" + t["rd_wb"] + ":** {{ {'trip': '" + t["rd_wb_trip"] + "', 'mode': '" + t["rd_wb_mode"] + "', 'buttons': '"
+        + t["rd_wb_buttons"] + "'}.get(a.wallbox_control, '" + t["rd_wb_none"] + "') }}\n\n"
         "{% set cd = checks | selectattr('key', 'eq', 'compare_days') | list | first %}"
         "{% if states('" + ids["switch_ready"] + "') == 'ready' %}" + t["rd_ready"] + "{% else %}" + t["rd_wait"]
         + "{% if a.estimate %} " + t["rd_est"] + " **{{ (a.estimate | as_datetime).strftime('%d.%m.') }}**.{% elif cd and cd.ok %} "

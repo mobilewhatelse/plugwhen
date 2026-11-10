@@ -276,7 +276,8 @@
         "state": {
           "off": "Off",
           "learn": "Learn",
-          "evcc": "Via evcc (write plan)"
+          "evcc": "Via evcc (write plan)",
+          "direct": "Direct (Plugwhen controls the wallbox)"
         }
       }
     }

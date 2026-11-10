@@ -28,19 +28,32 @@ class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
 
     def __init__(self, plug, vehicle) -> None:
         super().__init__(plug, vehicle, "mode")
-        self._attr_options = [m for m in MODES if m != "evcc" or vehicle.cfg.get("evcc_vehicle")]
+
+    @property
+    def options(self) -> list[str]:
+        """'evcc' only for a car linked to evcc; 'direct' once the wallbox can be controlled and the learn mode is through
+        (or while it is the chosen mode)."""
+        from homeassistant.util import dt as dt_util
+
+        v = self.vehicle
+        out = ["off", "learn"]
+        if v.cfg.get("evcc_vehicle"):
+            out.append("evcc")
+        if v.mode == "direct" or self.plug.direct_offered(v, dt_util.now()):
+            out.append("direct")
+        return out
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
-        self.vehicle.mode = last.state if last is not None and last.state in self._attr_options else DEFAULT_MODE
+        self.vehicle.mode = last.state if last is not None and last.state in MODES else DEFAULT_MODE
 
     @property
     def current_option(self) -> str:
         return self.vehicle.mode
 
     async def async_select_option(self, option: str) -> None:
-        self.vehicle.mode = option if option in self._attr_options else DEFAULT_MODE
+        self.vehicle.mode = option if option in self.options else DEFAULT_MODE
         self.async_write_ha_state()
         if self.vehicle.mode == "evcc":
             await self.plug.async_write_evcc_now(self.vehicle)

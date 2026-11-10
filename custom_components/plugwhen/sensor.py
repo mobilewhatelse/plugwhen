@@ -371,4 +371,6 @@ class SwitchReadySensor(PlugwhenEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         r = self.plug.switch_ready(self.vehicle, dt_util.now())
-        return {"checks": r["checks"], "estimate": r["estimate"]}
+        caps = self.plug.wallbox_control(self.vehicle)
+        return {"checks": r["checks"], "estimate": r["estimate"], "wallbox_control": caps.get("variant"),
+                "wallbox_entities": {k: v for k, v in caps.items() if k != "variant"}, "direct_last": self.vehicle.direct_last}

@@ -101,6 +101,20 @@ geladen oder pausiert würde), **mindestens 80 % gleich entschieden** wie die Wi
 Sonnenprognose**. Dazu ein ungefähres Datum. Ist alles erfüllt, kommt einmal eine Nachricht. Bis dahin plant und warnt Plugwhen, und in
 der Betriebsart „Über evcc“ lädt evcc nach dem Plan.
 
+## Betriebsart „Direkt“: Plugwhen steuert die Wallbox
+
+Erst wählbar, wenn „Bereit zum Schalten?“ grün ist **und** sich die Wallbox steuern lässt. Plugwhen findet am Gerät der Wallbox selbst
+heraus, was sie kann (die Karte „Bereit zum Schalten?“ zeigt es):
+
+- **Abfahrtsmodus der Wallbox** (z. B. Fronius Wattpilot „Next Trip“): Plugwhen trägt nur Abfahrtszeit und Energie ein und stellt auf diesen
+  Modus, wenn für eine Abfahrt in den nächsten 24 Stunden geladen werden muss. Die Wallbox nutzt weiter zuerst die Sonne und lädt den Rest
+  rechtzeitig. Danach stellt Plugwhen den vorherigen Modus (z. B. Eco) zurück.
+- **Moduswechsel** (Lademodus mit Sonnen- und Netzmodus): in den geplanten Netz-Fenstern Netzmodus, sonst zurück.
+- **Nur Start/Stopp:** Start am Anfang, Stopp am Ende eines geplanten Fensters.
+
+Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie in Ruhe. Der
+Wächter hat weiter das letzte Wort.
+
 ## Fahrten aus dem Kalender, Vorrat
 
 - **Kalender mit Fahrten** (je Auto, optional): Jeder Termin in einem Kalender von Home Assistant (zum Beispiel ein lokaler Kalender

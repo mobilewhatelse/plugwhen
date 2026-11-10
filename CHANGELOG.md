@@ -14,6 +14,11 @@
 - **Fix: the solar check stayed at 0 days.** Pairing the forecast with what the plant produced ran once a day inside the calibration
   and was skipped whenever an earlier part failed (e.g. the recorder not ready after a restart). It is its own step now, every 15 minutes,
   looks back 7 days, and the charge plan shows `solar_check` (forecasts remembered, days measured, last error).
+- **Mode "Direct": Plugwhen controls the wallbox**, offered only once "Ready to switch?" is green and the wallbox can be controlled. What it
+  does depends on the wallbox, found on its device without settings: (A) a wallbox with its own next-trip mode (e.g. Fronius Wattpilot
+  "Next Trip"): Plugwhen fills in departure and energy for a departure within 24 hours and switches to that mode, the wallbox keeps using
+  the sun first; (B) a mode select with a sun and a grid mode: grid mode during the planned grid windows; (C) only start/stop: in the windows.
+  Only what Plugwhen set is changed back; if you change the wallbox in between, it is left alone. The guard keeps the last word.
 - **Ready to switch?** (sensor and card at the top of the overview): a checklist when Plugwhen may switch the wallbox itself (mode
   "direct", later): trips learned on every weekday the car is used, 7 days with a comparison in learn mode, at least 80 % decided the
   same as reality, and with a solar plant 5 days of checked solar forecast; with a rough date. One message per car when it is ready.

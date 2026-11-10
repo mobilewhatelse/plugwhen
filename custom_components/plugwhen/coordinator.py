@@ -27,6 +27,7 @@ from dataclasses import replace
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
+from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
 from .trips import range_for_trip, trip_km, trips_from_events, waze_region
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
@@ -100,6 +101,7 @@ class Vehicle:
     trips_at: datetime | None = None
     trips_error: str | None = None
     evcc_write: dict | None = None           # last write into evcc: {at, action, reason, error}
+    direct_last: dict | None = None          # last action of the mode 'direct' on the wallbox
 
 
 class Plugwhen:
@@ -119,6 +121,7 @@ class Plugwhen:
         self._evcc_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.evcc")   # the plans Plugwhen wrote into evcc
         self._written: dict[str, dict] = {}
         self._routes: dict[str, dict] = {}   # destination -> {"km", "at"} from the route service (one way)
+        self._direct: dict[str, dict] = {}   # per car: entity -> {"set", "orig"} what the mode 'direct' set on the wallbox
         self._calib: dict[str, Any] = {"quarter_add_kw": None, "base_load_kw": None, "at": None}
         self._calib_at: datetime | None = None
         self._solar_acc = SolarAccuracy()
@@ -141,6 +144,7 @@ class Plugwhen:
         ev = await self._evcc_store.async_load() or {}
         self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
         self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
+        self._direct = ev.get("direct", {}) if isinstance(ev.get("direct"), dict) else {}
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
         calib = await self._calib_store.async_load() or {}
@@ -184,6 +188,7 @@ class Plugwhen:
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
             await self._write_evcc(v, now)
+            await self._direct_step(v, now)
 
     async def async_write_evcc_now(self, vehicle: Vehicle) -> None:
         """The mode 'evcc' was chosen: read evcc, write at once (not only at the next run) and show it."""
@@ -279,7 +284,7 @@ class Plugwhen:
         return km
 
     def _evcc_data(self) -> dict[str, Any]:
-        return {"written": self._written, "routes": self._routes}
+        return {"written": self._written, "routes": self._routes, "direct": self._direct}
 
     def _trip_at(self, v: Vehicle, dep: datetime | None) -> dict[str, Any] | None:
         """The calendar trip departing at `dep` (same minute), if any."""
@@ -305,6 +310,106 @@ class Plugwhen:
         if t and t.get("range_km"):
             p = replace(p, km_typical=t["km"], km_high=t["range_km"], samples=max(p.samples, MIN_SAMPLES), home_charge_share=None)
         return p
+
+    # ---------- mode 'direct': Plugwhen controls the wallbox ----------
+
+    def wallbox_control(self, v: Vehicle) -> dict[str, Any]:
+        """What the car's wallbox offers, found on its device (the device of the wallbox energy counter, the plug or charging sensor)."""
+        from homeassistant.helpers import entity_registry as er
+
+        reg = er.async_get(self.hass)
+        device = None
+        for key in (V_WALLBOX_ENERGY, V_CHARGING, V_PLUGGED):
+            ent = reg.async_get(v.cfg.get(key) or "")
+            if ent is not None and ent.device_id:
+                device = ent.device_id
+                break
+        if device is None:
+            return {"variant": None}
+        cands = []
+        for e in er.async_entries_for_device(reg, device):
+            st = self.hass.states.get(e.entity_id)
+            attrs = st.attributes if st else {}
+            cands.append({"entity_id": e.entity_id, "domain": e.domain, "options": attrs.get("options"), "unit": attrs.get("unit_of_measurement")})
+        return detect_wallbox(sorted(cands, key=lambda c: c["entity_id"]))
+
+    def direct_offered(self, v: Vehicle, now: datetime) -> bool:
+        """The mode 'direct' is offered once the wallbox can be controlled and the learn mode is through."""
+        return bool(self.wallbox_control(v).get("variant")) and self.switch_ready(v, now)["ready"]
+
+    async def _set_entity(self, entity_id: str, value: Any) -> None:
+        domain = entity_id.split(".", 1)[0]
+        if domain == "select":
+            await self.hass.services.async_call("select", "select_option", {"entity_id": entity_id, "option": value}, blocking=True)
+        elif domain == "time":
+            await self.hass.services.async_call("time", "set_value", {"entity_id": entity_id, "time": value}, blocking=True)
+        elif domain == "number":
+            await self.hass.services.async_call("number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True)
+        elif domain == "button":
+            await self.hass.services.async_call("button", "press", {"entity_id": entity_id}, blocking=True)
+
+    async def _own(self, v: Vehicle, entity_id: str, wanted: Any) -> str | None:
+        """Set `entity_id` to `wanted` (None = give back) - only what Plugwhen set itself is changed back."""
+        mine = self._direct.setdefault(v.sub_id, {})
+        st = self.hass.states.get(entity_id)
+        current = st.state if st is not None else None
+        rec = mine.get(entity_id, {})
+        action, value = next_action(current, wanted, rec.get("set"), rec.get("orig"))
+        if action is None:
+            if value == "user_changed" or (wanted is None and rec):
+                mine.pop(entity_id, None)   # the user took over, or nothing left to give back
+            return None
+        await self._set_entity(entity_id, value)
+        if action == "set":
+            mine[entity_id] = {"set": value, "orig": rec.get("orig", current)}
+        else:
+            mine.pop(entity_id, None)
+        return f"{entity_id}={value}"
+
+    async def _direct_step(self, v: Vehicle, now: datetime) -> None:
+        """Mode 'direct': fill the gap the sun leaves before a departure; outside it give back what Plugwhen set."""
+        caps = self.wallbox_control(v)
+        variant = caps.get("variant") if v.mode == "direct" else None
+        done: list[str] = []
+        try:
+            if variant == "trip":
+                ts = trip_settings(v.need.charge_kwh if v.need else None, v.departure, now, caps.get("trip_energy_unit"))
+                if ts:
+                    for eid, val in ((caps["trip_time"], ts["time"]), (caps["trip_energy"], ts["energy"])):
+                        st = self.hass.states.get(eid)
+                        if st is None or str(st.state) not in (str(val), f"{val}.0"):
+                            await self._set_entity(eid, val)
+                            done.append(f"{eid}={val}")
+                r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else None)
+                done += [r] if r else []
+            elif variant == "mode":
+                windows = (v.charge_plan or {}).get("windows")
+                r = await self._own(v, caps["mode"], caps["mode_grid"] if in_grid_window(windows, now) else None)
+                done += [r] if r else []
+            elif variant == "buttons":
+                mine = self._direct.setdefault(v.sub_id, {})
+                active = in_grid_window((v.charge_plan or {}).get("windows"), now)
+                if active and not mine.get("started"):
+                    await self._set_entity(caps["start"], None)
+                    mine["started"] = now.isoformat()
+                    done.append(caps["start"])
+                elif not active and mine.get("started"):
+                    await self._set_entity(caps["stop"], None)
+                    mine.pop("started", None)
+                    done.append(caps["stop"])
+            else:   # not (or no longer) in mode 'direct': give back everything Plugwhen set
+                for eid in list(self._direct.get(v.sub_id, {})):
+                    if eid == "started":
+                        continue
+                    r = await self._own(v, eid, None)
+                    done += [r] if r else []
+        except Exception as err:  # noqa: BLE001 - a wallbox that does not answer must not stop the planner
+            v.direct_last = {"at": now.isoformat(), "variant": variant, "error": str(err)[:120]}
+            _LOGGER.warning("Plugwhen: wallbox of %s not controlled: %s", v.name, err)
+            return
+        if done:
+            v.direct_last = {"at": now.isoformat(), "variant": variant, "done": done, "error": None}
+            self._evcc_store.async_delay_save(self._evcc_data, 5)
 
     def _min_soc(self, v: Vehicle) -> float:
         """Never plan below this: the stock for unplanned trips (setting), at least 20 %."""
