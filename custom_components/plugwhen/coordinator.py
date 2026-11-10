@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
@@ -28,7 +29,7 @@ from .evcc import EvccClient, EvccError, connection as evcc_connection, live_veh
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
-from .trips import range_for_trip, trip_km, trips_from_events, waze_region
+from .trips import coordinates, parse_geocode, range_for_trip, trip_km, trips_from_events, waze_region
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
 from .habit import charging_habit
@@ -122,6 +123,7 @@ class Plugwhen:
         self._written: dict[str, dict] = {}
         self._routes: dict[str, dict] = {}   # destination -> {"km", "at"} from the route service (one way)
         self._direct: dict[str, dict] = {}   # per car: entity -> {"set", "orig"} what the mode 'direct' set on the wallbox
+        self._geo: dict[str, str] = {}       # location text -> "lat,lon" (OpenStreetMap search, kept)
         self._calib: dict[str, Any] = {"quarter_add_kw": None, "base_load_kw": None, "at": None}
         self._calib_at: datetime | None = None
         self._solar_acc = SolarAccuracy()
@@ -145,6 +147,7 @@ class Plugwhen:
         self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
         self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
         self._direct = ev.get("direct", {}) if isinstance(ev.get("direct"), dict) else {}
+        self._geo = ev.get("geo", {}) if isinstance(ev.get("geo"), dict) else {}
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
         calib = await self._calib_store.async_load() or {}
@@ -274,9 +277,12 @@ class Plugwhen:
             return hit.get("km")
         if not self.hass.services.has_service("waze_travel_time", "get_travel_times"):
             return None
+        dest = coordinates(location) or await self._geocode(location)   # Waze's own address search fails: coordinates work
+        if dest is None:
+            return None
         try:
             resp = await self.hass.services.async_call("waze_travel_time", "get_travel_times", {
-                "origin": "zone.home", "destination": location, "region": waze_region(self.hass.config.country)},
+                "origin": "zone.home", "destination": dest, "region": waze_region(self.hass.config.country)},
                 blocking=True, return_response=True)
             routes = (resp or {}).get("routes") or []
             km = round(min(float(r["distance"]) for r in routes if r.get("distance")), 1) if routes else None
@@ -288,8 +294,30 @@ class Plugwhen:
             self._evcc_store.async_delay_save(self._evcc_data, 10)
         return km
 
+    async def _geocode(self, location: str) -> str | None:
+        """Coordinates of a location text from OpenStreetMap (Nominatim), kept for good. Only the location goes there, not home."""
+        if location in self._geo:
+            return self._geo[location]
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        try:
+            async with asyncio.timeout(10):
+                async with async_get_clientsession(self.hass).get(
+                        "https://nominatim.openstreetmap.org/search", params={"q": location, "format": "json", "limit": "1"},
+                        headers={"User-Agent": "Plugwhen (Home Assistant integration; github.com/mobilewhatelse/plugwhen)",
+                                 "Accept-Language": self.hass.config.language or "en"}) as resp:
+                    data = await resp.json(content_type=None) if resp.status == 200 else None
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Plugwhen: location %s not found: %s", location, err)
+            return None
+        hit = parse_geocode(data)
+        if hit:
+            self._geo[location] = hit
+            self._evcc_store.async_delay_save(self._evcc_data, 10)
+        return hit
+
     def _evcc_data(self) -> dict[str, Any]:
-        return {"written": self._written, "routes": self._routes, "direct": self._direct}
+        return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo}
 
     def _trip_at(self, v: Vehicle, dep: datetime | None) -> dict[str, Any] | None:
         """The calendar trip departing at `dep` (same minute), if any."""

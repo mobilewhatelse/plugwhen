@@ -121,7 +121,9 @@ Wächter hat weiter das letzte Wort.
   „Fahrten“ oder ein eingebundener Google-/Outlook-Kalender) ist eine Fahrt. Beginn = Abfahrt. **Kilometer** stehen im Titel oder in der
   Beschreibung („Linz 200 km“) und gelten zuerst; sonst rechnet Plugwhen die Strecke von zu Hause zum **Ort** des Termins über die
   Integration **Waze Travel Time** (Schalter in den Einstellungen, Standard aus; die Integration einmal hinzufügen, ohne Konto; Zuhause und
-  Ziel gehen an Waze), hin und zurück, außer im Termin steht „einfach“. Reichweite bei Abfahrt = Kilometer plus 15 %, mindestens die
+  Ziel gehen an Waze), hin und zurück, außer im Termin steht „einfach“. Der **Ort** kann ein Ortsname, eine Adresse oder
+  Koordinaten („48.2082,16.3738“) sein. Weil die Adresssuche von Waze über Home Assistant derzeit nicht funktioniert, sucht Plugwhen den Ort
+  zuerst bei **OpenStreetMap** (nur das Ziel geht dorthin, einmal je Ort) und fragt Waze dann mit den Koordinaten. Reichweite bei Abfahrt = Kilometer plus 15 %, mindestens die
   Reserve. Die Fahrt ersetzt die gelernte Abfahrt dieses Tages, im Plan und in der Vorausschau. Ganztägige Termine zählen nicht.
   Karte **„Eingetragene Fahrten“**.
 - **Vorrat** (je Auto, Mindest-Ladestand, Standard 0 = aus): Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt

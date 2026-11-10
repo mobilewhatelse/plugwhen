@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from trips import one_way, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
+from trips import coordinates, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
 
 CET = timezone(timedelta(hours=1))
 NOW = datetime(2026, 11, 10, 9, 0, tzinfo=CET)
@@ -65,6 +65,21 @@ class KmTest(unittest.TestCase):
 
     def test_region(self):
         self.assertEqual((waze_region("AT"), waze_region("us"), waze_region(None)), ("eu", "us", "eu"))
+
+
+class GeoTest(unittest.TestCase):
+    def test_coordinates_in_the_location(self):
+        self.assertEqual(coordinates("48.2082,16.3738"), "48.2082,16.3738")
+        self.assertEqual(coordinates(" 48.2082 , 16.3738 "), "48.2082,16.3738")
+        self.assertIsNone(coordinates("Wien"))
+        self.assertIsNone(coordinates("Hauptplatz 1, 8010 Graz"))
+        self.assertIsNone(coordinates("95.0,16.0"))
+
+    def test_geocode_answer(self):
+        self.assertEqual(parse_geocode([{"lat": "47.0708", "lon": "15.4386", "display_name": "Graz"}]), "47.0708,15.4386")
+        self.assertIsNone(parse_geocode([]))
+        self.assertIsNone(parse_geocode({"error": "x"}))
+        self.assertIsNone(parse_geocode([{"lat": "x"}]))
 
 
 if __name__ == "__main__":

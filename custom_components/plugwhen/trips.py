@@ -77,6 +77,28 @@ def range_for_trip(km: float, reserve_km: float) -> float:
     return round(max(reserve_km, km * TRIP_MARGIN), 1)
 
 
+_COORDS = re.compile(r"^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$")
+
+
+def coordinates(text: str | None) -> str | None:
+    """'48.2082, 16.3738' -> '48.2082,16.3738' (the location is already coordinates), else None."""
+    m = _COORDS.match(text or "")
+    if not m:
+        return None
+    lat, lon = float(m.group(1)), float(m.group(2))
+    return f"{lat},{lon}" if -90 <= lat <= 90 and -180 <= lon <= 180 else None
+
+
+def parse_geocode(data) -> str | None:
+    """The first hit of an OpenStreetMap (Nominatim) search as 'lat,lon', or None."""
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        try:
+            return f"{float(data[0]['lat'])},{float(data[0]['lon'])}"
+        except (KeyError, TypeError, ValueError):
+            return None
+    return None
+
+
 def waze_region(country: str | None) -> str:
     """The region the route service wants for this country."""
     c = (country or "").upper()

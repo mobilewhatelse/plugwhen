@@ -14,6 +14,9 @@
 - **Fix: the solar check stayed at 0 days.** Pairing the forecast with what the plant produced ran once a day inside the calibration
   and was skipped whenever an earlier part failed (e.g. the recorder not ready after a restart). It is its own step now, every 15 minutes,
   looks back 7 days, and the charge plan shows `solar_check` (forecasts remembered, days measured, last error).
+- **Locations for Waze are looked up at OpenStreetMap first:** the address search of the Waze integration fails at the moment
+  (a place or address gives an error, coordinates work). Plugwhen finds the coordinates at OpenStreetMap (Nominatim, only the destination
+  goes there, kept for good) and asks Waze with them. Coordinates in the location are used as they are.
 - **A plan in evcc whose time has passed** (evcc keeps it) counts as done, not as your own plan: Plugwhen may replace it. A valid own
   plan is still never touched.
 - **Mode "Direct": Plugwhen controls the wallbox**, offered only once "Ready to switch?" is green and the wallbox can be controlled. What it
