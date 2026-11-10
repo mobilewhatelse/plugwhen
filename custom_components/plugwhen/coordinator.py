@@ -426,9 +426,9 @@ class Plugwhen:
 
     async def _direct_step(self, v: Vehicle, now: datetime) -> None:
         """The mode decides who controls, and Plugwhen sets what belongs to it (only what it set itself is given back):
-        direct - the wallbox's base mode is its sun mode (e.g. Eco), before a departure the next-trip mode or the grid mode, and evcc's
-        loadpoint is off so that evcc does not regulate the same wallbox; evcc - the wallbox's grid mode (e.g. Default), evcc regulates;
-        off/learn - everything Plugwhen set is given back."""
+        direct - the wallbox's base mode is its sun mode (e.g. Eco), before a departure the next-trip mode or the grid mode (evcc must
+        only read this wallbox: evcc's "off" blocks charging, it is not touched); evcc - the wallbox's grid mode (e.g. Default), evcc
+        regulates; off/learn - everything Plugwhen set is given back."""
         caps = self.wallbox_control(v)
         variant = caps.get("variant")
         done: list[str] = []
@@ -459,7 +459,9 @@ class Plugwhen:
                         await self._set_entity(caps["stop"], None)
                         mine.pop("started", None)
                         done.append(caps["stop"])
-                r = await self._evcc_loadpoint_mode(v, "off")
+                # evcc's loadpoint is left alone: "off" in evcc means charging blocked, not "evcc keeps out". For 'direct' evcc must
+                # only read the wallbox (or not be there); a mode Plugwhen set earlier is given back.
+                r = await self._evcc_loadpoint_mode(v, None)
                 done += [r] if r else []
             elif v.mode == "evcc":
                 if caps.get("mode") and caps.get("mode_grid"):   # evcc regulates: the wallbox charges when evcc lets it

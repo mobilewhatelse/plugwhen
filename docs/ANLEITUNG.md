@@ -115,7 +115,8 @@ heraus, was sie kann (die Karte „Bereit zum Schalten?“ zeigt es):
 Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie in Ruhe.
 
 **Die Betriebsart entscheidet, wer steuert, und stellt mit um:** „Direkt“ stellt die Wallbox auf ihren Sonnenmodus (z. B. Eco) als
-Grundstellung und den evcc-Ladepunkt des Autos auf „Off“, damit evcc nicht dieselbe Wallbox regelt; „Über evcc“ stellt die Wallbox auf
+Grundstellung; evcc darf diese Wallbox dann **nur lesen** (oder gar nicht da sein), denn „Off“ heißt in evcc „Laden gesperrt“ und nicht
+„evcc hält sich raus“ – steuert evcc die Wallbox, ist „Über evcc“ die richtige Betriebsart; „Über evcc“ stellt die Wallbox auf
 ihren Netzmodus (z. B. Default) und lässt evcc regeln; „Aus“ und „Lernen“ geben alles zurück. Zum Ausprobieren lässt sich „Direkt“ in den
 Einstellungen **vorzeitig freigeben**, bevor „Bereit zum Schalten“ grün ist. Der
 Wächter hat weiter das letzte Wort.

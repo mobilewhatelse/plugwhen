@@ -15,7 +15,7 @@
   and was skipped whenever an earlier part failed (e.g. the recorder not ready after a restart). It is its own step now, every 15 minutes,
   looks back 7 days, and the charge plan shows `solar_check` (forecasts remembered, days measured, last error).
 - **The mode decides who controls, and sets what belongs to it:** "direct" puts the wallbox in its sun mode (e.g. Eco) as the base
-  and evcc's loadpoint of the car to off, so evcc does not regulate the same wallbox; "via evcc" puts the wallbox in its grid mode
+  (evcc must only read this wallbox then: "off" in evcc blocks charging, so Plugwhen does not touch evcc's loadpoint); "via evcc" puts the wallbox in its grid mode
   (e.g. Default) and lets evcc regulate; "off"/"learn" give back everything Plugwhen set. Only what Plugwhen set itself is changed back.
 - **"Direct" can be released early** (setting, for trying it out) before "ready to switch" is green.
 - **Locations for Waze are looked up at OpenStreetMap first:** the address search of the Waze integration fails at the moment
