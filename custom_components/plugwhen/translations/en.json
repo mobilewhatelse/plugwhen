@@ -35,7 +35,7 @@
     "step": {
       "init": {
         "title": "Connections",
-        "description": "Optional. Plugwhen also works alone. Connect it to what you have: the load forecast of the quarter-hour peak guard (keeps the car's charging under the peak target) and a sensor of the availability interface (when power is cheap or free).",
+        "description": "Optional. Plugwhen also works alone. Connect it to what you have: the load forecast of the quarter-hour peak guard (keeps the car's charging under the peak target) and a sensor of the availability interface (when power is cheap or free).\n\n{waze}",
         "data": {
           "waechter_entry": "Quarter-hour peak guard",
           "load_entity": "Other load forecast",

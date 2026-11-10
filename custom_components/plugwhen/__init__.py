@@ -87,7 +87,7 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
             if entity_id is None:
                 raise ServiceValidationError(f"Entity '{key}' of {sub.title} not found - restart Home Assistant after the update")
             ids[key] = entity_id
-        vehicles.append({"name": sub.data.get("name", sub.title), "ids": ids})
+        vehicles.append({"name": sub.data.get("name", sub.title), "ids": ids, "calendar": sub.data.get("trip_calendar")})
     if not vehicles:
         raise ServiceValidationError("Add a vehicle first (integration page: Add vehicle)")
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency)}

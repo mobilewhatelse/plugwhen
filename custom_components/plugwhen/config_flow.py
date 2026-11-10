@@ -41,6 +41,17 @@ def _opt(key: str, d: dict[str, Any]) -> vol.Optional:
     return vol.Optional(key, description={"suggested_value": d.get(key)})
 
 
+WAZE_HINT = {
+    "de": "Kilometer von Kalender-Fahrten über Waze: dafür einmal die Integration „Waze Travel Time“ hinzufügen (ohne Konto), dann erscheint hier der Schalter.",
+    "en": "Kilometres of calendar trips via Waze: add the integration \u201cWaze Travel Time\u201d once (no account), then the switch appears here.",
+}
+
+
+def waze_ready(hass: HomeAssistant) -> bool:
+    """The Waze travel time integration is set up (its action is there)."""
+    return bool(hass.config_entries.async_entries("waze_travel_time")) and hass.services.has_service("waze_travel_time", "get_travel_times")
+
+
 def find_waechter_entry(hass: HomeAssistant) -> str | None:
     """The config entry of the quarter-hour peak guard if there is exactly one (offered in the settings, nothing is imported)."""
     entries = hass.config_entries.async_entries(WAECHTER_DOMAIN)
@@ -174,8 +185,9 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_EVCC_URL, current): TextSelector(),
             _opt(O_EVCC_PASSWORD, current): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
             vol.Required(O_EVCC_WRITE, default=bool(current.get(O_EVCC_WRITE, False))): BooleanSelector(),
-            vol.Required(O_ROUTE_WAZE, default=bool(current.get(O_ROUTE_WAZE, False))): BooleanSelector(),
-        }))
+            **({vol.Required(O_ROUTE_WAZE, default=bool(current.get(O_ROUTE_WAZE, False))): BooleanSelector()}
+               if waze_ready(self.hass) else {}),
+        }), description_placeholders={"waze": "" if waze_ready(self.hass) else WAZE_HINT.get(self.hass.config.language[:2], WAZE_HINT["en"])})
 
 
 TAKEN_OVER = {

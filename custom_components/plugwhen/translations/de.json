@@ -35,7 +35,7 @@
     "step": {
       "init": {
         "title": "Verbindungen",
-        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
+        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).\n\n{waze}",
         "data": {
           "waechter_entry": "Viertelstunden-Wächter",
           "load_entity": "Andere Last-Prognose",

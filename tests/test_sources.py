@@ -50,5 +50,20 @@ class CardTest(unittest.TestCase):
             self.assertIn(".sources", text)
 
 
+class CalendarCardTest(unittest.TestCase):
+    def test_calendar_view_and_how_to_with_a_calendar(self):
+        ids = {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}
+        text = json.dumps(build_views([{"name": "Car", "ids": ids, "calendar": "calendar.fahrten"}], "de"), ensure_ascii=False)
+        self.assertIn('"type": "calendar"', text)
+        self.assertIn("calendar.fahrten", text)
+        self.assertIn("So tragen Sie eine Fahrt ein", text)
+
+    def test_setup_hint_without_a_calendar(self):
+        ids = {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}
+        text = json.dumps(build_views([{"name": "Car", "ids": ids}], "en"), ensure_ascii=False)
+        self.assertNotIn('"type": "calendar"', text)
+        self.assertIn("Local Calendar", text)
+
+
 if __name__ == "__main__":
     unittest.main()
