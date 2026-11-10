@@ -185,10 +185,15 @@ class Plugwhen:
         for v in self.vehicles.values():
             self._compute(v, now)
         async_dispatcher_send(self.hass, self.signal)
+        acted = False
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
+            before = (v.evcc_write, v.direct_last)
             await self._write_evcc(v, now)
             await self._direct_step(v, now)
+            acted = acted or before != (v.evcc_write, v.direct_last)
+        if acted:   # show at once what was written into evcc or set on the wallbox, not only at the next run
+            async_dispatcher_send(self.hass, self.signal)
 
     async def async_write_evcc_now(self, vehicle: Vehicle) -> None:
         """The mode 'evcc' was chosen: read evcc, write at once (not only at the next run) and show it."""
