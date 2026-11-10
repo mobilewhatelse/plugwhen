@@ -37,6 +37,8 @@ def main():
     if not ok:
         return
     it.wait_for(lambda: it.state("sensor.auto_ladestand") and it.state("sensor.auto_ladestand")["state"] not in ("unknown", "unavailable"), 120)
+    for key in ("vehicle_1", "vehicle_2"):   # the demo evcc keeps running between test runs: start without plans
+        subprocess.run(["curl", "-s", "-m", "5", "-X", "DELETE", f"http://localhost:17070/api/vehicles/{key}/plan/soc"], capture_output=True)
 
     pw, err = it.flow_finish("/api/config/config_entries/flow", {"handler": "plugwhen", "show_advanced_options": False}, {})
     log(pw is not None, "Plugwhen is set up (no guard installed)", err)
@@ -115,7 +117,7 @@ def main():
         demo_plan = ((json.loads(st).get("result", json.loads(st)).get("vehicles") or {}).get("vehicle_1") or {}).get("plan")
     except ValueError:
         demo_plan = "?"
-    log(not demo_plan or (ep or {}).get("current") == demo_plan or not (demo_plan or {}).get("soc"),
+    log(not (demo_plan or {}).get("soc"),
         "evcc's own plan is untouched (Plugwhen only reads)", json.dumps(demo_plan))
 
     # ---------- a calendar with a trip, a stock, and writing plans into evcc ----------

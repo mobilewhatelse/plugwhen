@@ -182,7 +182,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 15, "entities of the vehicle exist", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 16, "entities of the vehicle exist (16 with 'ready to switch')", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
