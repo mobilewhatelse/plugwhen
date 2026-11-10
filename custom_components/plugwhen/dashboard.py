@@ -14,7 +14,7 @@ ENTITY_KEYS = {
     "departure": "sensor", "need_charge": "sensor", "need_range": "sensor", "target_soc": "sensor", "charge_plan": "sensor",
     "readiness": "sensor", "potential": "sensor", "week_plan": "sensor", "reserve_km": "number", "learn_km": "switch",
     "mode": "select", "would_switch": "sensor", "learning_check": "sensor", "habit": "sensor",
-    "notice_enabled": "switch",
+    "notice_enabled": "switch", "switch_ready": "sensor",
 }
 
 TEXT = {
@@ -96,6 +96,11 @@ TEXT = {
         tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
         tr_range="Reichweite bei Abfahrt", tr_err="Kalender nicht lesbar",
         v_overview="Übersicht", v_learning="Lernen", v_details="Details", sun_h="Sonne und gelernte Werte",
+        rd_h="Bereit zum Schalten?", rd_trips="Fahrten gelernt", rd_cmp="Tage mit Vergleich (Lernmodus)", rd_agree="Gleich entschieden",
+        rd_solar="Sonnenprognose geprüft", rd_days="Tage", rd_wd="Wochentage", rd_est="voraussichtlich ab",
+        rd_ready="Bereit: Plugwhen hat oft genug gleich entschieden wie die Wirklichkeit. Die Betriebsart „Direkt“ (Plugwhen schaltet die Wallbox) kann gewählt werden, sobald es sie gibt.",
+        rd_wait="Noch nicht bereit. Bis dahin plant und warnt Plugwhen, und in der Betriebsart „Über evcc“ lädt evcc nach dem Plan.",
+        rd_low="Die Entscheidungen passen noch nicht gut genug zur Wirklichkeit (Reiter Lernen).",
         tr_how="**So tragen Sie eine Fahrt ein:** im Kalender auf den Tag tippen, Titel mit Ziel und Kilometern („Linz 200 km“), "
                "Beginn = Abfahrtszeit. Ohne Kilometer zählt der **Ort** (über Waze, falls eingeschaltet), hin und zurück; „einfach“ im Titel = nur eine Richtung. "
                "Ganztägige Termine zählen nicht.",
@@ -184,6 +189,11 @@ TEXT = {
         tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
         tr_range="range at departure", tr_err="calendar not readable",
         v_overview="Overview", v_learning="Learning", v_details="Details", sun_h="Sun and learned values",
+        rd_h="Ready to switch?", rd_trips="Trips learned", rd_cmp="Days with a comparison (learn mode)", rd_agree="Decided the same",
+        rd_solar="Solar forecast checked", rd_days="days", rd_wd="weekdays", rd_est="expected from",
+        rd_ready="Ready: Plugwhen decided like reality often enough. The mode \u201cdirect\u201d (Plugwhen switches the wallbox) can be chosen as soon as it exists.",
+        rd_wait="Not ready yet. Until then Plugwhen plans and warns, and in the mode \u201cvia evcc\u201d evcc charges by the plan.",
+        rd_low="The decisions do not match reality well enough yet (tab Learning).",
         tr_how="**How to enter a trip:** tap the day in the calendar, title with destination and kilometres (\u201cLinz 200 km\u201d), "
                "start = departure time. Without kilometres the **location** counts (via Waze, if switched on), there and back; \u201cone way\u201d in the title = one direction. "
                "All-day events are ignored.",
@@ -335,6 +345,20 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         + "' if x.one_way else '" + t["tr_km_route"] + "')}.get(x.km_source, '') }}) · " + t["tr_range"] + " {{ x.range_km | round(0) | int }} km"
         "{% else %} · " + t["tr_km_none"] + "{% endif %}\n{% endfor %}{% endif %}"
     )
+    rd = (
+        "{% set a = " + _s(ids["switch_ready"]) + ".attributes %}{% set checks = a.checks or [] %}"
+        "{% macro row(checks, key, label, unit) %}{% set x = checks | selectattr('key', 'eq', key) | list | first %}"
+        "{% if x %}{{ '✅' if x.ok else '⏳' }} {{ label }}: {{ x.value if x.value is not none else '–' }}"
+        "{% if x.need %} / {{ x.need }}{% endif %} {{ unit }}\n\n{% endif %}{% endmacro %}"
+        "{{ row(checks, 'trips', '" + t["rd_trips"] + "', '" + t["rd_wd"] + "') }}"
+        "{{ row(checks, 'compare_days', '" + t["rd_cmp"] + "', '" + t["rd_days"] + "') }}"
+        "{{ row(checks, 'agree', '" + t["rd_agree"] + "', '%') }}"
+        "{{ row(checks, 'solar', '" + t["rd_solar"] + "', '" + t["rd_days"] + "') }}"
+        "{% set cd = checks | selectattr('key', 'eq', 'compare_days') | list | first %}"
+        "{% if states('" + ids["switch_ready"] + "') == 'ready' %}" + t["rd_ready"] + "{% else %}" + t["rd_wait"]
+        + "{% if a.estimate %} " + t["rd_est"] + " **{{ (a.estimate | as_datetime).strftime('%d.%m.') }}**.{% elif cd and cd.ok %} "
+        + t["rd_low"] + "{% endif %}{% endif %}"
+    )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
     overview = [
         {"type": "grid", "cards": [   # what matters now: ready for the next departure?
@@ -345,6 +369,9 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "markdown", "content": status},
             {"type": "heading", "heading": head(t["plan_h"]), "icon": "mdi:calendar-clock"},
             {"type": "markdown", "content": _chart(ids["charge_plan"])},
+            {"type": "heading", "heading": head(t["rd_h"]), "icon": "mdi:clipboard-check-outline"},
+            {"type": "tile", "entity": ids["switch_ready"], "name": t["rd_h"]},
+            {"type": "markdown", "content": rd},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["tr_h"]), "icon": "mdi:calendar-month"},

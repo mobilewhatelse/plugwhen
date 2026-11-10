@@ -35,6 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddC
             LearningCheckSensor(plug, v),
             ChargingHabitSensor(plug, v),
             WeekPlanSensor(plug, v),
+            SwitchReadySensor(plug, v),
         ], config_subentry_id=sub_id)
 
 
@@ -350,3 +351,24 @@ class ChargingHabitSensor(PlugwhenEntity, SensorEntity):
         h = self.vehicle.habit or {"status": "no_data"}
         keys = ("status", "days", "total_kwh", "day_share_pct", "night_share_pct", "weekend_share_pct", "weekdays_night_share_pct")
         return {**{k: h.get(k) for k in keys}, "by_weekday": h.get("weekday"), "chart": chart_habit(h, self.hass.config.language)}
+
+
+class SwitchReadySensor(PlugwhenEntity, SensorEntity):
+    """Ready to switch? `ready` once the learn mode has shown that the decisions match reality (then the mode 'direct' can be
+    offered), else `learning`. Attributes: the checklist and a rough date."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["learning", "ready"]
+    _attr_icon = "mdi:clipboard-check-outline"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "switch_ready")
+
+    @property
+    def native_value(self) -> str:
+        return "ready" if self.plug.switch_ready(self.vehicle, dt_util.now())["ready"] else "learning"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        r = self.plug.switch_ready(self.vehicle, dt_util.now())
+        return {"checks": r["checks"], "estimate": r["estimate"]}

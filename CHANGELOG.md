@@ -11,6 +11,9 @@
   to date; when it is not needed any more it is removed. Only plans Plugwhen wrote itself are changed: a plan set in evcc by hand is never
   touched. The card says whether it is written. Repeating plans are still only proposed.
 - **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, so the car is ready for an unplanned trip.
+- **Ready to switch?** (sensor and card at the top of the overview): a checklist when Plugwhen may switch the wallbox itself (mode
+  "direct", later): trips learned on every weekday the car is used, 7 days with a comparison in learn mode, at least 80 % decided the
+  same as reality, and with a solar plant 5 days of checked solar forecast; with a rough date. One message per car when it is ready.
 - **Dashboard in three tabs:** *Overview* (ready for the next departure, charge plan, planned trips with a calendar view and a short how-to,
   the next departures, plan for evcc), *Learning* (learn mode, does learning help, charging habit, plug-in times), *Details* (potential,
   sun and learned values, where the data comes from, settings). The most important first.

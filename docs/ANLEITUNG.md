@@ -93,6 +93,14 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 - „Höchste Spitze“ ist der schlechteste Monat, die Kosten sind der Durchschnitt der Monate – deshalb passen die zwei Spalten nicht 1:1 zusammen.
 - Eine Schätzung aus Stundenwerten, keine Rechnung.
 
+## Bereit zum Schalten?
+
+Ganz oben in der Übersicht steht je Auto eine Checkliste, wann Plugwhen die Wallbox **selbst** schalten darf (Betriebsart „Direkt“, kommt
+später): Fahrten an jedem genutzten Wochentag gelernt (mindestens 3 Beispiele), **7 Tage mit Vergleich** im Lernmodus (Tage, an denen
+geladen oder pausiert würde), **mindestens 80 % gleich entschieden** wie die Wirklichkeit und, mit Solaranlage, **5 Tage geprüfte
+Sonnenprognose**. Dazu ein ungefähres Datum. Ist alles erfüllt, kommt einmal eine Nachricht. Bis dahin plant und warnt Plugwhen, und in
+der Betriebsart „Über evcc“ lädt evcc nach dem Plan.
+
 ## Fahrten aus dem Kalender, Vorrat
 
 - **Kalender mit Fahrten** (je Auto, optional): Jeder Termin in einem Kalender von Home Assistant (zum Beispiel ein lokaler Kalender

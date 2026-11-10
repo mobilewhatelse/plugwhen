@@ -248,6 +248,13 @@
           "not_reachable": "Not reachable",
           "unknown": "Unknown"
         }
+      },
+      "switch_ready": {
+        "name": "Ready to switch",
+        "state": {
+          "learning": "Still learning",
+          "ready": "Ready"
+        }
       }
     },
     "switch": {

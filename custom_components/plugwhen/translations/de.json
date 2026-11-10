@@ -248,6 +248,13 @@
           "not_reachable": "Nicht erreichbar",
           "unknown": "Unbekannt"
         }
+      },
+      "switch_ready": {
+        "name": "Bereit zum Schalten",
+        "state": {
+          "learning": "Lernt noch",
+          "ready": "Bereit"
+        }
       }
     },
     "switch": {

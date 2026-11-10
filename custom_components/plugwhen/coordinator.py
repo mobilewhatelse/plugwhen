@@ -26,6 +26,7 @@ from dataclasses import replace
 
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle
 from .evcc_plan import decide_write, evcc_plan
+from .readiness import switch_readiness
 from .trips import range_for_trip, trip_km, trips_from_events, waze_region
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
@@ -964,6 +965,30 @@ class Plugwhen:
     async def _maybe_send(self, v: Vehicle, now: datetime) -> None:
         await self._send_ready(v, now)
         await self._send_ahead(v, now)
+        await self._send_switch_ready(v, now)
+
+    def switch_ready(self, v: Vehicle, now: datetime) -> dict[str, Any]:
+        """Checklist: may Plugwhen switch the wallbox itself (mode 'direct', later)? Learned trips, days with a comparison in learn
+        mode, agreement, and with a solar plant the checked solar forecast."""
+        weekdays = []
+        for wd in range(7):
+            p = v.model.plan(wd)
+            weekdays.append({"weekday": wd, "samples": p.samples, "used": (p.drive_share or 0.0) >= MIN_DRIVE_SHARE})
+        summ = v.shadow.summary(now, days=30)
+        solar_days = len(self._solar_acc.days) if (self.entry.options.get(O_SOLAR, True) and self._solar) else None
+        return switch_readiness(weekdays, int(summ.get("days") or 0), summ.get("agree_pct"), solar_days, now)
+
+    async def _send_switch_ready(self, v: Vehicle, now: datetime) -> None:
+        """Once per car: tell that the learn mode is through (the notify services of the car; nothing without them)."""
+        key = "switch_ready"
+        services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
+        if not services or key in self._sent.get(v.sub_id, []) or not self.switch_ready(v, now)["ready"]:
+            return
+        de = (self.hass.config.language or "").lower().startswith("de")
+        title = f"Plugwhen · {v.name}"
+        msg = ("Der Lernmodus ist durch: Plugwhen hat oft genug gleich entschieden wie die Wirklichkeit. Die Betriebsart „Direkt“ kann gewählt werden, sobald es sie gibt."
+               if de else "The learn mode is through: Plugwhen decided like reality often enough. The mode \u201cdirect\u201d can be chosen as soon as it exists.")
+        await self._deliver(v, services, title, msg, key)
 
     async def _deliver(self, v: Vehicle, services: list[str], title: str, message: str, key: str) -> bool:
         sent = self._sent.setdefault(v.sub_id, [])
