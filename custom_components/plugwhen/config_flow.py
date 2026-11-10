@@ -17,7 +17,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
-    O_EVCC_PASSWORD, O_EVCC_URL, V_EVCC_VEHICLE, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
+    O_EVCC_PASSWORD, O_EVCC_URL, O_EVCC_WRITE, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, match_vehicle, parse_vehicles, vehicle_from_evcc
@@ -71,6 +71,8 @@ def _vehicle_fields(d: dict[str, Any]) -> dict[Any, Any]:
         _opt(V_CHARGING, d): _ent(["binary_sensor", "switch", "input_boolean"]),
         _opt(V_WALLBOX_ENERGY, d): _ent("sensor"),
         _opt(V_DEPARTURE, d): _ent(["time", "datetime", "input_datetime", "sensor"]),
+        _opt(V_CALENDAR, d): _ent("calendar"),
+        vol.Required(V_STOCK, default=d.get(V_STOCK, 0)): _num(0, 100, 5, "%"),
         _opt(V_NOTIFY, d): TextSelector(),
         vol.Required(V_NOTIFY_HOUR, default=d.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)): _num(0, 23, 1, "h"),
     })
@@ -171,6 +173,8 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_PRICE_THRESHOLD, current): _num(0, 100, 0.1, "kW"),
             _opt(O_EVCC_URL, current): TextSelector(),
             _opt(O_EVCC_PASSWORD, current): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            vol.Required(O_EVCC_WRITE, default=bool(current.get(O_EVCC_WRITE, False))): BooleanSelector(),
+            vol.Required(O_ROUTE_WAZE, default=bool(current.get(O_ROUTE_WAZE, False))): BooleanSelector(),
         }))
 
 

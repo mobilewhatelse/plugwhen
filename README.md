@@ -94,6 +94,14 @@ above its hourly mean) plus the car in that way of charging. The prices come fro
 year up to the threshold, above it, the threshold; 0 = one price) or, if empty, from the chosen peak guard. **Without any prices
 only kW are shown**; the verdict still works because it depends on kW. It is an estimate from hourly values, not a bill.
 
+## Trips from a calendar, stock
+
+- **Calendar with trips** (per car, optional): every event in a calendar of Home Assistant is a trip. Start = departure. Kilometres written
+  in the title or description ("Linz 200 km") win; otherwise the route from home to the event's location via the **Waze travel time**
+  integration (switch, default off; add the integration once, no account; home and destination go to Waze), there and back unless it says
+  "one way". Range at departure = kilometres plus 15 %, at least the reserve. The trip replaces the learned departure of its day.
+- **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, for unplanned trips.
+
 ## With evcc (optional)
 
 - evcc is **optional** and only **read**, through its address (evcc may run anywhere on the network). The address comes from the
@@ -107,6 +115,8 @@ only kW are shown**; the verdict still works because it depends on kW. It is an 
   learned week (evcc's `repeatingPlans`, equal times and targets grouped), each next to what evcc has now and whether they are the same. Nothing is written yet (learn mode). A plan set in evcc by hand that differs is shown as
   your own plan, which Plugwhen would never overwrite. **Without evcc** Plugwhen will switch the wallbox itself later; in learn mode
   *Would switch* shows what it would do.
+- **Write plans into evcc** (switch, default off): the plan for the first needed departure is written into evcc and kept up to date;
+  only plans Plugwhen wrote itself are changed, a plan set in evcc by hand is never touched.
 - Card **Where the data comes from**: for every value whether it is a sensor, evcc or learned, the evcc connection, and what the car
   was set up with (guard, evcc, by hand).
 - Several cars: each car has its own plan and its own proposal for evcc. Two cars sharing one wallbox are not planned together yet.

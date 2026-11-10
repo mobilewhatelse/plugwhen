@@ -108,8 +108,21 @@ def same_weekly(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> bool:
     return all(da[d][0] == db[d][0] and abs(da[d][1] - db[d][1]) <= SAME_SOC_PCT for d in da)
 
 
+def decide_write(would: dict[str, Any] | None, current: dict[str, Any] | None, last_written: dict[str, Any] | None) -> tuple[str | None, str]:
+    """("set" | "delete" | None, reason). Plugwhen only touches a plan it wrote itself: a plan in evcc that is not the last one Plugwhen
+    wrote is the user's own and is left alone. Nothing is written when evcc already has the same plan."""
+    if current and not same(current, last_written):
+        return None, "own_plan"
+    if would:
+        return (None, "same") if same(would, current) else ("set", "update" if current else "new")
+    if current and same(current, last_written):
+        return "delete", "not_needed_anymore"
+    return None, "nothing"
+
+
 def evcc_plan(state: dict[str, Any] | None, key: str | None, ahead: dict[str, Any] | None, week: list[dict[str, Any]],
-              now: datetime, reason: str = "planned", lasts_until: str | None = None, written: bool = False) -> dict[str, Any] | None:
+              now: datetime, reason: str = "planned", lasts_until: str | None = None, written: bool = False,
+              last_written: dict[str, Any] | None = None, write_enabled: bool = False) -> dict[str, Any] | None:
     """The comparison for the dashboard, or None without an evcc car.
 
     `ahead` = {"departure": datetime, "target_soc": float} for the first departure of the look-ahead that needs charging, or None (then
@@ -129,6 +142,7 @@ def evcc_plan(state: dict[str, Any] | None, key: str | None, ahead: dict[str, An
         reason = "covered"
     cur = current_plan(state, key) if state is not None else None
     match = same(would, cur)
+    mine = bool(cur) and same(cur, last_written)
     weekly = weekly_plans(week)
     weekly_cur = current_weekly(state, key) if state is not None else []
     return {
@@ -138,9 +152,11 @@ def evcc_plan(state: dict[str, Any] | None, key: str | None, ahead: dict[str, An
         "current": cur,
         "evcc_known": state is not None,
         "same": match,
-        "own_plan": bool(cur) and not match,
+        "own_plan": bool(cur) and not match and not mine,
+        "by_plugwhen": mine,
+        "write_enabled": bool(write_enabled),
         "weekly": weekly,
         "weekly_current": weekly_cur,
         "weekly_same": same_weekly(weekly, weekly_cur),
-        "written": bool(written),
+        "written": bool(written) or (mine and match),
     }

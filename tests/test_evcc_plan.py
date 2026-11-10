@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from evcc_plan import current_plan, current_weekly, evcc_plan, hhmm, same, same_weekly, weekly_plans  # noqa: E402
+from evcc_plan import current_plan, current_weekly, decide_write, evcc_plan, hhmm, same, same_weekly, weekly_plans  # noqa: E402
 
 CET = timezone(timedelta(hours=1))
 NOW = datetime(2026, 11, 9, 22, 0, tzinfo=CET)          # Monday evening
@@ -65,6 +65,37 @@ class AheadTest(unittest.TestCase):
         b = evcc_plan(STATE, "golf", {"departure": FRI + timedelta(days=1), "target_soc": 60}, [], NOW)
         self.assertEqual((a["would_write"]["soc"], b["would_write"]["soc"]), (50, 60))
         self.assertIsNone(b["current"])
+
+
+class WriteTest(unittest.TestCase):
+    P = {"soc": 34, "time": "2026-11-13T07:00:00+01:00"}
+    OWN = {"soc": 80, "time": "2026-11-10T07:00:00+01:00"}
+
+    def test_never_touches_the_users_own_plan(self):
+        self.assertEqual(decide_write(self.P, self.OWN, None), (None, "own_plan"))
+        self.assertEqual(decide_write(None, self.OWN, self.P), (None, "own_plan"))
+
+    def test_writes_when_evcc_has_no_plan(self):
+        self.assertEqual(decide_write(self.P, None, None), ("set", "new"))
+
+    def test_updates_its_own_plan(self):
+        newer = {"soc": 40, "time": self.P["time"]}
+        self.assertEqual(decide_write(newer, self.P, self.P), ("set", "update"))
+
+    def test_same_plan_is_not_written_again(self):
+        self.assertEqual(decide_write(self.P, self.P, self.P), (None, "same"))
+
+    def test_deletes_its_own_plan_when_not_needed(self):
+        self.assertEqual(decide_write(None, self.P, self.P), ("delete", "not_needed_anymore"))
+        self.assertEqual(decide_write(None, None, self.P), (None, "nothing"))
+
+    def test_marks_its_own_plan(self):
+        out = evcc_plan({"vehicles": {"x": {"plan": self.P}}}, "x", {"departure": FRI, "target_soc": 34}, [], NOW,
+                        last_written=self.P, write_enabled=True)
+        self.assertTrue(out["by_plugwhen"])
+        self.assertFalse(out["own_plan"])
+        self.assertTrue(out["written"])
+        self.assertTrue(out["write_enabled"])
 
 
 class WeeklyTest(unittest.TestCase):

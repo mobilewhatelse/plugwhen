@@ -124,7 +124,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
     """The charging plan until the next departure. The attributes are the interface other integrations read
     (for example the quarter-hour peak guard): `windows`, `needed_kwh`, `planned_kwh`, `departure`, `target_soc`, `executed`."""
 
-    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart", "evcc_plan"})
+    _unrecorded_attributes = frozenset({"windows", "chart", "horizon", "horizon_chart", "sun_chart", "evcc_plan", "trips"})
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = PLAN_STATES
     _attr_icon = "mdi:calendar-clock"
@@ -147,6 +147,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "needed_kwh": p.get("needed_kwh"), "planned_kwh": p.get("planned_kwh"),
             "available_kwh": p.get("available_kwh"), "grid_kwh": p.get("grid_kwh"), "shortfall_kwh": p.get("shortfall_kwh"),
             "departure": iso(v.departure), "departure_source": v.departure_source,
+            "trip_calendar": v.cfg.get("trip_calendar"), "trips": v.trips, "trips_error": v.trips_error,
             # Plugwhen does not switch the wallbox (modes off and learn): readers must not take the plan as what the car will do.
             # Becomes True with a mode that executes the plan.
             "executed": False,
@@ -171,8 +172,10 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
         if not v.cfg.get("evcc_vehicle"):
             return None
         now = dt_util.now()
-        ahead, week, reason, lasts = self.plug.evcc_plan_inputs(v, now)
-        return evcc_plan(self.plug.evcc_state, v.cfg["evcc_vehicle"], ahead, week, now, reason, lasts)
+        out = self.plug.evcc_plan_for(v, now)
+        if out is not None:
+            out["last_write"] = v.evcc_write
+        return out
 
 
 class ReadinessSensor(PlugwhenEntity, SensorEntity):

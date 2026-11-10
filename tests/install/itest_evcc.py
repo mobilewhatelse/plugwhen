@@ -118,6 +118,63 @@ def main():
     log(not demo_plan or (ep or {}).get("current") == demo_plan or not (demo_plan or {}).get("soc"),
         "evcc's own plan is untouched (Plugwhen only reads)", json.dumps(demo_plan))
 
+    # ---------- a calendar with a trip, a stock, and writing plans into evcc ----------
+    def evcc_vehicle(key):
+        out = subprocess.run(["curl", "-s", "-m", "5", "http://localhost:17070/api/state"], capture_output=True, text=True).stdout
+        try:
+            d = json.loads(out)
+            return ((d.get("result", d).get("vehicles") or {}).get(key) or {})
+        except ValueError:
+            return {}
+
+    cal, err = it.flow_finish("/api/config/config_entries/flow", {"handler": "local_calendar", "show_advanced_options": False}, {"calendar_name": "Fahrten"})
+    log(cal is not None, "a local calendar 'Fahrten' is set up", err)
+    tomorrow = time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400))
+    it.svc("calendar", "create_event", {"entity_id": "calendar.fahrten", "summary": "Linz 200 km", "location": "Linz",
+                                         "start_date_time": f"{tomorrow} 05:00:00", "end_date_time": f"{tomorrow} 18:00:00"})
+    car2 = {"name": "Kalenderauto", "odometer_entity": "sensor.auto_kilometerstand", "soc_entity": "sensor.auto_ladestand", "capacity_kwh": 80,
+            "reserve_km": 100, "consumption_kwh_100": 20, "charge_kw_max": 11, "charge_kw_min": 4.1, "evcc_vehicle": "vehicle_2",
+            "trip_calendar": "calendar.fahrten", "stock_soc": 60}
+    s, d = it.api("POST", "/api/config/config_entries/subentries/flow", {"handler": [pw_id, "vehicle"]})
+    s, d = it.api("POST", f"/api/config/config_entries/subentries/flow/{d['flow_id']}", car2)
+    log(s == 200 and d.get("type") == "create_entry", "a second car with the calendar and a stock of 60 % is added", f"{d.get('type')} {d.get('errors')}")
+    pa = {}
+
+    def trip_seen():
+        nonlocal pa
+        pa = ((it.state("sensor.kalenderauto_charge_plan") or {}).get("attributes") or {})
+        return bool(pa.get("trips"))
+    ok = it.wait_for(trip_seen, 240, step=10)
+    tr = (pa.get("trips") or [{}])[0]
+    log(bool(ok) and tr.get("km") == 200.0 and tr.get("km_source") == "event" and tr.get("range_km") == 230.0 and pa.get("departure_source") == "calendar",
+        "the calendar trip is the departure: 200 km from the title, range 230 km", json.dumps({k: tr.get(k) for k in ("title", "km", "km_source", "range_km")}) + f" {pa.get('departure_source')}")
+    need2 = ((it.state("sensor.kalenderauto_energy_to_charge") or {}).get("attributes") or {})
+    log((need2.get("target_soc") or 0) >= 60, "the stock of 60 % is the lowest target", str(need2.get("target_soc")))
+
+    # an own plan in evcc for the first car must never be touched; the second car gets Plugwhen's plan
+    own_t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 3 * 86400))
+    subprocess.run(["curl", "-s", "-m", "5", "-X", "POST", f"http://localhost:17070/api/vehicles/vehicle_1/plan/soc/90/{own_t}"], capture_output=True)
+    own_before = evcc_vehicle("vehicle_1").get("plan")
+    s, d = it.api("POST", "/api/config/config_entries/options/flow", {"handler": pw_id})
+    s, d = it.api("POST", f"/api/config/config_entries/options/flow/{d['flow_id']}", {"use_solar_forecast": True, "evcc_url": EVCC, "evcc_write_plans": True})
+    log(s == 200 and d.get("type") == "create_entry", "writing plans into evcc is switched on", f"{d.get('type')} {d.get('errors')}")
+    it.api("POST", f"/api/config/config_entries/entry/{pw_id}/reload")
+    written = {}
+
+    def plan_written():
+        nonlocal written
+        written = evcc_vehicle("vehicle_2").get("plan") or {}
+        return bool(written.get("soc"))
+    ok = it.wait_for(plan_written, 240, step=10)
+    ep2 = ((it.state("sensor.kalenderauto_charge_plan") or {}).get("attributes") or {}).get("evcc_plan") or {}
+    want = ep2.get("would_write") or {}
+    log(bool(ok) and int(written.get("soc", 0)) == int(want.get("soc", -1)) and ep2.get("by_plugwhen") is True,
+        "Plugwhen wrote its plan into evcc for the second car (target and time as proposed)", json.dumps({"evcc": written, "proposal": want}))
+    own_after = evcc_vehicle("vehicle_1").get("plan")
+    ep1 = ((it.state("sensor.blue_e_golf_charge_plan") or {}).get("attributes") or {}).get("evcc_plan") or {}
+    log(bool(own_before) and own_after == own_before and ep1.get("own_plan") is True,
+        "the own plan in evcc of the first car is left alone", json.dumps({"before": own_before, "after": own_after}))
+
     logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of Plugwhen in the log", "; ".join(errs[:3]))

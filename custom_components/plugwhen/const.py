@@ -19,6 +19,8 @@ O_SOLAR_DEDUCT = "solar_deduct_kw"        # kW taken off the solar forecast firs
 DEFAULT_SOLAR_DEDUCT = 0.5
 SOLAR_REFRESH = timedelta(minutes=15)
 O_EVCC_URL = "evcc_url"                    # optional: address of evcc (anywhere on the network); empty = the guard's address
+O_EVCC_WRITE = "evcc_write_plans"         # write the plan for the next needed departure into evcc (default off; only plans Plugwhen wrote itself are changed)
+O_ROUTE_WAZE = "route_waze"                # kilometres of calendar trips from the Waze travel time integration (sends home and destination to Waze)
 O_EVCC_PASSWORD = "evcc_password"          # optional: only if evcc asks for one
 O_GRID_ENERGY = "grid_energy_entity"       # grid import energy counter (for the potential calculator); taken from the guard if chosen
 O_PRICE_LOW = "price_low"                  # demand charge per kW and year (up to the threshold); taken from the guard if empty
@@ -43,6 +45,8 @@ V_CHARGE_PREF = "charge_kw_pref"          # preferred lowest power: spread no fl
 DEFAULT_CHARGE_PREF = 4.0
 CALIBRATE_INTERVAL = timedelta(hours=24)  # learn the house-specific numbers again (quarter add, base load, solar accuracy)
 V_NOTIFY = "notify_service"               # optional: e.g. notify.mobile_app_phone
+V_CALENDAR = "trip_calendar"               # optional: calendar whose events are trips of this car (start = departure, km in the title or from the location)
+V_STOCK = "stock_soc"                      # optional: never plan below this state of charge (a stock for unplanned trips), 0 = off
 V_EVCC_VEHICLE = "evcc_vehicle"            # optional: the car's name in evcc (plugged in / charging when no sensor is set)
 V_NOTIFY_HOUR = "notify_hour"             # the warning is sent from this hour of the evening on
 

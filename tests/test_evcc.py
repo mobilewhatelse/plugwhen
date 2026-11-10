@@ -131,6 +131,15 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(s.calls[1][3], {"password": "pw"})
         self.assertEqual(s.calls[2][2], {"Cookie": "auth=abc"})
 
+    def test_writes_and_deletes_a_plan(self):
+        from datetime import datetime, timezone, timedelta
+        s = _Session([_Resp(200, ""), _Resp(200, "")])
+        c = EvccClient(s, "http://evcc")
+        self.run_(c.set_plan("db:3", 34, datetime(2026, 11, 13, 7, 0, tzinfo=timezone(timedelta(hours=1)))))
+        self.run_(c.delete_plan("db:3"))
+        self.assertEqual(s.calls[0][:2], ("POST", "http://evcc/api/vehicles/db%3A3/plan/soc/34/2026-11-13T06:00:00Z"))
+        self.assertEqual(s.calls[1][:2], ("DELETE", "http://evcc/api/vehicles/db%3A3/plan/soc"))
+
     def test_errors(self):
         with self.assertRaises(EvccAuthError):
             self.run_(EvccClient(_Session([_Resp(401, "no")]), "http://evcc").state())

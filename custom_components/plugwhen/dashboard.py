@@ -90,6 +90,11 @@ TEXT = {
         ep_r_covered="Ladung reicht bis", ep_r_covered_all="Ladung reicht für alle gelernten Abfahrten", ep_next="nächste nötige Ladung",
         ep_week="Wochenpläne (Vorschlag)", ep_week_now="Wochenpläne in evcc", ep_week_none="noch zu wenig gelernt", ep_week_same="gleich wie in evcc",
         ep_follow="Der Plan wird laufend angepasst (mehr Kilometer, Sonne, nächste Abfahrt).",
+        ep_written="In evcc geschrieben.", ep_write_off="Schreiben ist aus (Einstellungen: „Pläne in evcc schreiben“).",
+        ep_write_err="Schreiben fehlgeschlagen", ep_mine="von Plugwhen geschrieben",
+        tr_h="Eingetragene Fahrten", tr_none="Keine Fahrten im Kalender.", tr_nocal="Kein Kalender eingetragen. Fahrten können Sie in einem Kalender von Home Assistant eintragen (Titel z. B. „Linz 200 km“).",
+        tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
+        tr_range="Reichweite bei Abfahrt", tr_err="Kalender nicht lesbar",
         wd="['Mo','Di','Mi','Do','Fr','Sa','So']", day="Tag", samples="Tage", km_typ="typisch km", km_high="hoch km", drives="fährt",
         dep="Abfahrt", home="zu Hause geladen",
         week_note="Grundlage: die letzten 8 Tage je Wochentag aus der Langzeitstatistik. „hoch“ = 80. Perzentil.",
@@ -167,6 +172,11 @@ TEXT = {
         ep_r_covered="charge lasts until", ep_r_covered_all="charge lasts for all learned departures", ep_next="next charging needed",
         ep_week="Repeating plans (proposal)", ep_week_now="Repeating plans in evcc", ep_week_none="too little learned yet", ep_week_same="same as in evcc",
         ep_follow="The plan follows what happens (more kilometres, sun, the next departure).",
+        ep_written="Written into evcc.", ep_write_off="Writing is off (settings: \u201cWrite plans into evcc\u201d).",
+        ep_write_err="Writing failed", ep_mine="written by Plugwhen",
+        tr_h="Planned trips", tr_none="No trips in the calendar.", tr_nocal="No calendar set. Trips can be entered in a calendar of Home Assistant (title e.g. \u201cLinz 200 km\u201d).",
+        tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
+        tr_range="range at departure", tr_err="calendar not readable",
         wd="['Mon','Tue','Wed','Thu','Fri','Sat','Sun']", day="Day", samples="days", km_typ="typical km", km_high="high km", drives="drives",
         dep="Departure", home="charged at home",
         week_note="Based on the last 8 days per weekday from the long-term statistics. \"high\" = 80th percentile.",
@@ -293,12 +303,24 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "**" + t["ep_now"] + ":** {% if e.current %}{% set c = e.current.time | as_datetime | as_local %}"
         "{{ e.current.soc }} % " + t["ep_until"] + " {{ wd[c.weekday()] }} {{ c.strftime('%H:%M') }}"
         "{% elif e.evcc_known %}" + t["ep_none"] + "{% else %}" + t["ep_unreach"] + "{% endif %}"
-        "{% if e.same %} · " + t["ep_same"] + "{% elif e.own_plan %} · " + t["ep_own"] + "{% endif %}\n\n"
+        "{% if e.by_plugwhen %} · " + t["ep_mine"] + "{% elif e.same %} · " + t["ep_same"] + "{% elif e.own_plan %} · " + t["ep_own"] + "{% endif %}\n\n"
         "**" + t["ep_week"] + ":** {% if e.weekly %}" + week_tpl.replace("@LIST@", "e.weekly") + "{% else %}" + t["ep_week_none"] + "{% endif %}\n\n"
         "{% if e.evcc_known %}**" + t["ep_week_now"] + ":** {% if e.weekly_current %}" + week_tpl.replace("@LIST@", "e.weekly_current")
         + "{% else %}" + t["ep_none"] + "{% endif %}{% if e.weekly_same %} · " + t["ep_week_same"] + "{% endif %}\n\n{% endif %}"
-        "{% if not e.written %}_" + t["ep_not_written"] + " " + t["ep_follow"] + "_{% endif %}"
+        "{% if e.last_write and e.last_write.error %}**" + t["ep_write_err"] + ":** {{ e.last_write.error }}\n\n{% endif %}"
+        "{% if e.written %}_" + t["ep_written"] + " " + t["ep_follow"] + "_{% elif e.write_enabled %}_" + t["ep_follow"] + "_"
+        "{% else %}_" + t["ep_not_written"] + " " + t["ep_write_off"] + "_{% endif %}"
         "{% else %}" + t["ep_no_evcc"] + "{% endif %}"
+    )
+    trips_md = (
+        "{% set wd = " + t["wd"] + " %}{% set a = " + _s(ids["charge_plan"]) + ".attributes %}"
+        "{% if not a.trip_calendar %}" + t["tr_nocal"] + "{% elif a.trips_error %}" + t["tr_err"] + ": {{ a.trips_error }}"
+        "{% elif not a.trips %}" + t["tr_none"] + "{% else %}"
+        "{% for x in a.trips[:6] %}{% set d = x.departure | as_datetime | as_local %}"
+        "- **{{ wd[d.weekday()] }} {{ d.strftime('%d.%m. %H:%M') }}** {{ x.title }}"
+        "{% if x.km %} · {{ x.km | round(0) | int }} km ({{ {'event': '" + t["tr_km_event"] + "', 'route': ('" + t["tr_km_route1"]
+        + "' if x.one_way else '" + t["tr_km_route"] + "')}.get(x.km_source, '') }}) · " + t["tr_range"] + " {{ x.range_km | round(0) | int }} km"
+        "{% else %} · " + t["tr_km_none"] + "{% endif %}\n{% endfor %}{% endif %}"
     )
     head = (lambda h: f"{name} · {h}") if multi else (lambda h: h)
     return [
@@ -330,6 +352,10 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "tile", "entity": hb_id, "name": t["hb_tile"]},
             {"type": "markdown", "content": _chart(hb_id)},
             {"type": "markdown", "content": habit_line},
+        ]},
+        {"type": "grid", "cards": [
+            {"type": "heading", "heading": head(t["tr_h"]), "icon": "mdi:calendar-month"},
+            {"type": "markdown", "content": trips_md},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["ep_h"]), "icon": "mdi:calendar-sync"},

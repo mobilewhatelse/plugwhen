@@ -47,7 +47,9 @@
           "price_high": "Leistungspreis über der Schwelle",
           "price_threshold": "Schwelle",
           "evcc_url": "Adresse von evcc (optional)",
-          "evcc_password": "Passwort von evcc"
+          "evcc_password": "Passwort von evcc",
+          "evcc_write_plans": "Pläne in evcc schreiben",
+          "route_waze": "Kilometer von Kalender-Fahrten über Waze"
         },
         "data_description": {
           "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
@@ -60,7 +62,9 @@
           "price_high": "Preis je kW und Jahr über der Schwelle. Leer: derselbe Preis.",
           "price_threshold": "kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
           "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt (leer = Adresse aus dem Wächter). evcc kann irgendwo im Netz laufen, z. B. http://192.168.1.20:7070. Ein evcc auf diesem Rechner wird vorgeschlagen.",
-          "evcc_password": "Nur wenn evcc eines verlangt."
+          "evcc_password": "Nur wenn evcc eines verlangt.",
+          "evcc_write_plans": "Schreibt den Plan für die nächste Abfahrt, für die geladen werden muss, in evcc und hält ihn aktuell (evcc lädt dann). Geändert werden nur Pläne, die Plugwhen selbst geschrieben hat; einen Plan, den Sie in evcc gesetzt haben, überschreibt es nie. Standard aus.",
+          "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen; Zuhause und Ziel gehen an Waze). Im Termin eingetragene Kilometer gelten immer zuerst."
         }
       }
     }
@@ -93,7 +97,9 @@
             "departure_entity": "Abfahrt (optional)",
             "notify_service": "Benachrichtigungsdienst (optional)",
             "notify_hour": "Warnen ab Uhrzeit",
-            "evcc_vehicle": "Fahrzeug in evcc (optional)"
+            "evcc_vehicle": "Fahrzeug in evcc (optional)",
+            "trip_calendar": "Kalender mit Fahrten (optional)",
+            "stock_soc": "Vorrat (Mindest-Ladestand)"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -111,7 +117,9 @@
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
-            "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos."
+            "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
+            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
           }
         },
         "reconfigure": {
@@ -134,7 +142,9 @@
             "departure_entity": "Abfahrt (optional)",
             "notify_service": "Benachrichtigungsdienst (optional)",
             "notify_hour": "Warnen ab Uhrzeit",
-            "evcc_vehicle": "Fahrzeug in evcc (optional)"
+            "evcc_vehicle": "Fahrzeug in evcc (optional)",
+            "trip_calendar": "Kalender mit Fahrten (optional)",
+            "stock_soc": "Vorrat (Mindest-Ladestand)"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -152,7 +162,9 @@
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
-            "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos."
+            "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
+            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
           }
         }
       },

@@ -93,6 +93,18 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 - „Höchste Spitze“ ist der schlechteste Monat, die Kosten sind der Durchschnitt der Monate – deshalb passen die zwei Spalten nicht 1:1 zusammen.
 - Eine Schätzung aus Stundenwerten, keine Rechnung.
 
+## Fahrten aus dem Kalender, Vorrat
+
+- **Kalender mit Fahrten** (je Auto, optional): Jeder Termin in einem Kalender von Home Assistant (zum Beispiel ein lokaler Kalender
+  „Fahrten“ oder ein eingebundener Google-/Outlook-Kalender) ist eine Fahrt. Beginn = Abfahrt. **Kilometer** stehen im Titel oder in der
+  Beschreibung („Linz 200 km“) und gelten zuerst; sonst rechnet Plugwhen die Strecke von zu Hause zum **Ort** des Termins über die
+  Integration **Waze Travel Time** (Schalter in den Einstellungen, Standard aus; die Integration einmal hinzufügen, ohne Konto; Zuhause und
+  Ziel gehen an Waze), hin und zurück, außer im Termin steht „einfach“. Reichweite bei Abfahrt = Kilometer plus 15 %, mindestens die
+  Reserve. Die Fahrt ersetzt die gelernte Abfahrt dieses Tages, im Plan und in der Vorausschau. Ganztägige Termine zählen nicht.
+  Karte **„Eingetragene Fahrten“**.
+- **Vorrat** (je Auto, Mindest-Ladestand, Standard 0 = aus): Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt
+  bereit ist.
+
 ## Mit evcc
 
 - evcc ist **optional** und wird nur **gelesen** (über seine Adresse, evcc kann irgendwo im Netz laufen). Die Adresse kommt aus dem Wächter
@@ -107,6 +119,9 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
   was in evcc gerade eingestellt ist.
   Es wird noch nichts geschrieben (Lernmodus). Ein in evcc selbst gesetzter Plan würde nie überschrieben. **Ohne evcc** schaltet Plugwhen
   die Wallbox später selbst; im Lernmodus zeigt „Würde schalten“, was es täte.
+- **Pläne in evcc schreiben** (Schalter, Standard aus): Plugwhen schreibt den Plan für die erste nötige Abfahrt in evcc und hält ihn aktuell
+  (evcc lädt dann); wird er nicht mehr gebraucht, wird er entfernt. Geändert werden **nur Pläne, die Plugwhen selbst geschrieben hat**,
+  einen in evcc selbst gesetzten Plan fasst es nie an. Wochenpläne werden vorerst nur vorgeschlagen.
 - Karte **„Woher die Daten kommen“**: für jeden Wert, ob er von einem Sensor, aus evcc oder gelernt ist.
 
 ## Zusammen mit dem Viertelstunden-Wächter

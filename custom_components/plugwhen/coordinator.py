@@ -18,11 +18,15 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_MODE, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
-    O_EVCC_PASSWORD, O_EVCC_URL, V_EVCC_VEHICLE, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    O_EVCC_PASSWORD, O_EVCC_URL, O_EVCC_WRITE, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
 )
+from dataclasses import replace
+
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle
+from .evcc_plan import decide_write, evcc_plan
+from .trips import range_for_trip, trip_km, trips_from_events, waze_region
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
 from .habit import charging_habit
@@ -45,6 +49,7 @@ _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
 LOOKAHEAD_DAYS = 7
 HORIZON_DAYS = 14             # days looked at for the look-ahead (as far as possible: with normal behaviour, when is charging needed?)
 HORIZON_TRIPS = 10            # departures in the look-ahead
+TRIPS_REFRESH = timedelta(minutes=15)   # the calendar is read this often
 MIN_DRIVE_SHARE = 0.5        # a weekday counts as a day of departure if the car is used on at least half of its days
 SENT_KEEP = 8                # warnings remembered per vehicle (so that a restart does not repeat them)
 
@@ -89,6 +94,10 @@ class Vehicle:
     decision: Decision | None = None         # what would be switched now (learn mode)
     shadow: ShadowLog = field(default_factory=ShadowLog)
     evcc_live: dict | None = None            # plugged in / charging of this car at its evcc loadpoint (None = not known)
+    trips: list = field(default_factory=list)   # trips from the car's calendar: departure, title, location, km, km_source, range_km
+    trips_at: datetime | None = None
+    trips_error: str | None = None
+    evcc_write: dict | None = None           # last write into evcc: {at, action, reason, error}
 
 
 class Plugwhen:
@@ -105,6 +114,9 @@ class Plugwhen:
         self._plug_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.plugs")
         self._shadow_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.shadow")
         self._calib_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.calib")
+        self._evcc_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.evcc")   # the plans Plugwhen wrote into evcc
+        self._written: dict[str, dict] = {}
+        self._routes: dict[str, dict] = {}   # destination -> {"km", "at"} from the route service (one way)
         self._calib: dict[str, Any] = {"quarter_add_kw": None, "base_load_kw": None, "at": None}
         self._calib_at: datetime | None = None
         self._solar_acc = SolarAccuracy()
@@ -123,6 +135,9 @@ class Plugwhen:
 
     async def async_start(self) -> None:
         self._sent = (await self._store.async_load() or {}).get("sent", {})
+        ev = await self._evcc_store.async_load() or {}
+        self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
+        self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
         calib = await self._calib_store.async_load() or {}
@@ -165,6 +180,7 @@ class Plugwhen:
         async_dispatcher_send(self.hass, self.signal)
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
+            await self._write_evcc(v, now)
 
     async def async_recompute(self, vehicle: Vehicle) -> None:
         """A setting of the vehicle changed (reserve, switch): compute again and tell the entities."""
@@ -184,6 +200,9 @@ class Plugwhen:
             self.entry.async_create_background_task(self.hass, self._calibrate(now), f"{DOMAIN} calibrate")
         await self._refresh_evcc(now)
         for v in self.vehicles.values():
+            if v.cfg.get(V_CALENDAR) and (v.trips_at is None or now - v.trips_at >= TRIPS_REFRESH):
+                await self._refresh_trips(v, now)
+        for v in self.vehicles.values():
             if v.history_at is None or now - v.history_at >= HISTORY_INTERVAL:
                 await self._load_history(v, now)
             self._compute(v, now)
@@ -200,13 +219,130 @@ class Plugwhen:
         """(url, password, source) of evcc: Plugwhen's own setting, else the guard's, else None."""
         return evcc_connection(self.entry.options.get(O_EVCC_URL), self.entry.options.get(O_EVCC_PASSWORD), self._waechter_cfg())
 
+    # ---------- trips from a calendar (optional) ----------
+
+    async def _refresh_trips(self, v: Vehicle, now: datetime) -> None:
+        """Read the car's calendar for the next 14 days. Kilometres: written in the event, else (if switched on) the route to the location
+        from the Waze travel time integration, cached per destination. A failure keeps the last trips."""
+        v.trips_at = now
+        cal = v.cfg.get(V_CALENDAR)
+        try:
+            resp = await self.hass.services.async_call("calendar", "get_events", {"entity_id": cal, "start_date_time": now,
+                                                       "end_date_time": now + timedelta(days=14)}, blocking=True, return_response=True)
+            events = ((resp or {}).get(cal) or {}).get("events", [])
+        except Exception as err:  # noqa: BLE001 - optional: without the calendar Plugwhen plans as before
+            v.trips_error = str(err)[:120]
+            _LOGGER.debug("Plugwhen: calendar %s not readable: %s", cal, err)
+            return
+        v.trips_error = None
+        out = []
+        for t in trips_from_events(events, now):
+            route = await self._route_km(t.get("location"), now) if not t.get("km_given") else None
+            km, src = trip_km(t, route)
+            out.append({**t, "departure": t["departure"].isoformat(), "km": km, "km_source": src,
+                        "range_km": range_for_trip(km, v.reserve_km) if km else None})
+        v.trips = out
+
+    async def _route_km(self, location: str | None, now: datetime) -> float | None:
+        """One-way kilometres from home to `location` (Waze travel time, only if switched on and installed); cached for a week."""
+        if not location or not self.entry.options.get(O_ROUTE_WAZE):
+            return None
+        hit = self._routes.get(location)
+        if hit and hit.get("at") and now - datetime.fromisoformat(hit["at"]) < timedelta(days=7):
+            return hit.get("km")
+        if not self.hass.services.has_service("waze_travel_time", "get_travel_times"):
+            return None
+        try:
+            resp = await self.hass.services.async_call("waze_travel_time", "get_travel_times", {
+                "origin": "zone.home", "destination": location, "region": waze_region(self.hass.config.country)},
+                blocking=True, return_response=True)
+            routes = (resp or {}).get("routes") or []
+            km = round(min(float(r["distance"]) for r in routes if r.get("distance")), 1) if routes else None
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Plugwhen: route to %s not found: %s", location, err)
+            return None
+        if km:
+            self._routes[location] = {"km": km, "at": now.isoformat()}
+            self._evcc_store.async_delay_save(self._evcc_data, 10)
+        return km
+
+    def _evcc_data(self) -> dict[str, Any]:
+        return {"written": self._written, "routes": self._routes}
+
+    def _trip_at(self, v: Vehicle, dep: datetime | None) -> dict[str, Any] | None:
+        """The calendar trip departing at `dep` (same minute), if any."""
+        if dep is None:
+            return None
+        for t in v.trips:
+            d = dt_util.parse_datetime(t["departure"])
+            if d is not None and abs((d - dep).total_seconds()) < 60:
+                return t
+        return None
+
+    def _next_trip(self, v: Vehicle, now: datetime) -> dict[str, Any] | None:
+        for t in v.trips:
+            d = dt_util.parse_datetime(t["departure"])
+            if d is not None and d > now:
+                return t
+        return None
+
+    def _plan_for(self, v: Vehicle, dep: datetime | None, weekday: int) -> WeekdayPlan:
+        """The weekday's learned plan; for a calendar trip with kilometres the trip decides the range."""
+        p = v.model.plan(weekday)
+        t = self._trip_at(v, dep)
+        if t and t.get("range_km"):
+            p = replace(p, km_typical=t["km"], km_high=t["range_km"], samples=max(p.samples, MIN_SAMPLES), home_charge_share=None)
+        return p
+
+    def _min_soc(self, v: Vehicle) -> float:
+        """Never plan below this: the stock for unplanned trips (setting), at least 20 %."""
+        return max(20.0, float(v.cfg.get(V_STOCK) or 0.0))
+
+    def evcc_plan_for(self, v: Vehicle, now: datetime) -> dict[str, Any] | None:
+        if not v.cfg.get(V_EVCC_VEHICLE):
+            return None
+        ahead, week, reason, lasts = self.evcc_plan_inputs(v, now)
+        key = v.cfg[V_EVCC_VEHICLE]
+        return evcc_plan(self.evcc_state, key, ahead, week, now, reason, lasts, last_written=self._written.get(key),
+                         write_enabled=bool(self.entry.options.get(O_EVCC_WRITE)))
+
+    async def _write_evcc(self, v: Vehicle, now: datetime) -> None:
+        """Write the plan for the next needed departure into evcc (only when switched on, only plans Plugwhen wrote itself)."""
+        key = v.cfg.get(V_EVCC_VEHICLE)
+        conn = self.evcc_connection()
+        if not key or not self.entry.options.get(O_EVCC_WRITE) or conn is None or self.evcc_state is None:
+            return
+        plan = self.evcc_plan_for(v, now) or {}
+        action, why = decide_write(plan.get("would_write"), plan.get("current"), self._written.get(key))
+        if action is None:
+            return
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        client = EvccClient(async_get_clientsession(self.hass), conn[0], conn[1])
+        try:
+            if action == "set":
+                w = plan["would_write"]
+                await client.set_plan(key, int(w["soc"]), dt_util.parse_datetime(w["time"]))
+                self._written[key] = dict(w)
+            else:
+                await client.delete_plan(key)
+                self._written.pop(key, None)
+            v.evcc_write = {"at": now.isoformat(), "action": action, "reason": why, "error": None}
+            self.evcc_state = await client.state()   # show what evcc has now
+        except EvccError as err:
+            v.evcc_write = {"at": now.isoformat(), "action": action, "reason": why, "error": str(err)[:120]}
+            _LOGGER.warning("Plugwhen: plan of %s not written into evcc: %s", v.name, err)
+        self._evcc_store.async_delay_save(self._evcc_data, 5)
+
     def evcc_plan_inputs(self, v: Vehicle, now: datetime) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str, str | None]:
         """For the card "Plan for evcc": (first needed departure with its target, learned week, reason, lasts until).
         The target of a departure is the one Plugwhen plans for that weekday (reserve or learned kilometres)."""
         capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
 
-        def target(weekday: int) -> float:
-            return compute_need(v.model.plan(weekday), v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km).target_soc
+        def target(weekday: int, dep: datetime | None = None) -> float:
+            cal = self._trip_at(v, dep) is not None
+            return compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
+                                learn_km=v.learn_km or cal, min_soc=self._min_soc(v)).target_soc
 
         week = []
         for wd in range(7):
@@ -226,7 +362,7 @@ class Plugwhen:
         dep = dt_util.parse_datetime(str(fn.get("departure") or ""))
         if dep is None:
             return None, week, "no_departure", None
-        return {"departure": dep, "target_soc": target(dt_util.as_local(dep).weekday())}, week, "planned", None
+        return {"departure": dep, "target_soc": target(dt_util.as_local(dep).weekday(), dep)}, week, "planned", None
 
     async def _refresh_evcc(self, now: datetime) -> None:
         """Read evcc's state once per run, only if a vehicle names its evcc car. A failure leaves the cars as without evcc."""
@@ -351,9 +487,18 @@ class Plugwhen:
         if eid:
             st = self._state(eid)
             dep = departure_from_state(st.state, now) if st is not None else None
-            if dep is not None:
+            trip = self._next_trip(v, now)
+            tdep = dt_util.parse_datetime(trip["departure"]) if trip else None
+            if dep is not None and (tdep is None or dep <= tdep):
                 return dep, "entity"
+            if tdep is not None:
+                return tdep, "calendar"
         dep = self._learned_departure(v, now)
+        trip = self._next_trip(v, now)
+        if trip is not None:   # a trip in the calendar before the learned departure comes first
+            tdep = dt_util.parse_datetime(trip["departure"])
+            if tdep is not None and (dep is None or tdep <= dep + timedelta(minutes=1) or tdep.date() == dep.date()):
+                return tdep, "calendar"
         return dep, ("learned" if dep is not None else None)
 
     # ---------- potential calculator ----------
@@ -727,12 +872,12 @@ class Plugwhen:
             v.soc = None
         v.departure, v.departure_source = self._departure(v, now)
         weekday = (v.departure or (now + timedelta(days=1))).weekday()  # without a departure: tomorrow
-        v.plan = v.model.plan(weekday)
+        v.plan = self._plan_for(v, v.departure, weekday)
         v.consumption = (v.model.consumption_kwh_per_km() if v.model.consumption_known
                          else float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
         v.need = compute_need(
-            v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption, learn_km=v.learn_km,
-            efficiency=v.efficiency or DEFAULT_EFFICIENCY)
+            v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption,
+            learn_km=v.learn_km or v.departure_source == "calendar", efficiency=v.efficiency or DEFAULT_EFFICIENCY, min_soc=self._min_soc(v))
 
         max_kw = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
         if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
@@ -780,6 +925,15 @@ class Plugwhen:
         if v.departure is not None and v.departure_source == "entity":
             out = [t for t in out if t.departure.date() != v.departure.date()]
             out.append(trip_for(v.departure, v.departure.weekday()))
+        for t in v.trips:   # trips from the calendar replace the learned departure of their day
+            d = dt_util.parse_datetime(t["departure"])
+            if d is None or d <= now:
+                continue
+            out = [x for x in out if x.departure.date() != d.date()]
+            if t.get("km"):
+                out.append(Trip(d, float(t["km"]), float(t["range_km"])))
+            else:
+                out.append(trip_for(d, d.weekday()))
         out.sort(key=lambda t: t.departure)
         return out[:HORIZON_TRIPS]
 

@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 TIMEOUT_S = 6.0
 VOLTAGE = 230.0
@@ -143,7 +145,7 @@ PROBE_TIMEOUT_S = 2.0
 
 
 class EvccClient:
-    """Reads evcc's state. With a password it logs in itself and again when the login has run out. Never writes."""
+    """Reads evcc's state; writes a vehicle's one-time plan only when the user switched that on. With a password it logs in itself."""
 
     def __init__(self, session: Any, url: str, password: str | None = None, timeout: float = TIMEOUT_S) -> None:
         self._session = session
@@ -187,6 +189,31 @@ class EvccClient:
             return json.loads(text)
         except ValueError as err:
             raise EvccError("evcc did not answer with JSON") from err
+
+    async def _send(self, method: str, path: str, retry: bool = True) -> None:
+        headers = {"Cookie": f"auth={self._cookie}"} if self._cookie else {}
+        try:
+            async with asyncio.timeout(self._timeout):
+                async with self._session.request(method, self._base + path, headers=headers) as resp:
+                    status = resp.status
+                    text = await resp.text()
+        except Exception as err:  # noqa: BLE001
+            raise EvccError(str(err) or type(err).__name__) from err
+        if status == 401:
+            if self._password and retry:
+                await self._login()
+                return await self._send(method, path, retry=False)
+            raise EvccAuthError("evcc wants a password" if not self._password else "password refused")
+        if status >= 400:
+            raise EvccError(f"evcc answered {status}: {text[:120]}")
+
+    async def set_plan(self, vehicle: str, soc: int, when: datetime) -> None:
+        """evcc's one-time plan of a vehicle: charge to `soc` % by `when`."""
+        t = when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        await self._send("POST", f"/api/vehicles/{quote(vehicle, safe='')}/plan/soc/{int(soc)}/{t}")
+
+    async def delete_plan(self, vehicle: str) -> None:
+        await self._send("DELETE", f"/api/vehicles/{quote(vehicle, safe='')}/plan/soc")
 
     async def state(self) -> dict[str, Any]:
         data = await self._get("/api/state")

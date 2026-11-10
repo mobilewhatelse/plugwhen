@@ -30,7 +30,8 @@ def data_sources(cfg: dict[str, Any], evcc_known: bool, evcc_info: dict[str, Any
         "plugged": _src(cfg.get("plugged_entity"), evcc_known),
         "charging": _src(cfg.get("charging_entity"), evcc_known),
         "wallbox_energy": _src(cfg.get("wallbox_energy_entity"), False),
-        "departure": {"from": "sensor", "entity": cfg["departure_entity"]} if cfg.get("departure_entity") else {"from": "learned"},
+        "departure": ({"from": "sensor", "entity": cfg["departure_entity"]} if cfg.get("departure_entity")
+                      else {"from": "calendar", "entity": cfg["trip_calendar"]} if cfg.get("trip_calendar") else {"from": "learned"}),
         "plan": "executed" if executed else "recommendation",
         "evcc": evcc,
         "taken_from": list(cfg.get("taken_from") or []),

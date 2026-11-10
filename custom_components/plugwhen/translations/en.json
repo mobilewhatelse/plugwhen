@@ -47,7 +47,9 @@
           "price_high": "Demand charge above the threshold",
           "price_threshold": "Threshold",
           "evcc_url": "Address of evcc (optional)",
-          "evcc_password": "Password of evcc"
+          "evcc_password": "Password of evcc",
+          "evcc_write_plans": "Write plans into evcc",
+          "route_waze": "Kilometres of calendar trips via Waze"
         },
         "data_description": {
           "waechter_entry": "Choose the quarter-hour peak guard and Plugwhen finds its load forecast by itself (and keeps the charging under its peak target). Suggested automatically if exactly one is installed.",
@@ -60,7 +62,9 @@
           "price_high": "Price per kW and year above the threshold. Empty: the same price.",
           "price_threshold": "kW from which the higher price applies. 0 = one price.",
           "evcc_url": "Only if you use evcc and the guard does not know it already (empty = the guard's address). evcc may run anywhere on the network, e.g. http://192.168.1.20:7070. A local evcc is suggested.",
-          "evcc_password": "Only if evcc asks for one."
+          "evcc_password": "Only if evcc asks for one.",
+          "evcc_write_plans": "Writes the plan for the next departure that needs charging into evcc and keeps it up to date (evcc then charges). Only plans Plugwhen wrote itself are changed; a plan you set in evcc is never overwritten. Default off.",
+          "route_waze": "For calendar events without kilometres: the route from home to the event's location from the Waze travel time integration (it must be added once; home and destination go to Waze). Kilometres written in the event always win."
         }
       }
     }
@@ -93,7 +97,9 @@
             "departure_entity": "Departure (optional)",
             "notify_service": "Notify service (optional)",
             "notify_hour": "Warn from this hour",
-            "evcc_vehicle": "Vehicle in evcc (optional)"
+            "evcc_vehicle": "Vehicle in evcc (optional)",
+            "trip_calendar": "Calendar with trips (optional)",
+            "stock_soc": "Stock (minimum state of charge)"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -111,7 +117,9 @@
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
             "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
-            "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors."
+            "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
+            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
           }
         },
         "reconfigure": {
@@ -134,7 +142,9 @@
             "departure_entity": "Departure (optional)",
             "notify_service": "Notify service (optional)",
             "notify_hour": "Warn from this hour",
-            "evcc_vehicle": "Vehicle in evcc (optional)"
+            "evcc_vehicle": "Vehicle in evcc (optional)",
+            "trip_calendar": "Calendar with trips (optional)",
+            "stock_soc": "Stock (minimum state of charge)"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -152,7 +162,9 @@
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
             "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
-            "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors."
+            "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
+            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
           }
         }
       },

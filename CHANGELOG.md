@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
+
+- **Trips from a calendar** (per car, optional): every event in a calendar of Home Assistant is a trip. Start = departure; kilometres
+  written in the title or description ("Linz 200 km") win, otherwise the route from home to the event's location via the Waze travel time
+  integration (switch, default off; home and destination go to Waze), there and back unless the event says "einfach"/"one way". The range
+  to have is the trip plus 15 %, at least the reserve. A trip replaces the learned departure of its day, in the plan and in the look-ahead.
+  All-day events are ignored. Card **Planned trips**.
+- **Write plans into evcc** (switch, default off): the plan for the first departure that needs charging is written into evcc and kept up
+  to date; when it is not needed any more it is removed. Only plans Plugwhen wrote itself are changed: a plan set in evcc by hand is never
+  touched. The card says whether it is written. Repeating plans are still only proposed.
+- **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, so the car is ready for an unplanned trip.
+
 ## 0.8.1 (unreleased) - trips over midnight
 
 - **A trip that started the evening before and is still running after midnight is not a departure of the new day.** The learned early
