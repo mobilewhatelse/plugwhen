@@ -90,7 +90,7 @@ TEXT = {
         ep_r_covered="Ladung reicht bis", ep_r_covered_all="Ladung reicht für alle gelernten Abfahrten", ep_next="nächste nötige Ladung",
         ep_week="Wochenpläne (Vorschlag)", ep_week_now="Wochenpläne in evcc", ep_week_none="noch zu wenig gelernt", ep_week_same="gleich wie in evcc",
         ep_follow="Der Plan wird laufend angepasst (mehr Kilometer, Sonne, nächste Abfahrt).",
-        ep_written="In evcc geschrieben.", ep_write_off="Geschrieben wird erst in der Betriebsart „Über evcc“ (oben); dann lädt evcc nach diesem Plan.",
+        ep_expired="der alte Plan ist abgelaufen", ep_written="In evcc geschrieben.", ep_write_off="Geschrieben wird erst in der Betriebsart „Über evcc“ (oben); dann lädt evcc nach diesem Plan.",
         ep_write_err="Schreiben fehlgeschlagen", ep_mine="von Plugwhen geschrieben",
         tr_h="Eingetragene Fahrten", tr_none="Keine Fahrten im Kalender.", tr_nocal="Kein Kalender eingetragen. Fahrten können Sie in einem Kalender von Home Assistant eintragen (Titel z. B. „Linz 200 km“).",
         tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
@@ -186,7 +186,7 @@ TEXT = {
         ep_r_covered="charge lasts until", ep_r_covered_all="charge lasts for all learned departures", ep_next="next charging needed",
         ep_week="Repeating plans (proposal)", ep_week_now="Repeating plans in evcc", ep_week_none="too little learned yet", ep_week_same="same as in evcc",
         ep_follow="The plan follows what happens (more kilometres, sun, the next departure).",
-        ep_written="Written into evcc.", ep_write_off="It is written only in the mode \u201cVia evcc\u201d (above); evcc then charges by this plan.",
+        ep_expired="the old plan has expired", ep_written="Written into evcc.", ep_write_off="It is written only in the mode \u201cVia evcc\u201d (above); evcc then charges by this plan.",
         ep_write_err="Writing failed", ep_mine="written by Plugwhen",
         tr_h="Planned trips", tr_none="No trips in the calendar.", tr_nocal="No calendar set. Trips can be entered in a calendar of Home Assistant (title e.g. \u201cLinz 200 km\u201d).",
         tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
@@ -331,7 +331,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% else %}" + t["ep_nothing"] + " ({{ rs.get(e.reason, e.reason) }}){% endif %}\n\n"
         "**" + t["ep_now"] + ":** {% if e.current %}{% set c = e.current.time | as_datetime | as_local %}"
         "{{ e.current.soc }} % " + t["ep_until"] + " {{ wd[c.weekday()] }} {{ c.strftime('%H:%M') }}"
-        "{% elif e.evcc_known %}" + t["ep_none"] + "{% else %}" + t["ep_unreach"] + "{% endif %}"
+        "{% elif e.evcc_known %}" + t["ep_none"] + "{% if e.expired %} (" + t["ep_expired"] + "){% endif %}{% else %}" + t["ep_unreach"] + "{% endif %}"
         "{% if e.by_plugwhen %} · " + t["ep_mine"] + "{% elif e.same %} · " + t["ep_same"] + "{% elif e.own_plan %} · " + t["ep_own"] + "{% endif %}\n\n"
         "**" + t["ep_week"] + ":** {% if e.weekly %}" + week_tpl.replace("@LIST@", "e.weekly") + "{% else %}" + t["ep_week_none"] + "{% endif %}\n\n"
         "{% if e.evcc_known %}**" + t["ep_week_now"] + ":** {% if e.weekly_current %}" + week_tpl.replace("@LIST@", "e.weekly_current")

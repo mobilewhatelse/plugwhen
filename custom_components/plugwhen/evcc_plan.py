@@ -141,6 +141,9 @@ def evcc_plan(state: dict[str, Any] | None, key: str | None, ahead: dict[str, An
     elif reason == "planned":
         reason = "covered"
     cur = current_plan(state, key) if state is not None else None
+    expired = None
+    if cur and (_parse(cur["time"]) or now) <= now:   # evcc keeps a plan whose time has passed: it is done, not an own plan any more
+        expired, cur = cur, None
     match = same(would, cur)
     mine = bool(cur) and same(cur, last_written)
     weekly = weekly_plans(week)
@@ -150,6 +153,7 @@ def evcc_plan(state: dict[str, Any] | None, key: str | None, ahead: dict[str, An
         "reason": "planned" if would else reason,
         "lasts_until": lasts_until if not would else None,
         "current": cur,
+        "expired": expired,
         "evcc_known": state is not None,
         "same": match,
         "own_plan": bool(cur) and not match and not mine,

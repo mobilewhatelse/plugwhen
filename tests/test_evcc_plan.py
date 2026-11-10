@@ -98,6 +98,21 @@ class WriteTest(unittest.TestCase):
         self.assertTrue(out["write_enabled"])
 
 
+class ExpiredTest(unittest.TestCase):
+    def test_a_plan_whose_time_has_passed_is_not_an_own_plan(self):
+        later = datetime(2026, 11, 10, 9, 53, tzinfo=CET)            # evcc still shows 80 % by 07:00 this morning
+        out = evcc_plan(STATE, "db:3", {"departure": FRI, "target_soc": 34}, [], later)
+        self.assertIsNone(out["current"])
+        self.assertEqual(out["expired"]["soc"], 80)
+        self.assertFalse(out["own_plan"])
+        self.assertEqual(decide_write(out["would_write"], out["current"], None), ("set", "new"))
+
+    def test_a_valid_own_plan_stays_untouched(self):
+        out = evcc_plan(STATE, "db:3", {"departure": FRI, "target_soc": 34}, [], NOW)   # Monday evening, plan for Tuesday 07:00
+        self.assertTrue(out["own_plan"])
+        self.assertIsNone(out["expired"])
+
+
 class WeeklyTest(unittest.TestCase):
     def test_grouped_by_time_and_target(self):
         self.assertEqual(weekly_plans(WEEK), [

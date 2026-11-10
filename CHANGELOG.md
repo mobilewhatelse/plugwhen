@@ -14,6 +14,8 @@
 - **Fix: the solar check stayed at 0 days.** Pairing the forecast with what the plant produced ran once a day inside the calibration
   and was skipped whenever an earlier part failed (e.g. the recorder not ready after a restart). It is its own step now, every 15 minutes,
   looks back 7 days, and the charge plan shows `solar_check` (forecasts remembered, days measured, last error).
+- **A plan in evcc whose time has passed** (evcc keeps it) counts as done, not as your own plan: Plugwhen may replace it. A valid own
+  plan is still never touched.
 - **Mode "Direct": Plugwhen controls the wallbox**, offered only once "Ready to switch?" is green and the wallbox can be controlled. What it
   does depends on the wallbox, found on its device without settings: (A) a wallbox with its own next-trip mode (e.g. Fronius Wattpilot
   "Next Trip"): Plugwhen fills in departure and energy for a departure within 24 hours and switches to that mode, the wallbox keeps using
