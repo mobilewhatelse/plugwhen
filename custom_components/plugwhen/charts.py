@@ -402,7 +402,8 @@ def chart_horizon(horizon: dict[str, Any] | None, lang: str | None = None) -> st
         body.append(f"<rect x='{xx}' y='{ly - 9}' width='10' height='10' fill='{colour}'/>" + _text(xx + 15, ly, t[key], size=11))
     if unknown:
         until = _as_dt(horizon.get("sun_until"))
-        d_txt = f"{t['wd'][until.weekday()]} {until:%H:%M}" if until is not None else "?"
+        last = until - timedelta(minutes=1) if until is not None else None      # the last day the forecast covers
+        d_txt = f"{t['wd'][last.weekday()]} {last:%d.%m.}" if last is not None else "?"
         body.append(f"<rect x='{L}' y='{ly + 7}' width='10' height='10' fill='{GREY}'/>" + _text(L + 15, ly + 16, t["hz_unk"], size=11))
         body.append(_text(L + 200, ly + 16, t["hz_until"].format(d=d_txt), size=11))
     saved = float(horizon.get("saved_grid_kwh") or 0)

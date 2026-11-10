@@ -167,14 +167,15 @@ class SunKnownTest(unittest.TestCase):
         self.assertEqual(sun_unknown_hours(at(0, 9), at(1, 13), until), 0.0)       # inside the forecast
         self.assertEqual(sun_unknown_hours(at(1, 17), at(2, 7), until), 0.0)       # night only: the sun does not matter
         self.assertEqual(sun_unknown_hours(at(2, 15), at(3, 12), until), 4 + 5)    # Mon 15-19 and Tue 7-12
+        self.assertEqual(sun_unknown_hours(at(2, 15), at(3, 12), until, (8, 16)), 1 + 4)   # winter sun hours from the forecast
         self.assertEqual(sun_unknown_hours(at(0, 9), at(5, 7), None), 0.0)         # no forecast at all: nothing to mark
 
     def test_days_marked(self):
-        r = plan()                                                                 # sun only Sat and Sun 10-13
-        self.assertEqual(r["sun_until"], at(1, 13).isoformat())
+        r = plan()                                                                 # sun only Sat and Sun 10-13: covers until Mon 0:00
+        self.assertEqual(r["sun_until"], at(2, 0).isoformat())
         known = [d["sun_known"] for d in r["days"]]
-        self.assertEqual(known[:2], [True, True])                                  # Sat 13:00, Sun 13:00
-        self.assertFalse(known[2])                                                 # Mon 08:00: window Sun afternoon, beyond 13:00
+        self.assertEqual(known[:3], [True, True, True])                            # Sat 13, Sun 13, Mon 8 (Mon 0-8: no sun hours 10-13)
+        self.assertEqual(known[3:], [False, False])                                # Tue 7, Wed 7: Mon daytime beyond the forecast
         r = plan(sun_kw=None)
         self.assertIsNone(r["sun_until"])
         self.assertTrue(all(d["sun_known"] for d in r["days"]))
@@ -183,6 +184,6 @@ class SunKnownTest(unittest.TestCase):
         from charts import GREY, chart_horizon
         svg = chart_horizon(plan(), "de")
         self.assertIn(f"fill='{GREY}'/>", svg)
-        self.assertIn("Prognose bis So 13:00", svg)
+        self.assertIn("Prognose bis So 10.01.", svg)
         svg = chart_horizon(plan(sun_kw=None), "en")
         self.assertNotIn("Forecast until", svg)
