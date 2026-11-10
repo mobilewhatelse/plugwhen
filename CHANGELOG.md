@@ -17,6 +17,8 @@
 - **The mode decides who controls, and sets what belongs to it:** "direct" puts the wallbox in its sun mode (e.g. Eco) as the base
   (evcc must only read this wallbox then: "off" in evcc blocks charging, so Plugwhen does not touch evcc's loadpoint); "via evcc" puts the wallbox in its grid mode
   (e.g. Default) and lets evcc regulate; "off"/"learn" give back everything Plugwhen set. Only what Plugwhen set itself is changed back.
+- **With evcc, evcc controls; without evcc, Plugwhen:** a car linked to evcc is offered "via evcc", a car without evcc "direct" - never
+  both (evcc's "off" blocks charging, so Plugwhen cannot control a wallbox evcc controls).
 - **"Direct" can be released early** (setting, for trying it out) before "ready to switch" is green.
 - **Locations for Waze are looked up at OpenStreetMap first:** the address search of the Waze integration fails at the moment
   (a place or address gives an error, coordinates work). Plugwhen finds the coordinates at OpenStreetMap (Nominatim, only the destination

@@ -118,7 +118,11 @@ Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox
 Grundstellung; evcc darf diese Wallbox dann **nur lesen** (oder gar nicht da sein), denn „Off“ heißt in evcc „Laden gesperrt“ und nicht
 „evcc hält sich raus“ – steuert evcc die Wallbox, ist „Über evcc“ die richtige Betriebsart; „Über evcc“ stellt die Wallbox auf
 ihren Netzmodus (z. B. Default) und lässt evcc regeln; „Aus“ und „Lernen“ geben alles zurück. Zum Ausprobieren lässt sich „Direkt“ in den
-Einstellungen **vorzeitig freigeben**, bevor „Bereit zum Schalten“ grün ist. Der
+Einstellungen **vorzeitig freigeben**, bevor „Bereit zum Schalten“ grün ist.
+
+**Mit evcc steuert evcc, ohne evcc Plugwhen:** Ein Auto, das mit einem evcc-Fahrzeug verknüpft ist, bekommt die Betriebsart „Über evcc“,
+ein Auto ohne evcc-Verknüpfung „Direkt“. Nie beides: „Off“ heißt in evcc „Laden gesperrt“, Plugwhen kann also keine Wallbox steuern, die
+evcc steuert. Wer „Direkt“ testen will, entfernt beim Fahrzeug die evcc-Verknüpfung. Der
 Wächter hat weiter das letzte Wort.
 
 ## Fahrten aus dem Kalender, Vorrat

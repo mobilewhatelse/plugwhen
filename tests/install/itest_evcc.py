@@ -158,7 +158,8 @@ def main():
     subprocess.run(["curl", "-s", "-m", "5", "-X", "POST", f"http://localhost:17070/api/vehicles/vehicle_1/plan/soc/90/{own_t}"], capture_output=True)
     own_before = evcc_vehicle("vehicle_1").get("plan")
     sw = it.find("select", "kalenderauto_mode") or {}
-    log(sw.get("state") == "learn" and "evcc" in ((sw.get("attributes") or {}).get("options") or []),
+    log(sw.get("state") == "learn" and "evcc" in ((sw.get("attributes") or {}).get("options") or [])
+        and "direct" not in ((sw.get("attributes") or {}).get("options") or []),
         "the car linked to evcc offers the mode 'via evcc' (default: learn)", json.dumps({"state": sw.get("state"), "options": (sw.get("attributes") or {}).get("options")}))
     it.svc("select", "select_option", {"entity_id": sw.get("entity_id"), "option": "evcc"})
     written = {}

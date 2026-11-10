@@ -31,15 +31,16 @@ class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
 
     @property
     def options(self) -> list[str]:
-        """'evcc' only for a car linked to evcc; 'direct' once the wallbox can be controlled and the learn mode is through
-        (or while it is the chosen mode)."""
+        """With evcc only evcc controls: a car linked to evcc gets 'evcc', a car without evcc gets 'direct' (once the wallbox can be
+        controlled and the learn mode is through, or released early). Never both: evcc's "off" blocks charging, so Plugwhen cannot
+        control a wallbox evcc controls."""
         from homeassistant.util import dt as dt_util
 
         v = self.vehicle
         out = ["off", "learn"]
         if v.cfg.get("evcc_vehicle"):
             out.append("evcc")
-        if v.mode == "direct" or self.plug.direct_offered(v, dt_util.now()):
+        elif v.mode == "direct" or self.plug.direct_offered(v, dt_util.now()):
             out.append("direct")
         return out
 
@@ -47,6 +48,8 @@ class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
         self.vehicle.mode = last.state if last is not None and last.state in MODES else DEFAULT_MODE
+        if self.vehicle.mode == "direct" and self.vehicle.cfg.get("evcc_vehicle"):
+            self.vehicle.mode = "evcc"   # linked to evcc since: evcc controls
 
     @property
     def current_option(self) -> str:

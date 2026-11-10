@@ -104,7 +104,7 @@ TEXT = {
         rd_wb="Wallbox-Steuerung erkannt", rd_wb_trip="Abfahrtsmodus der Wallbox (Zeit und Energie, Sonne bleibt zuerst)",
         rd_wb_mode="Moduswechsel (Netz in den geplanten Fenstern, sonst Sonnenmodus)", rd_wb_buttons="Start und Stopp in den geplanten Fenstern",
         rd_wb_none="keine (die Wallbox braucht einen Lademodus oder Start/Stopp in Home Assistant)",
-        rd_evcc_note="Für „Direkt“ darf evcc diese Wallbox nur lesen; steuert evcc sie, ist „Über evcc“ die richtige Betriebsart.",
+        rd_evcc_note="Dieses Auto ist mit evcc verknüpft: Dann steuert evcc (Betriebsart „Über evcc“). „Direkt“ gibt es nur für ein Auto ohne evcc-Verknüpfung.",
         tr_how="**So tragen Sie eine Fahrt ein:** im Kalender auf den Tag tippen, Titel mit Ziel und Kilometern („Linz 200 km“), "
                "Beginn = Abfahrtszeit. Ohne Kilometer zählt der **Ort** (über Waze, falls eingeschaltet), hin und zurück; „einfach“ im Titel = nur eine Richtung. "
                "Ganztägige Termine zählen nicht.",
@@ -201,7 +201,7 @@ TEXT = {
         rd_wb="Wallbox control found", rd_wb_trip="the next-trip mode of the wallbox (time and energy, the sun stays first)",
         rd_wb_mode="mode change (grid in the planned windows, else the sun mode)", rd_wb_buttons="start and stop in the planned windows",
         rd_wb_none="none (the wallbox needs a charging mode or start/stop in Home Assistant)",
-        rd_evcc_note="For “direct” evcc may only read this wallbox; if evcc controls it, “via evcc” is the right mode.",
+        rd_evcc_note="This car is linked to evcc: then evcc controls (mode “via evcc”). “Direct” is only for a car without an evcc link.",
         tr_how="**How to enter a trip:** tap the day in the calendar, title with destination and kilometres (\u201cLinz 200 km\u201d), "
                "start = departure time. Without kilometres the **location** counts (via Waze, if switched on), there and back; \u201cone way\u201d in the title = one direction. "
                "All-day events are ignored.",
