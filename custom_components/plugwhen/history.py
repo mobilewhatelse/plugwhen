@@ -16,7 +16,7 @@ Nothing is invented: a day without an odometer value has no km (None), a day bef
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 try:  # inside Home Assistant the module lives in a package, the tests import it flat
     from .learning import DayRecord
@@ -41,14 +41,23 @@ def records_from_hourly(
     """One record per local day covered by the odometer series. Series must be sorted by time."""
     days: dict[date, dict] = {}
     prev_o: float | None = None
+    prev_t: datetime | None = None
+    prev_rose = False
+    carry = False   # a trip that started the evening before is still running after midnight: not a departure of this day
     for t, o in odometer_km:
         rec = days.setdefault(t.date(), {"last_o": None, "first_move": None, "rise": 0.0, "prev_soc": None, "wb_last": None})
         if o is None:
             continue
-        if prev_o is not None and MIN_STEP_KM < o - prev_o < MAX_HOURLY_KM and rec["first_move"] is None:
+        rose = prev_o is not None and MIN_STEP_KM < o - prev_o < MAX_HOURLY_KM
+        next_hour = prev_t is not None and t - prev_t <= timedelta(hours=1, minutes=5)
+        if prev_t is not None and t.date() != prev_t.date():
+            carry = rose and prev_rose and next_hour
+        elif not rose or not next_hour:
+            carry = False
+        if rose and not carry and rec["first_move"] is None:
             rec["first_move"] = float(t.hour)
         rec["last_o"] = o
-        prev_o = o
+        prev_o, prev_t, prev_rose = o, t, rose
     soc_prev: float | None = None
     for t, s in soc_pct or []:
         rec = days.get(t.date())

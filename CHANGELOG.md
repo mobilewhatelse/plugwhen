@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 (unreleased) - trips over midnight
+
+- **A trip that started the evening before and is still running after midnight is not a departure of the new day.** The learned early
+  departure on Sundays was 00:00 in one house (Saturday-night trips home), which also showed up in the proposed evcc plans. The kilometres
+  still count for the day.
+
 ## 0.8.0 (unreleased) - little to set with the guard
 
 - **Adding a vehicle is filled in from the quarter-hour peak guard** when it knows the car: name, state of charge, capacity, charging

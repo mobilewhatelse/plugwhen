@@ -30,6 +30,41 @@ def flat_odometer(days: int, start=10000.0, trips: dict[int, tuple[int, float]] 
     return out
 
 
+class MidnightTest(unittest.TestCase):
+    def test_trip_over_midnight_is_not_a_departure_of_the_next_day(self):
+        o, series = 10000.0, []
+        for d in range(2):
+            for h in range(24):
+                if (d, h) in ((0, 23), (1, 0)):   # Saturday night home trip: 23:00 and 00:00
+                    o += 30.0
+                if (d, h) == (1, 13):             # the real Sunday trip
+                    o += 20.0
+                series.append((D0 + timedelta(days=d, hours=h), o))
+        by = {r.day: r for r in records_from_hourly(series)}
+        self.assertEqual(by[date(2027, 1, 5)].first_move_hour, 13.0)   # not 0
+        self.assertEqual(by[date(2027, 1, 5)].km, 50.0)                # the kilometres still count for the day
+
+    def test_trip_starting_after_midnight_counts(self):
+        o, series = 10000.0, []
+        for d in range(2):
+            for h in range(24):
+                if (d, h) == (1, 1):                # nothing at 23:00, a trip at 01:00 is a real departure
+                    o += 30.0
+                series.append((D0 + timedelta(days=d, hours=h), o))
+        by = {r.day: r for r in records_from_hourly(series)}
+        self.assertEqual(by[date(2027, 1, 5)].first_move_hour, 1.0)
+
+    def test_running_trip_without_a_later_one_gives_no_departure(self):
+        o, series = 10000.0, []
+        for d in range(2):
+            for h in range(24):
+                if (d, h) in ((0, 23), (1, 0), (1, 1)):
+                    o += 30.0
+                series.append((D0 + timedelta(days=d, hours=h), o))
+        by = {r.day: r for r in records_from_hourly(series)}
+        self.assertIsNone(by[date(2027, 1, 5)].first_move_hour)
+
+
 class KmTest(unittest.TestCase):
     def test_km_per_day_and_first_trip_hour(self):
         recs = records_from_hourly(flat_odometer(4, trips={1: (7, 40.0), 2: (13, 5.0)}))
