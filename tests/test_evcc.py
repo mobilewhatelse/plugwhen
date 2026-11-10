@@ -16,7 +16,7 @@ import asyncio  # noqa: E402
 sys.path.insert(0, _INTEGRATION)
 
 from evcc import (  # noqa: E402
-    EvccAuthError, EvccClient, EvccError, connection, live_vehicle, loadpoint_kw, match_vehicle, parse_vehicles, vehicle_from_evcc,
+    EvccAuthError, EvccClient, EvccError, connection, live_vehicle, loadpoint_index, loadpoint_kw, match_vehicle, parse_vehicles, vehicle_from_evcc,
 )
 
 # shaped like evcc 0.319 (demo and a real installation)
@@ -88,6 +88,12 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(match_vehicle(st, None, {"golf"}), "tesla")
         self.assertEqual(match_vehicle(st, None, {"golf", "tesla"}), "bike")
 
+    def test_loadpoint_of_the_car(self):
+        st = {"loadpoints": [{"vehicleName": "x", "mode": "pv"}, {"vehicleName": "db:3", "mode": "now"}]}
+        self.assertEqual(loadpoint_index(st, "db:3"), (2, "now"))
+        self.assertIsNone(loadpoint_index(st, "nope"))
+        self.assertIsNone(loadpoint_index(None, "db:3"))
+
     def test_live_values(self):
         self.assertEqual(live_vehicle(STATE, "db:3"), {"plugged": True, "charging": True, "power_kw": 7.36})
         self.assertIsNone(live_vehicle(STATE, "vehicle_2"))     # evcc does not know where this car is
@@ -139,6 +145,11 @@ class ClientTest(unittest.TestCase):
         self.run_(c.delete_plan("db:3"))
         self.assertEqual(s.calls[0][:2], ("POST", "http://evcc/api/vehicles/db%3A3/plan/soc/34/2026-11-13T06:00:00Z"))
         self.assertEqual(s.calls[1][:2], ("DELETE", "http://evcc/api/vehicles/db%3A3/plan/soc"))
+
+    def test_sets_the_loadpoint_mode(self):
+        s = _Session([_Resp(200, "")])
+        self.run_(EvccClient(s, "http://evcc").set_loadpoint_mode(1, "off"))
+        self.assertEqual(s.calls[0][:2], ("POST", "http://evcc/api/loadpoints/1/mode/off"))
 
     def test_errors(self):
         with self.assertRaises(EvccAuthError):

@@ -19,6 +19,7 @@ O_SOLAR_DEDUCT = "solar_deduct_kw"        # kW taken off the solar forecast firs
 DEFAULT_SOLAR_DEDUCT = 0.5
 SOLAR_REFRESH = timedelta(minutes=15)
 O_EVCC_URL = "evcc_url"                    # optional: address of evcc (anywhere on the network); empty = the guard's address
+O_DIRECT_EARLY = "direct_early"            # offer the mode "direct" before the learn mode is through (for trying it out)
 O_ROUTE_WAZE = "route_waze"                # kilometres of calendar trips from the Waze travel time integration (sends home and destination to Waze)
 O_EVCC_PASSWORD = "evcc_password"          # optional: only if evcc asks for one
 O_GRID_ENERGY = "grid_energy_entity"       # grid import energy counter (for the potential calculator); taken from the guard if chosen

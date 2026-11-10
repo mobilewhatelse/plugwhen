@@ -48,7 +48,8 @@
           "price_threshold": "Threshold",
           "evcc_url": "Address of evcc (optional)",
           "evcc_password": "Password of evcc",
-          "route_waze": "Kilometres of calendar trips via Waze"
+          "route_waze": "Kilometres of calendar trips via Waze",
+          "direct_early": "Offer “direct” before the learn mode is through"
         },
         "data_description": {
           "waechter_entry": "Choose the quarter-hour peak guard and Plugwhen finds its load forecast by itself (and keeps the charging under its peak target). Suggested automatically if exactly one is installed.",
@@ -62,7 +63,8 @@
           "price_threshold": "kW from which the higher price applies. 0 = one price.",
           "evcc_url": "Only if you use evcc and the guard does not know it already (empty = the guard's address). evcc may run anywhere on the network, e.g. http://192.168.1.20:7070. A local evcc is suggested.",
           "evcc_password": "Only if evcc asks for one.",
-          "route_waze": "For calendar events without kilometres: the route from home to the event's location via the Waze travel time integration (add it once, no account). The location may be a place, an address or coordinates; Plugwhen looks the place up at OpenStreetMap first (only the destination goes there) and asks Waze with the coordinates (home and destination go to Waze). Kilometres written in the event always win."
+          "route_waze": "For calendar events without kilometres: the route from home to the event's location via the Waze travel time integration (add it once, no account). The location may be a place, an address or coordinates; Plugwhen looks the place up at OpenStreetMap first (only the destination goes there) and asks Waze with the coordinates (home and destination go to Waze). Kilometres written in the event always win.",
+          "direct_early": "For trying it out: the mode “direct” (Plugwhen controls the wallbox) can be chosen although “ready to switch” is not green yet. Only what Plugwhen set itself is changed back."
         }
       }
     }

@@ -19,13 +19,13 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_MODE, LEARNING_MODES, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN,
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
-    O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
+    O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
 )
 from dataclasses import replace
 
-from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle
+from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
@@ -368,7 +368,9 @@ class Plugwhen:
 
     def direct_offered(self, v: Vehicle, now: datetime) -> bool:
         """The mode 'direct' is offered once the wallbox can be controlled and the learn mode is through."""
-        return bool(self.wallbox_control(v).get("variant")) and self.switch_ready(v, now)["ready"]
+        if not self.wallbox_control(v).get("variant"):
+            return False
+        return bool(self.entry.options.get(O_DIRECT_EARLY)) or self.switch_ready(v, now)["ready"]
 
     async def _set_entity(self, entity_id: str, value: Any) -> None:
         domain = entity_id.split(".", 1)[0]
@@ -399,49 +401,84 @@ class Plugwhen:
             mine.pop(entity_id, None)
         return f"{entity_id}={value}"
 
+    async def _evcc_loadpoint_mode(self, v: Vehicle, wanted: str | None) -> str | None:
+        """Set evcc's mode of the car's loadpoint (mode 'direct': off, so evcc does not regulate the same wallbox); give it back
+        afterwards - only what Plugwhen set itself."""
+        key, conn = v.cfg.get(V_EVCC_VEHICLE), self.evcc_connection()
+        lp = loadpoint_index(self.evcc_state, key) if key and self.evcc_state is not None else None
+        mine = self._direct.setdefault(v.sub_id, {})
+        rec = mine.get("evcc_loadpoint", {})
+        if lp is None or conn is None:
+            return None
+        action, value = next_action(lp[1], wanted, rec.get("set"), rec.get("orig"))
+        if action is None:
+            if value == "user_changed" or (wanted is None and rec):
+                mine.pop("evcc_loadpoint", None)
+            return None
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        await EvccClient(async_get_clientsession(self.hass), conn[0], conn[1]).set_loadpoint_mode(lp[0], value)
+        if action == "set":
+            mine["evcc_loadpoint"] = {"set": value, "orig": rec.get("orig", lp[1])}
+        else:
+            mine.pop("evcc_loadpoint", None)
+        return f"evcc loadpoint {lp[0]}={value}"
+
     async def _direct_step(self, v: Vehicle, now: datetime) -> None:
-        """Mode 'direct': fill the gap the sun leaves before a departure; outside it give back what Plugwhen set."""
+        """The mode decides who controls, and Plugwhen sets what belongs to it (only what it set itself is given back):
+        direct - the wallbox's base mode is its sun mode (e.g. Eco), before a departure the next-trip mode or the grid mode, and evcc's
+        loadpoint is off so that evcc does not regulate the same wallbox; evcc - the wallbox's grid mode (e.g. Default), evcc regulates;
+        off/learn - everything Plugwhen set is given back."""
         caps = self.wallbox_control(v)
-        variant = caps.get("variant") if v.mode == "direct" else None
+        variant = caps.get("variant")
         done: list[str] = []
         try:
-            if variant == "trip":
-                ts = trip_settings(v.need.charge_kwh if v.need else None, v.departure, now, caps.get("trip_energy_unit"))
-                if ts:
-                    for eid, val in ((caps["trip_time"], ts["time"]), (caps["trip_energy"], ts["energy"])):
-                        st = self.hass.states.get(eid)
-                        if st is None or str(st.state) not in (str(val), f"{val}.0"):
-                            await self._set_entity(eid, val)
-                            done.append(f"{eid}={val}")
-                r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else None)
+            if v.mode == "direct" and variant:
+                if variant == "trip":
+                    ts = trip_settings(v.need.charge_kwh if v.need else None, v.departure, now, caps.get("trip_energy_unit"))
+                    if ts:
+                        for eid, val in ((caps["trip_time"], ts["time"]), (caps["trip_energy"], ts["energy"])):
+                            st = self.hass.states.get(eid)
+                            if st is None or str(st.state) not in (str(val), f"{val}.0"):
+                                await self._set_entity(eid, val)
+                                done.append(f"{eid}={val}")
+                    r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else caps.get("mode_sun"))
+                    done += [r] if r else []
+                elif variant == "mode":
+                    windows = (v.charge_plan or {}).get("windows")
+                    r = await self._own(v, caps["mode"], caps["mode_grid"] if in_grid_window(windows, now) else caps.get("mode_sun"))
+                    done += [r] if r else []
+                elif variant == "buttons":
+                    mine = self._direct.setdefault(v.sub_id, {})
+                    active = in_grid_window((v.charge_plan or {}).get("windows"), now)
+                    if active and not mine.get("started"):
+                        await self._set_entity(caps["start"], None)
+                        mine["started"] = now.isoformat()
+                        done.append(caps["start"])
+                    elif not active and mine.get("started"):
+                        await self._set_entity(caps["stop"], None)
+                        mine.pop("started", None)
+                        done.append(caps["stop"])
+                r = await self._evcc_loadpoint_mode(v, "off")
                 done += [r] if r else []
-            elif variant == "mode":
-                windows = (v.charge_plan or {}).get("windows")
-                r = await self._own(v, caps["mode"], caps["mode_grid"] if in_grid_window(windows, now) else None)
+            elif v.mode == "evcc":
+                if caps.get("mode") and caps.get("mode_grid"):   # evcc regulates: the wallbox charges when evcc lets it
+                    r = await self._own(v, caps["mode"], caps["mode_grid"])
+                    done += [r] if r else []
+                r = await self._evcc_loadpoint_mode(v, None)
                 done += [r] if r else []
-            elif variant == "buttons":
-                mine = self._direct.setdefault(v.sub_id, {})
-                active = in_grid_window((v.charge_plan or {}).get("windows"), now)
-                if active and not mine.get("started"):
-                    await self._set_entity(caps["start"], None)
-                    mine["started"] = now.isoformat()
-                    done.append(caps["start"])
-                elif not active and mine.get("started"):
-                    await self._set_entity(caps["stop"], None)
-                    mine.pop("started", None)
-                    done.append(caps["stop"])
-            else:   # not (or no longer) in mode 'direct': give back everything Plugwhen set
-                for eid in list(self._direct.get(v.sub_id, {})):
-                    if eid == "started":
-                        continue
+            else:   # off / learn: give back everything Plugwhen set
+                for eid in [e for e in self._direct.get(v.sub_id, {}) if "." in e]:
                     r = await self._own(v, eid, None)
                     done += [r] if r else []
-        except Exception as err:  # noqa: BLE001 - a wallbox that does not answer must not stop the planner
-            v.direct_last = {"at": now.isoformat(), "variant": variant, "error": str(err)[:120]}
+                r = await self._evcc_loadpoint_mode(v, None)
+                done += [r] if r else []
+        except Exception as err:  # noqa: BLE001 - a wallbox or evcc that does not answer must not stop the planner
+            v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "error": str(err)[:120]}
             _LOGGER.warning("Plugwhen: wallbox of %s not controlled: %s", v.name, err)
             return
         if done:
-            v.direct_last = {"at": now.isoformat(), "variant": variant, "done": done, "error": None}
+            v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "done": done, "error": None}
             self._evcc_store.async_delay_save(self._evcc_data, 5)
 
     def _min_soc(self, v: Vehicle) -> float:

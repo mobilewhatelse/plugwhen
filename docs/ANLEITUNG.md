@@ -112,7 +112,12 @@ heraus, was sie kann (die Karte „Bereit zum Schalten?“ zeigt es):
 - **Moduswechsel** (Lademodus mit Sonnen- und Netzmodus): in den geplanten Netz-Fenstern Netzmodus, sonst zurück.
 - **Nur Start/Stopp:** Start am Anfang, Stopp am Ende eines geplanten Fensters.
 
-Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie in Ruhe. Der
+Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie in Ruhe.
+
+**Die Betriebsart entscheidet, wer steuert, und stellt mit um:** „Direkt“ stellt die Wallbox auf ihren Sonnenmodus (z. B. Eco) als
+Grundstellung und den evcc-Ladepunkt des Autos auf „Off“, damit evcc nicht dieselbe Wallbox regelt; „Über evcc“ stellt die Wallbox auf
+ihren Netzmodus (z. B. Default) und lässt evcc regeln; „Aus“ und „Lernen“ geben alles zurück. Zum Ausprobieren lässt sich „Direkt“ in den
+Einstellungen **vorzeitig freigeben**, bevor „Bereit zum Schalten“ grün ist. Der
 Wächter hat weiter das letzte Wort.
 
 ## Fahrten aus dem Kalender, Vorrat

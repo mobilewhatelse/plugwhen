@@ -48,7 +48,8 @@
           "price_threshold": "Schwelle",
           "evcc_url": "Adresse von evcc (optional)",
           "evcc_password": "Passwort von evcc",
-          "route_waze": "Kilometer von Kalender-Fahrten über Waze"
+          "route_waze": "Kilometer von Kalender-Fahrten über Waze",
+          "direct_early": "„Direkt“ vorzeitig freigeben"
         },
         "data_description": {
           "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
@@ -62,7 +63,8 @@
           "price_threshold": "kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
           "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt (leer = Adresse aus dem Wächter). evcc kann irgendwo im Netz laufen, z. B. http://192.168.1.20:7070. Ein evcc auf diesem Rechner wird vorgeschlagen.",
           "evcc_password": "Nur wenn evcc eines verlangt.",
-          "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen, ohne Konto). Der Ort kann ein Ortsname, eine Adresse oder Koordinaten sein; Plugwhen sucht den Ort zuerst bei OpenStreetMap (dorthin geht nur das Ziel) und fragt Waze mit den Koordinaten (an Waze gehen Zuhause und Ziel). Im Termin eingetragene Kilometer gelten immer zuerst."
+          "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen, ohne Konto). Der Ort kann ein Ortsname, eine Adresse oder Koordinaten sein; Plugwhen sucht den Ort zuerst bei OpenStreetMap (dorthin geht nur das Ziel) und fragt Waze mit den Koordinaten (an Waze gehen Zuhause und Ziel). Im Termin eingetragene Kilometer gelten immer zuerst.",
+          "direct_early": "Zum Ausprobieren: Die Betriebsart „Direkt“ (Plugwhen steuert die Wallbox) ist wählbar, obwohl „Bereit zum Schalten“ noch nicht grün ist. Zurückgestellt wird nur, was Plugwhen selbst gesetzt hat."
         }
       }
     }

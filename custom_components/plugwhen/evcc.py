@@ -129,6 +129,14 @@ def match_vehicle(state: dict[str, Any] | None, name: str | None, taken: set[str
     return vehicles[0]["key"] if vehicles else None
 
 
+def loadpoint_index(state: dict[str, Any] | None, key: str) -> tuple[int, str | None] | None:
+    """(number 1.., current mode) of the loadpoint evcc has assigned vehicle `key` to, or None."""
+    for i, lp in enumerate(_loadpoints(state), 1):
+        if str(lp.get("vehicleName") or "") == key:
+            return i, lp.get("mode")
+    return None
+
+
 def live_vehicle(state: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
     """Plugged in and charging of vehicle `key` from its loadpoint: {"plugged", "charging", "power_kw"}. None if evcc has not
     assigned the vehicle to a loadpoint (then evcc does not know whether this car is plugged in)."""
@@ -211,6 +219,10 @@ class EvccClient:
         """evcc's one-time plan of a vehicle: charge to `soc` % by `when`."""
         t = when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         await self._send("POST", f"/api/vehicles/{quote(vehicle, safe='')}/plan/soc/{int(soc)}/{t}")
+
+    async def set_loadpoint_mode(self, loadpoint: int, mode: str) -> None:
+        """evcc's charge mode of loadpoint number `loadpoint` (1 = first): off, pv, minpv, now (or smart in newer versions)."""
+        await self._send("POST", f"/api/loadpoints/{int(loadpoint)}/mode/{quote(mode, safe='')}")
 
     async def delete_plan(self, vehicle: str) -> None:
         await self._send("DELETE", f"/api/vehicles/{quote(vehicle, safe='')}/plan/soc")
