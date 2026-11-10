@@ -156,7 +156,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "ready_at": iso(p.get("ready_at")), "latest_start": iso(p.get("latest_start")),
             "load_forecast_used": v.load_used, "load_entity": self.plug._load_entity(), "availability_used": v.availability_used,
             "availability_source": v.availability_source,
-            "solar_factor": self.plug.solar_factor(), "solar_deduct_kw": self.plug.solar_deduct_kw(),
+            "solar_factor": self.plug.solar_factor(), "solar_check": self.plug.solar_check or None, "solar_deduct_kw": self.plug.solar_deduct_kw(),
             "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
             "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
             # what Plugwhen would write into evcc (learn mode: nothing is written); None without an evcc car

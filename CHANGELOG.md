@@ -11,6 +11,9 @@
   to date; when it is not needed any more it is removed. Only plans Plugwhen wrote itself are changed: a plan set in evcc by hand is never
   touched. The card says whether it is written. Repeating plans are still only proposed.
 - **Stock** (per car, minimum state of charge, default off): Plugwhen never plans below it, so the car is ready for an unplanned trip.
+- **Fix: the solar check stayed at 0 days.** Pairing the forecast with what the plant produced ran once a day inside the calibration
+  and was skipped whenever an earlier part failed (e.g. the recorder not ready after a restart). It is its own step now, every 15 minutes,
+  looks back 7 days, and the charge plan shows `solar_check` (forecasts remembered, days measured, last error).
 - **Ready to switch?** (sensor and card at the top of the overview): a checklist when Plugwhen may switch the wallbox itself (mode
   "direct", later): trips learned on every weekday the car is used, 7 days with a comparison in learn mode, at least 80 % decided the
   same as reality, and with a solar plant 5 days of checked solar forecast; with a rough date. One message per car when it is ready.

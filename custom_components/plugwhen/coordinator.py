@@ -50,6 +50,7 @@ _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
 LOOKAHEAD_DAYS = 7
 HORIZON_DAYS = 14             # days looked at for the look-ahead (as far as possible: with normal behaviour, when is charging needed?)
 HORIZON_TRIPS = 10            # departures in the look-ahead
+SOLAR_CHECK_DAYS = 7                    # past days the solar check looks at
 TRIPS_REFRESH = timedelta(minutes=15)   # the calendar is read this often
 MIN_DRIVE_SHARE = 0.5        # a weekday counts as a day of departure if the car is used on at least half of its days
 SENT_KEEP = 8                # warnings remembered per vehicle (so that a restart does not repeat them)
@@ -124,6 +125,7 @@ class Plugwhen:
         self._add_model = QuarterAddModel()
         self._solar: dict[datetime, float] | None = None
         self._solar_at: datetime | None = None
+        self.solar_check: dict[str, Any] = {}   # forecasts remembered and days measured (shown at the charge plan)
         self.evcc_state: dict[str, Any] | None = None   # last state read from evcc (only while a vehicle names its evcc car)
         self.evcc_info: dict[str, Any] = {}             # where evcc is, whether it answered (for the sensors)
         for sub in entry.subentries.values():
@@ -204,6 +206,7 @@ class Plugwhen:
             self._solar_at = now
             self._solar = await self._solar_kw()
             self._note_solar_prediction(now)
+            await self._check_solar(now)
         if self._calib_at is None or now - self._calib_at >= CALIBRATE_INTERVAL:
             self._calib_at = now
             self.entry.async_create_background_task(self.hass, self._calibrate(now), f"{DOMAIN} calibrate")
@@ -715,6 +718,38 @@ class Plugwhen:
         if per_day:
             self._save_calib()
 
+    async def _check_solar(self, now: datetime) -> None:
+        """Pair the remembered forecasts of past days with what the solar plant really produced (Energy dashboard, daily statistics).
+        Its own step, every 15 minutes: before, it ran once a day inside the calibration and was skipped whenever an earlier part failed
+        (e.g. the recorder not ready right after a restart), so the solar check stayed at 0 days."""
+        info = self.solar_check = {"at": now.isoformat(), "pending": len(self._solar_acc.pending), "days": len(self._solar_acc.days),
+                                   "sources": [], "error": None}
+        try:
+            solar_ids = await self._solar_production_ids()
+            info["sources"] = solar_ids
+            if not solar_ids or not any(k < now.date().isoformat() for k in self._solar_acc.pending):
+                return
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.statistics import statistics_during_period
+
+            stats = await get_instance(self.hass).async_add_executor_job(
+                statistics_during_period, self.hass, now - timedelta(days=SOLAR_CHECK_DAYS), now, set(solar_ids), "day", {"energy": "kWh"}, {"change"})
+            per_day: dict = {}
+            for sid in solar_ids:
+                for r in stats.get(sid, []):
+                    if r.get("change") is not None:
+                        d = dt_util.as_local(dt_util.utc_from_timestamp(r["start"])).date()
+                        per_day[d] = per_day.get(d, 0.0) + float(r["change"])
+            added = sum(1 for d, kwh in per_day.items() if d < now.date() and self._solar_acc.measured(d, kwh))
+            for k in [k for k in self._solar_acc.pending if k < (now.date() - timedelta(days=SOLAR_CHECK_DAYS)).isoformat()]:
+                del self._solar_acc.pending[k]   # too old to be measured any more
+            if added:
+                self._save_calib()
+            info.update(pending=len(self._solar_acc.pending), days=len(self._solar_acc.days), added=added)
+        except Exception as err:  # noqa: BLE001 - optional; tried again in 15 minutes
+            info["error"] = str(err)[:120]
+            _LOGGER.debug("Plugwhen: solar check skipped: %s", err)
+
     def _save_calib(self) -> None:
         self._calib_store.async_delay_save(lambda: {"calib": self._calib, "solar": self._solar_acc.to_dict(), "add": self._add_model.to_dict()}, 30)
 
@@ -782,19 +817,6 @@ class Plugwhen:
                 b = base_load_from_hourly(hourly)
                 if b is not None:
                     self._calib["base_load_kw"], changed = b, True
-            solar_ids = await self._solar_production_ids()
-            if solar_ids and self._solar_acc.pending:
-                stats = await rec.async_add_executor_job(
-                    statistics_during_period, self.hass, now - timedelta(days=4), now, set(solar_ids), "day", {"energy": "kWh"}, {"change"})
-                per_day: dict = {}
-                for sid in solar_ids:
-                    for r in stats.get(sid, []):
-                        if r.get("change") is not None:
-                            d = dt_util.as_local(dt_util.utc_from_timestamp(r["start"])).date()
-                            per_day[d] = per_day.get(d, 0.0) + float(r["change"])
-                for d, kwh in per_day.items():
-                    if d < now.date() and self._solar_acc.measured(d, kwh):
-                        changed = True
         except Exception as err:  # noqa: BLE001 - the recorder may be busy or a sensor without statistics
             _LOGGER.debug("Plugwhen: calibration skipped: %s", err)
         if changed:
