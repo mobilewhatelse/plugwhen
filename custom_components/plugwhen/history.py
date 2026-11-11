@@ -11,6 +11,10 @@ of the wallbox and hands them over as lists of `(local hour start, value)`. This
   the state of charge (steps of at least `MIN_RISE_PCT`) times the capacity, minus the wallbox energy that reached
   the battery. The car sees charging the wallbox does not, so this is an estimate. None if the home energy is unknown.
 
+* **consumption** = the falls of the state of charge that day times the capacity, per km driven (only from
+  `MIN_CONSUMPTION_KM` on: on short days one percent of the state of charge is already a large part),
+* **temp_c** = the mean of the hourly means of an outdoor temperature (optional).
+
 Nothing is invented: a day without an odometer value has no km (None), a day before the first reading is skipped.
 """
 
@@ -27,6 +31,7 @@ MIN_RISE_PCT = 1.5          # smaller rises of the state of charge are noise
 MAX_HOURLY_KM = 400.0       # an hourly odometer jump larger than this is a glitch, no trip start
 MIN_STEP_KM = 0.5           # an hour with fewer kilometres is not a trip start
 DEFAULT_EFFICIENCY = 0.9    # share of the wallbox energy that reaches the battery
+MIN_CONSUMPTION_KM = 30.0   # a day needs this many km for a consumption value
 
 Series = list[tuple[datetime, float | None]]
 
@@ -37,15 +42,20 @@ def records_from_hourly(
     wallbox_kwh: Series | None = None,
     capacity_kwh: float | None = None,
     efficiency: float = DEFAULT_EFFICIENCY,
+    temp_c: Series | None = None,
 ) -> list[DayRecord]:
     """One record per local day covered by the odometer series. Series must be sorted by time."""
     days: dict[date, dict] = {}
+    temps: dict[date, list[float]] = {}
+    for t, x in temp_c or []:
+        if x is not None:
+            temps.setdefault(t.date(), []).append(float(x))
     prev_o: float | None = None
     prev_t: datetime | None = None
     prev_rose = False
     carry = False   # a trip that started the evening before is still running after midnight: not a departure of this day
     for t, o in odometer_km:
-        rec = days.setdefault(t.date(), {"last_o": None, "first_move": None, "rise": 0.0, "prev_soc": None, "wb_last": None})
+        rec = days.setdefault(t.date(), {"last_o": None, "first_move": None, "rise": 0.0, "fall": 0.0, "prev_soc": None, "wb_last": None})
         if o is None:
             continue
         rose = prev_o is not None and MIN_STEP_KM < o - prev_o < MAX_HOURLY_KM
@@ -65,6 +75,8 @@ def records_from_hourly(
             continue
         if soc_prev is not None and s - soc_prev >= MIN_RISE_PCT:
             rec["rise"] += s - soc_prev
+        elif soc_prev is not None and s < soc_prev:
+            rec["fall"] += soc_prev - s
         soc_prev = s
     for t, w in wallbox_kwh or []:
         rec = days.get(t.date())
@@ -92,8 +104,13 @@ def records_from_hourly(
             charged = round(r["rise"] / 100.0 * capacity_kwh, 2)
         if home is not None and capacity_kwh:
             away = max(0.0, r["rise"] / 100.0 * capacity_kwh - home * efficiency)
+        cons = None
+        if capacity_kwh and km is not None and MIN_CONSUMPTION_KM <= km <= 1500.0 and r["fall"] > 0:
+            cons = round(r["fall"] / 100.0 * capacity_kwh / km, 3)
+        tl = temps.get(d)
         out.append(DayRecord(d, km=km, first_move_hour=r["first_move"] if km is not None and km >= 2.0 else None,
-                             home_kwh=home, away_kwh=away, charged_kwh=charged))
+                             home_kwh=home, away_kwh=away, consumption=cons, charged_kwh=charged,
+                             temp_c=round(sum(tl) / len(tl), 1) if tl else None))
     return [r for r in out if r.km is not None or r.home_kwh is not None]
 
 

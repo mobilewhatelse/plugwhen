@@ -2,6 +2,15 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Consumption per km is learned (it was not before):** from the falls of the state of charge on days with at least 30 km
+  (times the capacity), median of the last 20 days; until 3 days are known the typed-in value. Attributes `consumption_source`,
+  `consumption_days_with_temp`, `departure_temp_c` on the learned week sensor.
+- **Consumption by outdoor temperature (optional):** with an outdoor temperature (own option or taken from the Wächter) each
+  day gets its mean temperature. The need for a departure uses the temperature expected then (hourly weather forecast, else the
+  sensor's current value within a day): the car's own line once 8 days over 8 K are known (colder never costs less), before that
+  a rule of thumb (about 1 % per kelvin below 18 deg C, at most +40 %); a typed-in value only ever gets more. Without a
+  temperature nothing changes.
+
 - **Special trips are not learned:** the days of the events in the car's trip calendar are left out of the learned week (a single
   trip to Linz must not raise the kilometres of every Thursday). Attribute `trip_days_skipped` on the learned week sensor.
 - **Anonymous usage statistics, voluntary (default off):** asked in the last step of the set-up, afterwards a switch. Weekly: a

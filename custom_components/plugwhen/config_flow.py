@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
     O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
+    O_OUTDOOR_TEMP, O_WEATHER,
 )
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
 from .takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard
@@ -251,6 +252,8 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_WAECHTER, current): ConfigEntrySelector(ConfigEntrySelectorConfig(integration=WAECHTER_DOMAIN)),
             _opt(O_LOAD, current): _ent("sensor"),
             _opt(O_AVAIL, current): _ent("sensor"),
+            _opt(O_OUTDOOR_TEMP, current): _ent("sensor"),
+            _opt(O_WEATHER, current): _ent("weather"),
             vol.Required(O_SOLAR, default=current.get(O_SOLAR, True)): BooleanSelector(),
             _opt(O_SOLAR_DEDUCT, current): _num(0, 20, 0.1, "kW"),
             _opt(O_GRID_ENERGY, current): _ent("sensor"),

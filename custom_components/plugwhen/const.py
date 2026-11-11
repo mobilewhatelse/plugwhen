@@ -14,6 +14,9 @@ SUBENTRY_VEHICLE = "vehicle"
 O_WAECHTER = "waechter_entry"             # the quarter-hour peak guard (a config entry): its load forecast is found automatically
 O_LOAD = "load_entity"                    # sensor with the expected house load (attributes `hours`, `target_kw`), e.g. of the peak guard
 O_AVAIL = "availability_entity"          # sensor of the availability interface (attributes `schema`, `valid_until`, `forecast`)
+O_OUTDOOR_TEMP = "outdoor_temp_entity"    # optional: outdoor temperature sensor (consumption per km by temperature); taken from the guard if empty
+O_WEATHER = "weather_entity"              # optional: weather entity (temperature at the departure); taken from the guard if empty
+WEATHER_REFRESH = timedelta(minutes=30)
 O_SOLAR = "use_solar_forecast"            # take the solar forecast of the Energy dashboard as available power (default on)
 O_SOLAR_DEDUCT = "solar_deduct_kw"        # kW taken off the solar forecast first (house, home battery)
 DEFAULT_SOLAR_DEDUCT = 0.5

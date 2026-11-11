@@ -22,6 +22,7 @@ from .const import (
     O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
     V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
+    O_OUTDOOR_TEMP, O_WEATHER, WEATHER_REFRESH,
 )
 from dataclasses import replace
 
@@ -51,6 +52,14 @@ from .potential import Prices, calculate as calculate_potential, clean_grid
 
 _LOGGER = logging.getLogger(__name__)
 _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
+
+
+def _to_celsius(value: Any, unit: str | None) -> float | None:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round((x - 32.0) / 1.8, 2) if (unit or "").strip().upper() in ("°F", "F", "DEGF") else x
 LOOKAHEAD_DAYS = 7
 HORIZON_DAYS = 14             # days looked at for the look-ahead (as far as possible: with normal behaviour, when is charging needed?)
 HORIZON_TRIPS = 10            # departures in the look-ahead
@@ -74,6 +83,8 @@ class Vehicle:
     charge_plan: dict[str, Any] | None = None
     notice: Notice | None = None
     consumption: float = DEFAULT_CONSUMPTION_100 / 100.0   # kWh per km used for the need
+    consumption_source: str = "config"                     # learned, config, curve, rule, rule_config (learning.consumption_at)
+    departure_temp_c: float | None = None                  # outdoor temperature expected at the departure (None = not known)
     departure: datetime | None = None
     departure_source: str | None = None                    # "entity" or "learned"
     soc: float | None = None
@@ -137,6 +148,8 @@ class Plugwhen:
         self._add_model = QuarterAddModel()
         self._solar: dict[datetime, float] | None = None
         self._solar_at: datetime | None = None
+        self._wx: dict[datetime, float] = {}       # hourly outdoor temperature forecast (local hour start -> deg C)
+        self._wx_at: datetime | None = None
         self.solar_check: dict[str, Any] = {}   # forecasts remembered and days measured (shown at the charge plan)
         self.evcc_state: dict[str, Any] | None = None   # last state read from evcc (only while a vehicle names its evcc car)
         self.evcc_info: dict[str, Any] = {}             # where evcc is, whether it answered (for the sensors)
@@ -232,6 +245,9 @@ class Plugwhen:
         if self._calib_at is None or now - self._calib_at >= CALIBRATE_INTERVAL:
             self._calib_at = now
             self.entry.async_create_background_task(self.hass, self._calibrate(now), f"{DOMAIN} calibrate")
+        if self._wx_at is None or now - self._wx_at >= WEATHER_REFRESH:
+            self._wx_at = now
+            await self._refresh_weather()
         await self._refresh_evcc(now)
         self._usage_step(now)
         for v in self.vehicles.values():
@@ -730,7 +746,8 @@ class Plugwhen:
     async def _load_history(self, v: Vehicle, now: datetime) -> None:
         v.history_at = now  # also after a failure: try again in an hour
         odo_id, soc_id, wb_id = v.cfg.get(V_ODOMETER), v.cfg.get(V_SOC), v.cfg.get(V_WALLBOX_ENERGY)
-        ids = {e for e in (odo_id, soc_id, wb_id) if e}
+        temp_id = self._outdoor_entity()
+        ids = {e for e in (odo_id, soc_id, wb_id, temp_id) if e}
         try:
             from homeassistant.components.recorder import get_instance
             from homeassistant.components.recorder.statistics import statistics_during_period
@@ -770,6 +787,7 @@ class Plugwhen:
             series(soc_id, "mean", "state", lambda x, _u: x),
             series(wb_id, "state", "max", to_kwh) or None,
             float(v.cfg.get(V_CAPACITY) or 0) or None,
+            temp_c=series(temp_id, "mean", "state", _to_celsius) or None,
         )
         v.records = records
         v.efficiency = efficiency_from_records(records)
@@ -1057,6 +1075,45 @@ class Plugwhen:
     def _save_calib(self) -> None:
         self._calib_store.async_delay_save(lambda: {"calib": self._calib, "solar": self._solar_acc.to_dict(), "add": self._add_model.to_dict()}, 30)
 
+    # ---------- outdoor temperature (optional: consumption per km by temperature) ----------
+
+    def _outdoor_entity(self) -> str | None:
+        return self.entry.options.get(O_OUTDOOR_TEMP) or self._waechter_cfg().get("outdoor_temp_entity") or None
+
+    def _weather_entity(self) -> str | None:
+        return self.entry.options.get(O_WEATHER) or self._waechter_cfg().get("weather_entity") or None
+
+    async def _refresh_weather(self) -> None:
+        """Hourly temperature forecast of the weather entity (none: the outdoor sensor's value is used near the departure)."""
+        eid = self._weather_entity()
+        if not eid:
+            self._wx = {}
+            return
+        try:
+            resp = await self.hass.services.async_call(
+                "weather", "get_forecasts", {"entity_id": eid, "type": "hourly"}, blocking=True, return_response=True)
+            unit = (self._state(eid).attributes.get("temperature_unit") if self._state(eid) else None)
+            out: dict[datetime, float] = {}
+            for row in ((resp or {}).get(eid) or {}).get("forecast") or []:
+                t = dt_util.parse_datetime(str(row.get("datetime") or ""))
+                c = _to_celsius(row.get("temperature"), unit)
+                if t is not None and c is not None:
+                    out[dt_util.as_local(t).replace(minute=0, second=0, microsecond=0)] = c
+            self._wx = out
+        except Exception as err:  # noqa: BLE001 - the temperature is optional
+            _LOGGER.debug("Plugwhen: no weather forecast from %s: %s", eid, err)
+            self._wx = {}
+
+    def _temp_at(self, when: datetime, now: datetime) -> float | None:
+        """Outdoor temperature at `when`: the forecast hour, else the sensor's current value if `when` is within a day."""
+        hour = when.replace(minute=0, second=0, microsecond=0)
+        if hour in self._wx:
+            return self._wx[hour]
+        eid = self._outdoor_entity()
+        if eid and when - now <= timedelta(hours=24):
+            return _to_celsius(self._float(eid), self._unit(eid))
+        return None
+
     def _waechter_cfg(self) -> dict[str, Any]:
         wid = self.entry.options.get(O_WAECHTER)
         entry = self.hass.config_entries.async_get_entry(wid) if wid else None
@@ -1208,8 +1265,9 @@ class Plugwhen:
         v.departure, v.departure_source = self._departure(v, now)
         weekday = (v.departure or (now + timedelta(days=1))).weekday()  # without a departure: tomorrow
         v.plan = self._plan_for(v, v.departure, weekday)
-        v.consumption = (v.model.consumption_kwh_per_km() if v.model.consumption_known
-                         else float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
+        v.departure_temp_c = self._temp_at(v.departure or now + timedelta(hours=12), now)
+        v.consumption, v.consumption_source = v.model.consumption_at(
+            v.departure_temp_c, float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
         v.need = compute_need(
             v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption,
             learn_km=v.learn_km or v.departure_source == "calendar", efficiency=v.efficiency or DEFAULT_EFFICIENCY, min_soc=self._min_soc(v))

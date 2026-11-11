@@ -270,6 +270,9 @@ class WeekPlanSensor(PlugwhenEntity, SensorEntity):
             "history_error": v.history_error,
             "consumption_kwh_per_km": round(v.consumption, 3),
             "consumption_learned": v.model.consumption_known,
+            "consumption_source": v.consumption_source,
+            "consumption_days_with_temp": len(v.model.consumption_temp),
+            "departure_temp_c": v.departure_temp_c,
         }
 
 
