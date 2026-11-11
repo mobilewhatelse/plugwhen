@@ -50,6 +50,14 @@ def without_same_trip(trips: list[Trip], departure: datetime, window: timedelta 
     return [t for t in trips if abs(t.departure - departure) > window]
 
 
+def with_calendar(learned: list[Trip], calendar: list[Trip], window: timedelta = SAME_TRIP_WINDOW) -> list[Trip]:
+    """The learned departures plus the calendar trips. A calendar trip replaces a learned departure only when it is the same trip
+    (within `window`); calendar trips never replace each other: every entry in the calendar is a trip of its own."""
+    for c in calendar:
+        learned = without_same_trip(learned, c.departure, window)
+    return sorted(learned + list(calendar), key=lambda t: t.departure)
+
+
 def away_hours(km_typical: float) -> float:
     """How long the car is away: three hours plus an hour per 12 km, between 3 and 10 hours (a stand-in until it is learned from the plug-in times)."""
     return min(MAX_AWAY_H, max(MIN_AWAY_H, 3.0 + km_typical / 12.0))

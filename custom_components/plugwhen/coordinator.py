@@ -41,7 +41,7 @@ from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours, merge_available, surplus_from_solar
 from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
-from .horizon import Trip, horizon_plan, without_same_trip
+from .horizon import Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
 from .need import DEFAULT_EFFICIENCY, MIN_SAMPLES, Need, compute_need
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, should_check
@@ -1260,17 +1260,14 @@ class Plugwhen:
         if v.departure is not None and v.departure_source == "entity":
             out = [t for t in out if t.departure.date() != v.departure.date()]
             out.append(trip_for(v.departure, v.departure.weekday()))
-        for t in v.trips:   # a calendar trip replaces the learned departure only when it is the same trip (within two hours); a trip at another time comes on top
+        cal: list[Trip] = []
+        for t in v.trips:
             d = dt_util.parse_datetime(t["departure"])
             if d is None or d <= now:
                 continue
-            out = without_same_trip(out, d)
-            if t.get("km"):
-                out.append(Trip(d, float(t["km"]), float(t["range_km"])))
-            else:
-                out.append(trip_for(d, d.weekday()))
-        out.sort(key=lambda t: t.departure)
-        return out[:HORIZON_TRIPS]
+            cal.append(Trip(d, float(t["km"]), float(t["range_km"])) if t.get("km") else trip_for(d, d.weekday()))
+        # a calendar trip replaces the learned departure only when it is the same trip (within two hours); calendar trips never replace each other
+        return with_calendar(out, cal)[:HORIZON_TRIPS]
 
     def _horizon(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None, max_kw: float) -> dict[str, Any] | None:
         """Where the energy for the next departures comes from and whether charging with the sun in advance saves grid energy. Works without

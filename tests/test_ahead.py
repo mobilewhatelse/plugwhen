@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from horizon import Trip, horizon_plan, without_same_trip  # noqa: E402
+from horizon import Trip, horizon_plan, with_calendar, without_same_trip  # noqa: E402
 from messages import ahead_text  # noqa: E402
 from notice import ahead_key, check_ahead  # noqa: E402
 
@@ -106,6 +106,19 @@ class SameTripTest(unittest.TestCase):
     def test_only_the_trip_of_the_same_time_goes(self):
         a, b = Trip(at(2, 7, 30), 40, 100), Trip(at(2, 17, 0), 20, 100)
         self.assertEqual(without_same_trip([a, b], at(2, 17, 30)), [a])
+
+    def test_two_calendar_trips_close_together_both_stay(self):
+        # 11.11.2026 live: "Testfahrt 330 km" 07:00 and "Büro 100 km" 07:30 - the office entry pushed the long trip out
+        learned = [Trip(at(2, 7, 30), 40, 100)]
+        long_trip, office = Trip(at(2, 7, 0), 330, 379.5), Trip(at(2, 7, 30), 100, 115)
+        self.assertEqual(with_calendar(learned, [office, long_trip]), [long_trip, office])
+
+    def test_the_learned_departure_goes_and_a_far_calendar_trip_comes_on_top(self):
+        learned = [Trip(at(2, 7, 30), 40, 100), Trip(at(3, 7, 30), 40, 100)]
+        evening = Trip(at(2, 17, 0), 60, 100)
+        self.assertEqual(with_calendar(learned, [evening]), [learned[0], evening, learned[1]])
+        late = Trip(at(2, 8, 0), 60, 100)
+        self.assertEqual(with_calendar(learned, [late]), [late, learned[1]])
 
 
 if __name__ == "__main__":
