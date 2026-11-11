@@ -2,6 +2,9 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Odometer and state of charge found through evcc:** evcc reports both for the car at its loadpoint; the car form proposes the
+  sensors of Home Assistant that show the same values (the car's own integration before a copy of evcc's value, the state of charge only
+  from the same device as the odometer, nothing when it is not unambiguous).
 - **Set-up assistant:** two steps instead of an empty page. *What is there* says what was found (the Wächter is linked right away, evcc by
   the Wächter's address or on this machine; an address is asked only if evcc was not found). *Your cars* adds one car after the other,
   each prefilled from the Wächter and evcc; what is needed per car is its odometer and its state of charge.

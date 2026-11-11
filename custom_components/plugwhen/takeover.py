@@ -96,3 +96,15 @@ def pick_by_unit(candidates: list[tuple[str, str | None, str | None]], units: tu
     fit = [(sc not in COUNTERS, eid) for eid, unit, sc in candidates
            if eid not in (exclude or set()) and unit and unit.strip().lower() in want]
     return min(fit)[1] if fit else None
+
+
+def sensor_by_value(candidates: list[tuple[str, float, bool]], value: float | None, tolerance: float) -> str | None:
+    """The sensor that shows `value` right now: evcc knows the odometer and the state of charge of the car at its loadpoint, and the
+    sensor of the car's own integration in Home Assistant shows the same number. `candidates` = (entity_id, value, preferred);
+    among those within `tolerance` the preferred ones win (the car's own integration before a copy of evcc's value).
+    Exactly one must be left, otherwise nothing is proposed - a wrong sensor is worse than an empty field."""
+    if value is None:
+        return None
+    near = [(eid, pref) for eid, v, pref in candidates if abs(float(v) - float(value)) <= tolerance]
+    best = [eid for eid, pref in near if pref] or [eid for eid, _ in near]
+    return best[0] if len(best) == 1 else None

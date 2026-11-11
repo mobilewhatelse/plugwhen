@@ -21,8 +21,8 @@ from .const import (
     O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
 )
-from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, match_vehicle, parse_vehicles, vehicle_from_evcc
-from .takeover import guard_wallbox, next_vehicle, pick_by_unit, vehicle_from_guard
+from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
+from .takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
 
 WAECHTER_DOMAIN = "viertelstunden_waechter"
@@ -323,6 +323,58 @@ def vehicle_errors(hass: HomeAssistant, u: dict[str, Any]) -> dict[str, str]:
     return {}
 
 
+def _sensors_from_evcc_values(hass: HomeAssistant, state: dict[str, Any] | None, key: str, proposal: dict[str, Any]) -> bool:
+    """Fill the odometer and the state-of-charge sensor of the car by their values: evcc reports both for the car at its loadpoint,
+    the sensors of the car's integration in Home Assistant show the same numbers. Only empty fields, only an unambiguous hit."""
+    from homeassistant.helpers import entity_registry as er
+
+    lp = loadpoint_of(state, key)
+    if not lp:
+        return False
+    reg = er.async_get(hass)
+
+    def cands(units: tuple[str, ...], device: str | None = None) -> list[tuple[str, float, bool]]:
+        out = []
+        for st in hass.states.async_all("sensor"):
+            unit = str(st.attributes.get("unit_of_measurement") or "")
+            if unit not in units:
+                continue
+            try:
+                val = float(st.state)
+            except (TypeError, ValueError):
+                continue
+            ent = reg.async_get(st.entity_id)
+            if device is not None and (ent is None or ent.device_id != device):
+                continue
+            if unit in ("mi", "mile", "miles"):
+                val *= 1.609344
+            out.append((st.entity_id, val, "evcc" not in str(getattr(ent, "platform", "") or "")))
+        return out
+
+    def num(x: Any) -> float | None:
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    found = False
+    odo = num(lp.get("vehicleOdometer"))
+    if not proposal.get(V_ODOMETER) and odo and odo > 0:
+        eid = sensor_by_value(cands(DISTANCE_UNITS), odo, 2.0)
+        if eid:
+            proposal[V_ODOMETER] = eid
+            found = True
+    soc = num(lp.get("vehicleSoc"))
+    if not proposal.get(V_SOC) and soc is not None and proposal.get(V_ODOMETER):
+        ent = reg.async_get(proposal[V_ODOMETER])   # the state of charge only from the same device as the odometer: "62 %" alone is not unique
+        if ent is not None and ent.device_id:
+            eid = sensor_by_value(cands(PERCENT_UNITS, ent.device_id), soc, 2.5)
+            if eid:
+                proposal[V_SOC] = eid
+                found = True
+    return found
+
+
 async def car_proposal(hass: HomeAssistant, entry: Any, own_url: str | None, own_password: str | None,
                        taken_evcc: set[str]) -> tuple[dict[str, Any], list[str], list[str], dict[str, Any] | None, list[dict[str, Any]]]:
     """What the guard and evcc already know about the next car: (values, notes, sources, evcc state, evcc vehicles)."""
@@ -344,6 +396,8 @@ async def car_proposal(hass: HomeAssistant, entry: Any, own_url: str | None, own
             for k, val in found.items():   # the guard's values (sensors of Home Assistant) win
                 proposal.setdefault(k, val)
             notes.append(f"evcc ({found.get(V_NAME, key)})")
+            if _sensors_from_evcc_values(hass, state, key, proposal):
+                notes.append("evcc → Home Assistant (km, %)")
             taken.append("evcc")
     return proposal, notes, taken, state, vehicles
 

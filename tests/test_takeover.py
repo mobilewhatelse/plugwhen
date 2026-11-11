@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from takeover import guard_wallbox, next_vehicle, pick_by_unit, vehicle_from_guard, wallbox_kw  # noqa: E402
+from takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard, wallbox_kw  # noqa: E402
 
 CAR = {"kind": "vehicle", "name": "Mercedes", "soc_entity": "sensor.car_soc", "capacity_kwh": 66.0, "charge_kw_max": 11.0,
        "charge_kw_min": 1.4, "departure_entity": "time.wallbox_departure", "connected_entity": "binary_sensor.car_plug", "target_soc": 80.0}
@@ -91,6 +91,25 @@ class PickTest(unittest.TestCase):
         c = [("sensor.a", "KM", "total"), ("sensor.b", "km", None)]
         self.assertEqual(pick_by_unit(c, ("km",), exclude={"sensor.a"}), "sensor.b")
         self.assertIsNone(pick_by_unit([("sensor.a", None, "total")], ("km",)))
+
+
+class ByValueTest(unittest.TestCase):
+    """evcc knows odometer and state of charge of the car at its loadpoint: the sensor in Home Assistant with the same value is the car's."""
+
+    def test_the_sensor_with_the_same_value(self):
+        c = [("sensor.car_odometer", 61812.0, True), ("sensor.trip", 43.0, True), ("sensor.other_car_km", 20500.0, True)]
+        self.assertEqual(sensor_by_value(c, 61813.2, 2.0), "sensor.car_odometer")
+
+    def test_the_cars_own_sensor_before_a_copy_of_evcc(self):
+        c = [("sensor.evcc_vehicle_odometer", 61812.0, False), ("sensor.car_odometer", 61812.0, True)]
+        self.assertEqual(sensor_by_value(c, 61812.0, 2.0), "sensor.car_odometer")
+        self.assertEqual(sensor_by_value(c[:1], 61812.0, 2.0), "sensor.evcc_vehicle_odometer")   # better than nothing
+
+    def test_nothing_when_unclear_or_missing(self):
+        two = [("sensor.a", 62.0, True), ("sensor.b", 61.0, True)]
+        self.assertIsNone(sensor_by_value(two, 62.0, 2.5))
+        self.assertIsNone(sensor_by_value(two, None, 2.5))
+        self.assertIsNone(sensor_by_value([("sensor.a", 10.0, True)], 62.0, 2.5))
 
 
 if __name__ == "__main__":
