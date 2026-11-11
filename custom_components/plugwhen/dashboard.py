@@ -94,7 +94,7 @@ TEXT = {
         ep_write_err="Schreiben fehlgeschlagen", ep_mine="von Plugwhen geschrieben",
         tr_h="Eingetragene Fahrten", tr_none="Keine Fahrten im Kalender.", tr_nocal="Kein Kalender eingetragen. Fahrten können Sie in einem Kalender von Home Assistant eintragen (Titel z. B. „Linz 200 km“).",
         tr_km_event="aus dem Termin", tr_km_route="Strecke über Waze, hin und zurück", tr_km_route1="Strecke über Waze, einfach", tr_km_none="Kilometer unbekannt, gelernter Tag zählt",
-        tr_range="Reichweite bei Abfahrt", tr_err="Kalender nicht lesbar",
+        tr_range="Ziel bei Abfahrt", tr_why_res="Reserve", tr_why_km="Strecke + 15 %", tr_err="Kalender nicht lesbar",
         v_overview="Übersicht", v_learning="Lernen", v_details="Details", sun_h="Sonne und gelernte Werte",
         rd_h="Bereit zum Schalten?", rd_trips="Fahrten gelernt", rd_cmp="Tage mit Vergleich (Lernmodus)", rd_agree="Gleich entschieden",
         rd_solar="Sonnenprognose geprüft", rd_days="Tage", rd_wd="Wochentage", rd_est="voraussichtlich ab",
@@ -191,7 +191,7 @@ TEXT = {
         ep_write_err="Writing failed", ep_mine="written by Plugwhen",
         tr_h="Planned trips", tr_none="No trips in the calendar.", tr_nocal="No calendar set. Trips can be entered in a calendar of Home Assistant (title e.g. \u201cLinz 200 km\u201d).",
         tr_km_event="from the event", tr_km_route="route via Waze, there and back", tr_km_route1="route via Waze, one way", tr_km_none="kilometres unknown, the learned day counts",
-        tr_range="range at departure", tr_err="calendar not readable",
+        tr_range="target at departure", tr_why_res="reserve", tr_why_km="trip + 15 %", tr_err="calendar not readable",
         v_overview="Overview", v_learning="Learning", v_details="Details", sun_h="Sun and learned values",
         rd_h="Ready to switch?", rd_trips="Trips learned", rd_cmp="Days with a comparison (learn mode)", rd_agree="Decided the same",
         rd_solar="Solar forecast checked", rd_days="days", rd_wd="weekdays", rd_est="expected from",
@@ -350,7 +350,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% for x in a.trips[:6] %}{% set d = x.departure | as_datetime | as_local %}"
         "- **{{ wd[d.weekday()] }} {{ d.strftime('%d.%m. %H:%M') }}** {{ x.title }}"
         "{% if x.km %} · {{ x.km | round(0) | int }} km ({{ {'event': '" + t["tr_km_event"] + "', 'route': ('" + t["tr_km_route1"]
-        + "' if x.one_way else '" + t["tr_km_route"] + "')}.get(x.km_source, '') }}) · " + t["tr_range"] + " {{ x.range_km | round(0) | int }} km"
+        + "' if x.one_way else '" + t["tr_km_route"] + "')}.get(x.km_source, '') }}) · " + t["tr_range"] + " {{ x.range_km | round(0) | int }} km ({{ '" + t["tr_why_res"] + "' if (x.range_km | float(0)) > (x.km | float(0)) * 1.15 + 0.5 else '" + t["tr_why_km"] + "' }})"
         "{% else %} · " + t["tr_km_none"] + "{% endif %}\n{% endfor %}{% endif %}"
     )
     rd = (
