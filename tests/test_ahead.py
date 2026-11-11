@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from horizon import Trip, horizon_plan  # noqa: E402
+from horizon import Trip, horizon_plan, without_same_trip  # noqa: E402
 from messages import ahead_text  # noqa: E402
 from notice import ahead_key, check_ahead  # noqa: E402
 
@@ -92,6 +92,20 @@ class AheadTest(unittest.TestCase):
         from notice import Ahead
         bare = Ahead("charge", SAT.date(), at(2, 7), 5.0, None, None)
         self.assertIn("Morgen", ahead_text("de", bare, "Auto")[1])
+
+
+class SameTripTest(unittest.TestCase):
+    def test_a_calendar_trip_close_to_the_learned_departure_is_the_same_trip(self):
+        learned = [Trip(at(2, 7, 30), 40, 100)]
+        self.assertEqual(without_same_trip(learned, at(2, 8, 45)), [])
+
+    def test_a_trip_at_another_time_of_the_day_comes_on_top(self):
+        learned = [Trip(at(2, 7, 30), 40, 100)]
+        self.assertEqual(without_same_trip(learned, at(2, 17)), learned)
+
+    def test_only_the_trip_of_the_same_time_goes(self):
+        a, b = Trip(at(2, 7, 30), 40, 100), Trip(at(2, 17, 0), 20, 100)
+        self.assertEqual(without_same_trip([a, b], at(2, 17, 30)), [a])
 
 
 if __name__ == "__main__":

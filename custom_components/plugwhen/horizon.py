@@ -42,6 +42,14 @@ class Trip:
     km_target: float         # the range to have at departure (reserve floor, lifted by the learned high value)
 
 
+SAME_TRIP_WINDOW = timedelta(hours=2)   # a calendar trip this close to a learned departure counts as the same trip
+
+
+def without_same_trip(trips: list[Trip], departure: datetime, window: timedelta = SAME_TRIP_WINDOW) -> list[Trip]:
+    """The trips without the one that is the same as a trip at `departure` (within the window). Trips at another time stay: they come on top."""
+    return [t for t in trips if abs(t.departure - departure) > window]
+
+
 def away_hours(km_typical: float) -> float:
     """How long the car is away: three hours plus an hour per 12 km, between 3 and 10 hours (a stand-in until it is learned from the plug-in times)."""
     return min(MAX_AWAY_H, max(MIN_AWAY_H, 3.0 + km_typical / 12.0))

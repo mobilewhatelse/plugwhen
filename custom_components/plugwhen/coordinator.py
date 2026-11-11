@@ -41,7 +41,7 @@ from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours, merge_available, surplus_from_solar
 from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
-from .horizon import Trip, horizon_plan
+from .horizon import Trip, horizon_plan, without_same_trip
 from .messages import ahead_text, notice_text
 from .need import DEFAULT_EFFICIENCY, MIN_SAMPLES, Need, compute_need
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, should_check
@@ -1260,11 +1260,11 @@ class Plugwhen:
         if v.departure is not None and v.departure_source == "entity":
             out = [t for t in out if t.departure.date() != v.departure.date()]
             out.append(trip_for(v.departure, v.departure.weekday()))
-        for t in v.trips:   # trips from the calendar replace the learned departure of their day
+        for t in v.trips:   # a calendar trip replaces the learned departure only when it is the same trip (within two hours); a trip at another time comes on top
             d = dt_util.parse_datetime(t["departure"])
             if d is None or d <= now:
                 continue
-            out = [x for x in out if x.departure.date() != d.date()]
+            out = without_same_trip(out, d)
             if t.get("km"):
                 out.append(Trip(d, float(t["km"]), float(t["range_km"])))
             else:
