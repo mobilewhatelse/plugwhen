@@ -943,7 +943,9 @@ class Plugwhen:
         st = self._state(self._load_entity())
         if st is None or st.state in _BAD:
             return None, None
-        quarters = load_from_hours(st.attributes.get("hours"), now.tzinfo)
+        # the house alone if the guard offers it (from 0.14.1): its own `hours` contain the expected charging of the car, and the
+        # car Plugwhen plans must not count as load against itself (otherwise there is "no room" every night)
+        quarters = load_from_hours(st.attributes.get("hours_house") or st.attributes.get("hours"), now.tzinfo)
         try:
             target = float(st.attributes.get("target_kw")) if st.attributes.get("target_kw") is not None else None
         except (TypeError, ValueError):
