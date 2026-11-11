@@ -13,6 +13,24 @@
     "create_dashboard": {
       "name": "Dashboard erstellen",
       "description": "Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation (alle Fahrzeuge) und gibt es als YAML zurück, auch als Benachrichtigung, zum Einfügen in ein neues Dashboard (Bearbeiten, Raw-Konfigurationseditor). Nur Standardkarten. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren."
+    },
+    "send_feedback": {
+      "name": "Rückmeldung senden",
+      "description": "Schickt Ihre Rückmeldung an den Autor von Plugwhen (aiwhatelse.eu). Mit „Einrichtung mitsenden“ geht eine Übersicht mit: Zahl der Autos, Betriebsarten, Integrationen der Sensoren, keine Namen, Entitäts-IDs oder Messwerte.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "Was funktioniert, was nicht, was Sie sich wünschen."
+        },
+        "contact": {
+          "name": "Kontakt (optional)",
+          "description": "Eine E-Mail-Adresse, wenn Sie eine Antwort möchten."
+        },
+        "include_setup": {
+          "name": "Einrichtung mitsenden",
+          "description": "Zahl der Autos, Betriebsarten und Integrationen, keine Namen oder Werte."
+        }
+      }
     }
   },
   "config": {
@@ -79,6 +97,13 @@
           "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
           "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
           "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
+        }
+      },
+      "finish": {
+        "title": "Darf ich Sie um etwas bitten?",
+        "description": "Eine anonyme Nutzungsstatistik hilft mir, Plugwhen weiterzuentwickeln und zu betreiben. Gesendet werden nur Versionen, Land und welche Autos und Wallboxen verwendet werden, **nie** Namen, Messwerte oder Kennwörter.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+        "data": {
+          "share_usage": "Ja, ich bin einverstanden"
         }
       }
     },
@@ -335,6 +360,9 @@
       },
       "notice_enabled": {
         "name": "Warnen, wenn das Auto nicht bereit sein wird"
+      },
+      "share_usage": {
+        "name": "Anonyme Nutzungsstatistik senden"
       }
     },
     "number": {
@@ -350,6 +378,32 @@
           "learn": "Lernen",
           "evcc": "Über evcc (Plan schreiben)",
           "direct": "Direkt (Plugwhen steuert die Wallbox)"
+        }
+      }
+    },
+    "text": {
+      "feedback_text": {
+        "name": "Rückmeldung"
+      }
+    },
+    "button": {
+      "feedback_send": {
+        "name": "Rückmeldung senden"
+      }
+    }
+  },
+  "issues": {
+    "share_usage_question": {
+      "title": "Anonyme Nutzungsstatistik senden? (eine Bitte)",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Darf ich Sie um etwas bitten?",
+            "description": "Eine anonyme Nutzungsstatistik hilft mir, Plugwhen weiterzuentwickeln und zu betreiben. Gesendet werden nur Versionen, Land und welche Autos und Wallboxen verwendet werden, **nie** Namen, Messwerte oder Kennwörter.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+            "data": {
+              "share_usage": "Ja, ich bin einverstanden"
+            }
+          }
         }
       }
     }

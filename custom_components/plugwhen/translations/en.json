@@ -13,6 +13,24 @@
     "create_dashboard": {
       "name": "Create the dashboard",
       "description": "Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only."
+    },
+    "send_feedback": {
+      "name": "Send feedback",
+      "description": "Sends your feedback to the author of Plugwhen (aiwhatelse.eu). With 'include setup' an overview goes along: number of cars, modes, the integrations of the sensors, no names, entity ids or values.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "What works, what does not, what you would like."
+        },
+        "contact": {
+          "name": "Contact (optional)",
+          "description": "An e-mail address if you want an answer."
+        },
+        "include_setup": {
+          "name": "Include setup",
+          "description": "Number of cars, modes and integrations, no names or values."
+        }
+      }
     }
   },
   "config": {
@@ -79,6 +97,13 @@
           "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
           "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
           "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
+        }
+      },
+      "finish": {
+        "title": "May I ask a favour?",
+        "description": "An anonymous usage statistic helps me keep developing and running Plugwhen. Only versions, country and which cars and wallboxes are used are sent, **never** names, measurements or passwords.\n\nVoluntary, and you can switch it off any time. Thank you!",
+        "data": {
+          "share_usage": "Yes, I agree"
         }
       }
     },
@@ -335,6 +360,9 @@
       },
       "notice_enabled": {
         "name": "Warn when the car will not be ready"
+      },
+      "share_usage": {
+        "name": "Share anonymous usage statistics"
       }
     },
     "number": {
@@ -350,6 +378,32 @@
           "learn": "Learn",
           "evcc": "Via evcc (write plan)",
           "direct": "Direct (Plugwhen controls the wallbox)"
+        }
+      }
+    },
+    "text": {
+      "feedback_text": {
+        "name": "Feedback"
+      }
+    },
+    "button": {
+      "feedback_send": {
+        "name": "Send feedback"
+      }
+    }
+  },
+  "issues": {
+    "share_usage_question": {
+      "title": "Share anonymous usage statistics? (a request)",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "May I ask a favour?",
+            "description": "An anonymous usage statistic helps me keep developing and running Plugwhen. Only versions, country and which cars and wallboxes are used are sent, **never** names, measurements or passwords.\n\nVoluntary, and you can switch it off any time. Thank you!",
+            "data": {
+              "share_usage": "Yes, I agree"
+            }
+          }
         }
       }
     }

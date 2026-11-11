@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 DOMAIN = "plugwhen"
-PLATFORMS = ["number", "select", "sensor", "switch"]
+PLATFORMS = ["button", "number", "select", "sensor", "switch", "text"]
 UPDATE_INTERVAL = timedelta(minutes=5)      # recompute the need from the current state of charge
 HISTORY_INTERVAL = timedelta(hours=1)       # read the long-term statistics again
 HISTORY_DAYS = 120

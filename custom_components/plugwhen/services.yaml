@@ -9,3 +9,19 @@ calculate_potential:
           max: 365
           mode: box
 create_dashboard:
+send_feedback:
+  fields:
+    text:
+      required: true
+      selector:
+        text:
+          multiline: true
+    contact:
+      required: false
+      selector:
+        text:
+    include_setup:
+      required: false
+      default: true
+      selector:
+        boolean:

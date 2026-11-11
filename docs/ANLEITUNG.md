@@ -277,6 +277,27 @@ Das ist der Beleg, auf dem das Schalten später angeboten werden kann: erst wenn
 mehrere Tage lang richtig gewesen wären. **Das Schalten selbst ist noch nicht gebaut.** Das Dashboard hat eine Karte *Lernmodus* mit der
 Entscheidung, dem Vergleich der letzten 7 Tage und dem Protokoll.
 
+## Anonyme Nutzungsstatistik (freiwillig) und Rückmeldung
+
+**Nutzungsstatistik, aus, solange Sie sie nicht einschalten.** Der letzte Schritt der Einrichtung fragt danach; danach der
+Schalter *Anonyme Nutzungsstatistik senden* am Gerät der Integration. Solange er an ist, geht einmal pro Woche an
+`aiwhatelse.eu`:
+
+| Gesendet | Nie gesendet |
+|---|---|
+| eine zufällige Kennung dieser Installation (nicht auf Sie zurückführbar) | Namen, Entitäts-IDs, Adressen, Standort |
+| Version der Integration und von Home Assistant, Land und Sprache von Home Assistant | Messwerte, Verbrauch, Spitzen, Fahrten |
+| welche Gerätearten eingerichtet sind und wie viele (z. B. 1 Wallbox, 2 Schalter) | Kennwörter, Token, Adresse von evcc |
+| aus welchen Integrationen ihre Entitäten kommen (z. B. `shelly`, `fronius`) | |
+| welche Funktionen genutzt werden (z. B. evcc, Solarprognose, Betriebsart) | |
+
+Es wird keine IP-Adresse gespeichert. Beim Ausschalten wird einmal das Löschen der Daten dieser Kennung angefordert. Wozu: um zu
+sehen, welche Wallboxen, Zähler und Autos verwendet werden, damit diese zuerst getestet werden.
+
+**Rückmeldung.** In das Textfeld *Rückmeldung* am Gerät der Integration schreiben und *Rückmeldung senden* drücken, oder die
+Aktion `send_feedback` (längere Texte, optional eine Kontaktadresse, mit oder ohne die Übersicht der Einrichtung oben). Sie geht
+an den Autor, sonst wird nichts gesendet.
+
 ## Grenzen
 
 Plugwhen plant und zeigt an; **das Ausführen (Wallbox steuern) ist noch nicht gebaut**. Der Plan beruht auf Gewohnheiten und Prognosen, er ist keine

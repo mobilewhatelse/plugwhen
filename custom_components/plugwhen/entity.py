@@ -29,3 +29,21 @@ class PlugwhenEntity(Entity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(async_dispatcher_connect(self.hass, self.plug.signal, self.async_write_ha_state))
+
+
+class PlugwhenMainEntity(Entity):
+    """An entity of Plugwhen itself (not of a car): usage statistics and feedback."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, plug: Plugwhen, key: str) -> None:
+        self.plug = plug
+        self._attr_translation_key = key
+        self._attr_unique_id = f"{plug.entry.entry_id}_{key}"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, plug.entry.entry_id)}, name="Plugwhen",
+                                            entry_type=DeviceEntryType.SERVICE, manufacturer="Plugwhen")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(async_dispatcher_connect(self.hass, self.plug.signal, self.async_write_ha_state))

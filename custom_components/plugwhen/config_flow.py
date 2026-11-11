@@ -198,6 +198,11 @@ class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
                                     description_placeholders={"taken_over": self._car_note or "–"})
 
     async def async_step_finish(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Last step: the voluntary, anonymous usage statistics (off unless ticked), then the entry is created."""
+        if user_input is None:
+            return self.async_show_form(step_id="finish", data_schema=vol.Schema(
+                {vol.Required("share_usage", default=False): BooleanSelector()}))
+        self._options["share_usage"] = bool(user_input.get("share_usage"))
         subentries = [{"subentry_type": SUBENTRY_VEHICLE, "title": vehicle_title(c), "data": c, "unique_id": None} for c in self._cars]
         return self.async_create_entry(title="Plugwhen", data={}, options=self._options, subentries=subentries)
 

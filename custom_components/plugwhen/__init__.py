@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.service import async_register_admin_service
 
 from .const import DOMAIN, PLATFORMS, POTENTIAL_DAYS
@@ -55,6 +56,22 @@ def _register_services(hass: HomeAssistant) -> None:
     async_register_admin_service(
         hass, DOMAIN, "calculate_potential", handle,
         schema=vol.Schema({vol.Optional("days", default=POTENTIAL_DAYS): vol.All(vol.Coerce(int), vol.Range(min=14, max=365))}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def handle_feedback(call: ServiceCall) -> dict[str, Any]:
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries or getattr(entries[0], "runtime_data", None) is None:
+            raise ServiceValidationError("Plugwhen is not set up")
+        if not await entries[0].runtime_data.send_feedback(call.data["text"], call.data.get("contact"), call.data["include_setup"]):
+            raise ServiceValidationError("Sending the feedback failed (no connection, or the text is empty)")
+        return {"sent": True}
+
+    hass.services.async_register(
+        DOMAIN, "send_feedback", handle_feedback,
+        schema=vol.Schema({vol.Required("text"): vol.All(cv.string, vol.Length(min=1, max=4000)),
+                           vol.Optional("contact"): vol.All(cv.string, vol.Length(max=200)),
+                           vol.Optional("include_setup", default=True): cv.boolean}),
         supports_response=SupportsResponse.OPTIONAL,
     )
 

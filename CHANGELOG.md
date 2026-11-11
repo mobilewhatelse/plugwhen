@@ -2,6 +2,10 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Anonymous usage statistics, voluntary (default off):** asked in the last step of the set-up, afterwards a switch. Weekly: a
+  random id, versions, country and language, kinds of devices and the integrations their entities come from; never names, entity
+  ids, measurements or passwords; switching off requests deletion. **Feedback:** a text field and a button on the device, and
+  the action `send_feedback`.
 - **Odometer and state of charge found through evcc:** evcc reports both for the car at its loadpoint; the car form proposes the
   sensors of Home Assistant that show the same values (the car's own integration before a copy of evcc's value, the state of charge only
   from the same device as the odometer, nothing when it is not unambiguous).

@@ -25,6 +25,8 @@ from .const import (
 )
 from dataclasses import replace
 
+from . import rueckmeldung as rm
+
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
@@ -110,6 +112,10 @@ class Plugwhen:
         self.hass = hass
         self.entry = entry
         self.signal = f"{DOMAIN}_{entry.entry_id}_update"
+        self.share_usage = bool(entry.options.get("share_usage"))   # voluntary anonymous usage statistics (default off, rueckmeldung.py)
+        self.feedback_text = ""
+        self._usage: dict[str, Any] = {}
+        self._usage_busy = False
         self.vehicles: dict[str, Vehicle] = {}
         self._unsub = None
         self._unsub_states = None
@@ -148,6 +154,8 @@ class Plugwhen:
         self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
         self._direct = ev.get("direct", {}) if isinstance(ev.get("direct"), dict) else {}
         self._geo = ev.get("geo", {}) if isinstance(ev.get("geo"), dict) else {}
+        self._usage = ev.get("usage", {}) if isinstance(ev.get("usage"), dict) else {}
+        self.ask_usage_once()
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
         calib = await self._calib_store.async_load() or {}
@@ -224,6 +232,7 @@ class Plugwhen:
             self._calib_at = now
             self.entry.async_create_background_task(self.hass, self._calibrate(now), f"{DOMAIN} calibrate")
         await self._refresh_evcc(now)
+        self._usage_step(now)
         for v in self.vehicles.values():
             if v.cfg.get(V_CALENDAR) and (v.trips_at is None or now - v.trips_at >= TRIPS_REFRESH):
                 await self._refresh_trips(v, now)
@@ -316,8 +325,109 @@ class Plugwhen:
             self._evcc_store.async_delay_save(self._evcc_data, 10)
         return hit
 
+    # ---------- voluntary usage statistics and feedback (rueckmeldung.py) ----------
+
+    def setup_overview(self) -> dict[str, Any]:
+        """What is set up, without names, entity ids or values: number of cars, modes, the integrations the entities come from."""
+        from homeassistant.helpers import entity_registry as er
+
+        reg = er.async_get(self.hass)
+        ids: list[str] = []
+        modes: dict[str, int] = {}
+        control: dict[str, int] = {}
+        for v in self.vehicles.values():
+            ids += [x for k, x in v.cfg.items() if str(k).endswith("_entity") and isinstance(x, str)]
+            modes[v.mode] = modes.get(v.mode, 0) + 1
+            var = str(self.wallbox_control(v).get("variant") or "keine")
+            control[var] = control.get(var, 0) + 1
+
+        def platform(eid: str) -> str | None:
+            ent = reg.async_get(eid)
+            return ent.platform if ent else None
+
+        o = self.entry.options
+        return {
+            "autos": len(self.vehicles), "betriebsarten": modes, "wallbox_steuerung": control,
+            "herkunft": rm.herkunft(ids, platform),
+            "evcc": any(v.cfg.get(V_EVCC_VEHICLE) for v in self.vehicles.values()) or bool(o.get(O_EVCC_URL)),
+            "waechter": bool(o.get(O_WAECHTER)), "solarprognose": bool(o.get(O_SOLAR, True)), "waze": bool(o.get(O_ROUTE_WAZE)),
+            "kalender": sum(1 for v in self.vehicles.values() if v.cfg.get(V_CALENDAR)),
+            "vorrat": sum(1 for v in self.vehicles.values() if float(v.cfg.get(V_STOCK) or 0) > 0),
+        }
+
+    def _version(self) -> tuple[str, str]:
+        from homeassistant.const import __version__ as ha_version
+        from homeassistant.loader import async_get_loaded_integration
+
+        try:
+            ver = str(async_get_loaded_integration(self.hass, DOMAIN).version or "?")
+        except Exception:  # noqa: BLE001
+            ver = "?"
+        return ver, ha_version
+
+    def ask_usage_once(self) -> None:
+        """An installation from before the question (set up without the last step of the assistant): ask once, in Settings >
+        Repairs. Not again after an answer or after "ignore"."""
+        from homeassistant.helpers import issue_registry as ir
+
+        if "share_usage" in self.entry.options:
+            self._usage["gefragt"] = True   # answered in the set-up; a later change of the settings must not ask again
+            return
+        if self._usage.get("gefragt") or self.share_usage:
+            return
+        ir.async_create_issue(self.hass, DOMAIN, "share_usage_question", is_fixable=True, is_persistent=False,
+                              severity=ir.IssueSeverity.WARNING, translation_key="share_usage_question")
+
+    def answer_usage(self, share: bool) -> None:
+        self.share_usage = bool(share)
+        self._usage["gefragt"] = True
+        self._evcc_store.async_delay_save(self._evcc_data, 1)
+        from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+        async_dispatcher_send(self.hass, self.signal)
+
+    def _usage_step(self, now: datetime) -> None:
+        """Weekly while the switch is on; once 'delete' after it was switched off. Runs in the background, never blocks."""
+        if self._usage_busy:
+            return
+        if self.share_usage and rm.faellig(self._usage.get("gesendet"), now):
+            if not self._usage.get("kennung"):
+                self._usage["kennung"] = rm.neue_kennung()
+            ver, ha = self._version()
+            daten = rm.statistik(DOMAIN, ver, ha, self._usage["kennung"], self.hass.config.country, self.hass.config.language,
+                                 self.setup_overview())
+        elif not self.share_usage and self._usage.get("kennung"):
+            daten = rm.loeschen(DOMAIN, self._usage["kennung"])
+        else:
+            return
+        self._usage_busy = True
+        self.entry.async_create_background_task(self.hass, self._usage_send(daten, now), f"{DOMAIN} usage")
+
+    async def _usage_send(self, daten: dict[str, Any], now: datetime) -> None:
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        try:
+            ok = await rm.senden(async_get_clientsession(self.hass), rm.ZIEL_STATISTIK, daten)
+            if daten.get("loeschen"):
+                if ok:
+                    self._usage = {"gefragt": True} if self._usage.get("gefragt") else {}
+            else:
+                self._usage["gesendet"] = now.isoformat()   # sent or not: next try in a week
+            self._evcc_store.async_delay_save(self._evcc_data, 5)
+        finally:
+            self._usage_busy = False
+
+    async def send_feedback(self, text: str, kontakt: str | None, mit_einrichtung: bool) -> bool:
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        if not str(text or "").strip():
+            return False
+        ver, ha = self._version()
+        daten = rm.rueckmeldung(DOMAIN, ver, ha, text, kontakt, self.setup_overview() if mit_einrichtung else None)
+        return await rm.senden(async_get_clientsession(self.hass), rm.ZIEL_RUECKMELDUNG, daten)
+
     def _evcc_data(self) -> dict[str, Any]:
-        return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo}
+        return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo, "usage": self._usage}
 
     def _trip_at(self, v: Vehicle, dep: datetime | None) -> dict[str, Any] | None:
         """The calendar trip departing at `dep` (same minute), if any."""
