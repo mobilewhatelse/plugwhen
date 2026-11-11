@@ -31,7 +31,7 @@ from .evcc import EvccClient, EvccError, connection as evcc_connection, live_veh
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
-from .trips import coordinates, parse_geocode, range_for_trip, trip_km, trips_from_events, waze_region
+from .trips import coordinates, event_days, parse_geocode, range_for_trip, trip_km, trips_from_events, waze_region
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
 from .habit import charging_habit
@@ -82,6 +82,7 @@ class Vehicle:
     plugged: bool | None = None
     charging: bool = False
     history_days: int = 0
+    trip_days_skipped: int = 0   # days of the trip calendar left out of the learning (special trips)
     history_at: datetime | None = None
     history_error: str | None = None
     availability_used: bool = False
@@ -276,6 +277,19 @@ class Plugwhen:
             out.append({**t, "departure": t["departure"].isoformat(), "km": km, "km_source": src,
                         "range_km": range_for_trip(km, v.reserve_km) if km else None})
         v.trips = out
+
+    async def _calendar_days(self, v: Vehicle, now: datetime) -> set:
+        """The dates of the past events in the car's trip calendar (the learning period); empty without a calendar or on a failure."""
+        cal = v.cfg.get(V_CALENDAR)
+        if not cal:
+            return set()
+        try:
+            resp = await self.hass.services.async_call("calendar", "get_events", {"entity_id": cal, "start_date_time": now - timedelta(days=HISTORY_DAYS),
+                                                       "end_date_time": now}, blocking=True, return_response=True)
+        except Exception as err:  # noqa: BLE001 - then nothing is left out, as before
+            _LOGGER.debug("Plugwhen: calendar %s not readable for the learning: %s", cal, err)
+            return set()
+        return event_days(((resp or {}).get(cal) or {}).get("events", []), now.tzinfo, )
 
     async def _route_km(self, location: str | None, now: datetime) -> float | None:
         """One-way kilometres from home to `location` (Waze travel time, only if switched on and installed); cached for a week."""
@@ -759,9 +773,12 @@ class Plugwhen:
         )
         v.records = records
         v.efficiency = efficiency_from_records(records)
+        skip = await self._calendar_days(v, now)   # special trips from the calendar are exceptions, not the usual week
         model = MobilityModel()
         for r in records:
-            model.add_day(r)
+            if r.day not in skip:
+                model.add_day(r)
+        v.trip_days_skipped = sum(1 for r in records if r.day in skip)
         v.model, v.history_days, v.history_error = model, len(records), None
         _LOGGER.debug("Plugwhen: %s learned from %s days", v.name, len(records))
 

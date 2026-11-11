@@ -144,6 +144,11 @@ Wächter hat weiter das letzte Wort.
 - **Vorrat** (je Auto, Mindest-Ladestand, Standard 0 = aus): Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt
   bereit ist.
 
+
+**Sonderfahrten werden nicht gelernt:** Die Tage, an denen im Fahrten-Kalender des Autos etwas eingetragen war, lässt Plugwhen beim
+Lernen der typischen Woche weg. Eine einzelne Fahrt nach Linz soll nicht die Kilometer aller Donnerstage erhöhen. Wie viele Tage
+ausgelassen wurden, steht im Attribut `trip_days_skipped`.
+
 ## Mit evcc
 
 - evcc ist **optional** und wird nur **gelesen** (über seine Adresse, evcc kann irgendwo im Netz laufen). Die Adresse kommt aus dem Wächter

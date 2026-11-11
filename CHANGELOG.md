@@ -2,6 +2,8 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Special trips are not learned:** the days of the events in the car's trip calendar are left out of the learned week (a single
+  trip to Linz must not raise the kilometres of every Thursday). Attribute `trip_days_skipped` on the learned week sensor.
 - **Anonymous usage statistics, voluntary (default off):** asked in the last step of the set-up, afterwards a switch. Weekly: a
   random id, versions, country and language, kinds of devices and the integrations their entities come from; never names, entity
   ids, measurements or passwords; switching off requests deletion. **Feedback:** a text field and a button on the device, and

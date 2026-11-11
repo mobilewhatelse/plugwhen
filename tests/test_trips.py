@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from trips import coordinates, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
+from trips import coordinates, event_days, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
 
 CET = timezone(timedelta(hours=1))
 NOW = datetime(2026, 11, 10, 9, 0, tzinfo=CET)
@@ -80,6 +80,23 @@ class GeoTest(unittest.TestCase):
         self.assertIsNone(parse_geocode([]))
         self.assertIsNone(parse_geocode({"error": "x"}))
         self.assertIsNone(parse_geocode([{"lat": "x"}]))
+
+
+class EventDaysTest(unittest.TestCase):
+    """Special trips are exceptions: their days are left out of the learned week."""
+
+    def test_timed_and_all_day(self):
+        d = event_days([{"start": "2026-11-12T07:00:00+01:00", "end": "2026-11-12T18:00:00+01:00"},
+                        {"start": "2026-11-14T20:00:00+01:00", "end": "2026-11-15T02:00:00+01:00"},   # over midnight: both days
+                        {"start": "2026-11-20", "end": "2026-11-23"},                                  # all day, end exclusive
+                        {"start": "kaputt"}, "kaputt"], CET)
+        from datetime import date
+        self.assertEqual(sorted(d), [date(2026, 11, 12), date(2026, 11, 14), date(2026, 11, 15),
+                                     date(2026, 11, 20), date(2026, 11, 21), date(2026, 11, 22)])
+
+    def test_limit_per_event(self):
+        self.assertEqual(len(event_days([{"start": "2026-01-01", "end": "2026-12-31"}], CET)), 14)
+        self.assertEqual(event_days(None, CET), set())
 
 
 if __name__ == "__main__":

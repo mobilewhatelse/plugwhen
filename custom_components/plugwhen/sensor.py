@@ -265,6 +265,7 @@ class WeekPlanSensor(PlugwhenEntity, SensorEntity):
                 for p in v.model.week()
             ],
             "history_days": v.history_days,
+            "trip_days_skipped": v.trip_days_skipped,
             "history_read": v.history_at.isoformat() if v.history_at else None,
             "history_error": v.history_error,
             "consumption_kwh_per_km": round(v.consumption, 3),

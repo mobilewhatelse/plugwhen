@@ -109,3 +109,33 @@ def waze_region(country: str | None) -> str:
     if c in ("AU", "NZ"):
         return "au"
     return "eu"
+
+
+def event_days(events: list[dict[str, Any]] | None, tz, max_days: int = 14) -> set:
+    """The dates an event of the trip calendar touches: a special trip is an exception, so the learning leaves these days out.
+    Timed events: from the start date to the end date; all-day events: the end date is exclusive. At most `max_days` per event."""
+    from datetime import date
+
+    out: set[date] = set()
+    for e in events or []:
+        if not isinstance(e, dict):
+            continue
+        s, en = str(e.get("start") or ""), str(e.get("end") or e.get("start") or "")
+        try:
+            if len(s) == 10:
+                first, last = date.fromisoformat(s), date.fromisoformat(en[:10]) - timedelta(days=1) if len(en) == 10 else date.fromisoformat(s)
+            else:
+                a = _parse(s, tz)
+                b = _parse(en, tz) or a
+                if a is None:
+                    continue
+                first, last = a.astimezone(tz).date(), b.astimezone(tz).date()
+        except ValueError:
+            continue
+        last = max(first, last)
+        d, n = first, 0
+        while d <= last and n < max_days:
+            out.add(d)
+            d += timedelta(days=1)
+            n += 1
+    return out

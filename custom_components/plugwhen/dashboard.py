@@ -455,7 +455,8 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
     return {"overview": overview, "learning": learning, "details": details}
 
 
-def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None) -> list[dict[str, Any]]:
+def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None,
+                main_ids: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Three tabs: Overview (ready for the next departure, plan, trips, look-ahead, plan for evcc), Learning, Details."""
     t = dict(TEXT["de"] if (language or "").lower().startswith("de") else TEXT["en"])
     cur = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "€")
@@ -466,8 +467,25 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
         parts = _vehicle_section(v["ids"], t, v["name"], len(vehicles) > 1, v.get("calendar"), bool(v.get("evcc")))
         for key in tabs:
             tabs[key] += parts[key]
+    if main_ids and all(k in main_ids for k in ("feedback_text", "feedback_send", "share_usage")):
+        tabs["details"].append(feedback_section(main_ids, language))
     return [
         {"title": t["v_overview"], "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2, "sections": tabs["overview"]},
         {"title": t["v_learning"], "path": "lernen", "icon": "mdi:school-outline", "type": "sections", "max_columns": 2, "sections": tabs["learning"]},
         {"title": t["v_details"], "path": "details", "icon": "mdi:tune-variant", "type": "sections", "max_columns": 2, "sections": tabs["details"]},
     ]
+
+
+FEEDBACK_TEXT = {'de': ('Rückmeldung', 'Etwas funktioniert nicht, fehlt oder gefällt Ihnen? Text eingeben, Enter, dann bei *Rückmeldung senden* auf *Drücken*. Sie geht an den Autor; mitgesendet wird nur eine Übersicht der Einrichtung, keine Namen oder Messwerte.', 'Text', 'Senden', 'Anonyme Nutzungsstatistik'), 'en': ('Feedback', 'Something does not work, is missing or you like it? Type it, press Enter, then *Press* at *Send feedback*. It goes to the author; only an overview of the setup goes along, no names or measurements.', 'Text', 'Send', 'Anonymous usage statistics')}
+
+
+def feedback_section(ids: dict[str, str], lang: str | None) -> dict:
+    """The card 'Feedback': text field, button and the switch of the voluntary usage statistics."""
+    head, text, f_text, f_send, f_share = FEEDBACK_TEXT["de" if str(lang or "").lower().startswith("de") else "en"]
+    return {"type": "grid", "cards": [
+        {"type": "heading", "heading": head, "icon": "mdi:message-text-outline"},
+        {"type": "markdown", "content": text},
+        {"type": "entities", "show_header_toggle": False, "entities": [
+            {"entity": ids["feedback_text"], "name": f_text}, {"entity": ids["feedback_send"], "name": f_send},
+            {"entity": ids["share_usage"], "name": f_share}]},
+    ]}
