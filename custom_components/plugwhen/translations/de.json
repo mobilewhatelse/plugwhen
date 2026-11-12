@@ -2,7 +2,7 @@
   "services": {
     "calculate_potential": {
       "name": "Potenzial berechnen",
-      "description": "Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach (wie es war, über die Standzeit verteilt, die eigene Fertig-bis-Funktion der Wallbox mit kleinem Strom, der Spitzenwächter) und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Nur lesen, eine Schätzung. Nur für Administratoren.",
+      "description": "Spielt den Verlauf jedes Fahrzeugs mit anderen Ladeweisen nach und vergleicht Monatsspitze, Leistungspreis und wie oft das Auto nicht fertig gewesen wäre. Liest nur, eine Schätzung. Nur für Administratoren.",
       "fields": {
         "days": {
           "name": "Tage",
@@ -12,11 +12,11 @@
     },
     "create_dashboard": {
       "name": "Dashboard erstellen",
-      "description": "Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation (alle Fahrzeuge) und gibt es als YAML zurück, auch als Benachrichtigung, zum Einfügen in ein neues Dashboard (Bearbeiten, Raw-Konfigurationseditor). Nur Standardkarten. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren."
+      "description": "Baut das Plugwhen-Dashboard mit den Entitäten dieser Installation und gibt es als YAML zurück, zum Einfügen in ein neues Dashboard. Ein bestehendes Dashboard wird nie verändert. Nur für Administratoren."
     },
     "send_feedback": {
       "name": "Rückmeldung senden",
-      "description": "Schickt Ihre Rückmeldung an den Autor von Plugwhen (aiwhatelse.eu). Mit „Einrichtung mitsenden“ geht eine Übersicht mit: Zahl der Autos, Betriebsarten, Integrationen der Sensoren, keine Namen, Entitäts-IDs oder Messwerte.",
+      "description": "Schickt Ihre Rückmeldung an den Autor. Mit „Einrichtung mitsenden“ geht eine Übersicht mit (Zahl der Autos, Betriebsarten, Integrationen), ohne Namen, Entitäts-IDs oder Messwerte.",
       "fields": {
         "text": {
           "name": "Text",
@@ -37,7 +37,7 @@
     "step": {
       "user": {
         "title": "Einrichtung 1 von 2: Was ist da?",
-        "description": "Plugwhen berechnet, wann man anstecken soll, damit das Auto bei der Abfahrt bereit ist, und plant das Laden mit Sonne zuerst.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = gefunden und verbunden: Der Wächter liefert Netzbezug, Preise, Grenze und Lastprognose, evcc die Fahrzeuge und den Ladepunkt. Plugwhen geht auch ohne beide. Eine Solarprognose wird aus dem Energie-Dashboard genommen, wenn eine eingerichtet ist.",
+        "description": "Plugwhen plant das Laden so, dass das Auto zur Abfahrt bereit ist, zuerst mit Sonne.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = gefunden und verbunden. Plugwhen geht auch ohne beide.",
         "data": {
           "evcc_url": "Adresse von evcc (optional)",
           "evcc_password": "Passwort von evcc"
@@ -48,7 +48,7 @@
       },
       "cars": {
         "title": "Einrichtung 2 von 2: Ihre Autos",
-        "description": "Bisher hinzugefügt: {cars}.\n\nJedes Auto bekommt einen eigenen Plan. **Nötig je Auto:** Kilometerstand und Ladestand (aus der Integration des Autos). Der Rest wird aus dem Wächter und evcc vorbefüllt, wo es geht.",
+        "description": "Bisher hinzugefügt: {cars}.\n\nJedes Auto bekommt einen eigenen Plan. **Nötig je Auto:** Kilometerstand und Ladestand.",
         "menu_options": {
           "add_car": "Auto hinzufügen",
           "finish": "Einrichtung abschließen"
@@ -82,23 +82,23 @@
         "data_description": {
           "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
           "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
-          "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
+          "soc_max_age_h": "Ein älterer Ladestand gilt als unbekannt: kein Plan, keine Warnung. Beim Laden gelten schon 90 Minuten ohne neuen Wert als veraltet. 0 = keine Grenze.",
           "capacity_kwh": "Nutzbare Batteriekapazität.",
           "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
           "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
           "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
           "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
-          "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
+          "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert, weil das Auto bei sehr kleiner Leistung mehr verliert. Standard 4 kW.",
           "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
           "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
           "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
-          "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
+          "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen, tragen Sie hier deren Energiezähler ein. Plugwhen erkennt selbst, an welcher es gerade lädt. Teilen sich zwei Autos eine Wallbox, tragen Sie sie bei beiden ein: Sie werden dann nie gleichzeitig eingeplant.",
           "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
           "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
           "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
           "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
-          "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-          "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
+          "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+          "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
         }
       },
       "finish": {
@@ -132,7 +132,7 @@
     "step": {
       "init": {
         "title": "Verbindungen",
-        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
+        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben.",
         "data": {
           "waechter_entry": "Viertelstunden-Wächter",
           "load_entity": "Andere Last-Prognose",
@@ -155,18 +155,18 @@
           "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
           "load_entity": "Nur für eine andere Quelle: ein Sensor mit den Attributen hours (t, typical, high) und target_kw. Nicht nötig, wenn Sie den Wächter gewählt haben.",
           "availability_entity": "Ein Sensor mit den Attributen schema (1), valid_until und forecast (Liste aus start, end, kw), zum Beispiel von einer Energiegemeinschaft oder einer Solarprognose.",
-          "outdoor_temp_entity": "Optional. Mit einer Außentemperatur lernt Plugwhen, wie der Verbrauch je km von der Kälte abhängt, und plant einen kalten Morgen mit mehr Energie. Leer: vom Viertelstunden-Wächter übernommen, wenn er eine hat. Ohne Temperatur ändert sich nichts.",
-          "weather_entity": "Optional: die Temperatur, die zur Abfahrt erwartet wird (stündliche Vorhersage). Leer: vom Wächter übernommen; ohne Vorhersage gilt für Abfahrten innerhalb eines Tages der aktuelle Wert des Außensensors.",
-          "use_solar_forecast": "Zuerst mit dem erwarteten Sonnenüberschuss laden, solange das Auto zu Hause steht, den Rest über die Standzeit verteilen. Funktioniert mit jeder Solarprognose, die im Energie-Dashboard eingerichtet ist; ohne wird der Rest einfach verteilt.",
+          "outdoor_temp_entity": "Optional. Mit einer Außentemperatur plant Plugwhen einen kalten Morgen mit mehr Energie. Leer: vom Wächter übernommen.",
+          "weather_entity": "Optional: die Temperatur, die zur Abfahrt erwartet wird. Leer: vom Wächter übernommen.",
+          "use_solar_forecast": "Zuerst mit dem erwarteten Sonnenüberschuss laden, den Rest verteilen. Nutzt die Solarprognose des Energie-Dashboards.",
           "solar_deduct_kw": "kW, die zuerst von der Solarprognose abgehen, für Haus und Hausakku. Leer: aus der nächtlichen Grundlast des Bezugszählers gelernt (bis dahin 0,5 kW).",
           "grid_energy_entity": "Für den Potenzialrechner: der Bezugszähler (Wh oder kWh, mit Langzeitstatistik). Wird vom Viertelstunden-Wächter übernommen, wenn er gewählt ist.",
           "price_low": "Für den Potenzialrechner, in Ihrer Währung je kW und Jahr (bis zur Schwelle). Leer: vom Wächter übernommen, sonst werden nur kW gezeigt.",
           "price_high": "Preis je kW und Jahr über der Schwelle. Leer: derselbe Preis.",
           "price_threshold": "kW, ab denen der höhere Preis gilt. 0 = ein Preis.",
-          "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt (leer = Adresse aus dem Wächter). evcc kann irgendwo im Netz laufen, z. B. http://192.168.1.20:7070. Ein evcc auf diesem Rechner wird vorgeschlagen.",
+          "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt, zum Beispiel http://192.168.1.20:7070. Leer = Adresse aus dem Wächter.",
           "evcc_password": "Nur wenn evcc eines verlangt.",
-          "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen, ohne Konto). Der Ort kann ein Ortsname, eine Adresse oder Koordinaten sein; Plugwhen sucht den Ort zuerst bei OpenStreetMap (dorthin geht nur das Ziel) und fragt Waze mit den Koordinaten (an Waze gehen Zuhause und Ziel). Im Termin eingetragene Kilometer gelten immer zuerst.",
-          "direct_early": "Zum Ausprobieren: Die Betriebsart „Direkt“ (Plugwhen steuert die Wallbox) ist wählbar, obwohl „Bereit zum Schalten“ noch nicht grün ist. Zurückgestellt wird nur, was Plugwhen selbst gesetzt hat.",
+          "route_waze": "Für Termine ohne Kilometer rechnet Plugwhen die Strecke über die Integration Waze Travel Time aus. Dafür geht das Ziel an OpenStreetMap, Zuhause und Ziel gehen an Waze. Kilometer im Termin gelten immer zuerst.",
+          "direct_early": "Zum Ausprobieren: „Direkt“ ist wählbar, obwohl „Bereit zum Schalten“ noch nicht grün ist.",
           "waze_hint": "Kilometer von Kalender-Fahrten über Waze: dafür einmal die Integration „Waze Travel Time“ hinzufügen (ohne Konto), dann erscheint hier der Schalter."
         }
       }
@@ -208,23 +208,23 @@
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
             "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
-            "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
+            "soc_max_age_h": "Ein älterer Ladestand gilt als unbekannt: kein Plan, keine Warnung. Beim Laden gelten schon 90 Minuten ohne neuen Wert als veraltet. 0 = keine Grenze.",
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
             "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
             "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
-            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
+            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert, weil das Auto bei sehr kleiner Leistung mehr verliert. Standard 4 kW.",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
-            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
+            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen, tragen Sie hier deren Energiezähler ein. Plugwhen erkennt selbst, an welcher es gerade lädt. Teilen sich zwei Autos eine Wallbox, tragen Sie sie bei beiden ein: Sie werden dann nie gleichzeitig eingeplant.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
             "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
-            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
+            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
           }
         },
         "reconfigure": {
@@ -255,23 +255,23 @@
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
             "soc_entity": "Sensor mit dem Ladestand der Batterie in Prozent.",
-            "soc_max_age_h": "Wurde der Ladestand länger als das nicht geschrieben, behandelt Plugwhen ihn als unbekannt: kein Plan, keine Warnung. Ein parkendes, schlafendes Auto ist bis zu diesem Alter in Ordnung. Während des Ladens gelten schon 90 Minuten ohne neuen Wert als veraltet (viele Autos senden beim Laden nichts). 0 = keine Grenze.",
+            "soc_max_age_h": "Ein älterer Ladestand gilt als unbekannt: kein Plan, keine Warnung. Beim Laden gelten schon 90 Minuten ohne neuen Wert als veraltet. 0 = keine Grenze.",
             "capacity_kwh": "Nutzbare Batteriekapazität.",
             "reserve_km": "Das Auto soll mit mindestens dieser Reichweite losfahren. Später mit der Entität Reserve änderbar.",
             "consumption_kwh_100": "Gilt, bis der eigene Verbrauch des Autos bekannt ist (typisch 15 bis 25 kWh je 100 km).",
             "charge_kw_max": "Was die Wallbox höchstens liefern kann. Der Plan plant nie mehr.",
             "charge_kw_min": "Kleinste Ladeleistung der Wallbox (1 Phase, 6 A sind etwa 1,4 kW).",
-            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert (der Lader im Auto hat bei sehr kleiner Leistung höhere Verluste); nur wenn die Energie so nicht hineinpasst, geht er bis zum Minimum hinunter. Standard 4 kW.",
+            "charge_kw_pref": "Der Plan verteilt das Laden nicht flacher als diesen Wert, weil das Auto bei sehr kleiner Leistung mehr verliert. Standard 4 kW.",
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
-            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
+            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen, tragen Sie hier deren Energiezähler ein. Plugwhen erkennt selbst, an welcher es gerade lädt. Teilen sich zwei Autos eine Wallbox, tragen Sie sie bei beiden ein: Sie werden dann nie gleichzeitig eingeplant.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
             "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
-            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel oder in der Beschreibung („Linz 200 km“), sonst vom Ort (Waze, falls eingeschaltet), hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus (geplant wird nur für die nächste Abfahrt plus Reserve)."
+            "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
           }
         }
       },

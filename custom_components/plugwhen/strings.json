@@ -2,7 +2,7 @@
   "services": {
     "calculate_potential": {
       "name": "Calculate the potential",
-      "description": "Replays the history of each vehicle with other ways of charging (as it was, spread over the parking time, the wallbox's own ready-by with a low current, the peak guard) and compares the monthly peak, the demand charge and how often the car would not have been ready. Read only, an estimate. Administrators only.",
+      "description": "Replays the history of each vehicle with other ways of charging and compares the monthly peak, the demand charge and how often the car would not have been ready. Read-only, an estimate. Administrators only.",
       "fields": {
         "days": {
           "name": "Days",
@@ -12,11 +12,11 @@
     },
     "create_dashboard": {
       "name": "Create the dashboard",
-      "description": "Builds the Plugwhen dashboard with the entities of this installation (all vehicles) and returns it as YAML, also as a notification, to paste into a new dashboard (Edit, Raw configuration editor). Only standard cards. It never changes an existing dashboard. Administrators only."
+      "description": "Builds the Plugwhen dashboard with the entities of this installation and returns it as YAML, to paste into a new dashboard. An existing dashboard is never changed. Administrators only."
     },
     "send_feedback": {
       "name": "Send feedback",
-      "description": "Sends your feedback to the author of Plugwhen (aiwhatelse.eu). With 'include setup' an overview goes along: number of cars, modes, the integrations of the sensors, no names, entity ids or values.",
+      "description": "Sends your feedback to the author. With 'include setup' an overview goes along (number of cars, modes, integrations), without names, entity ids or values.",
       "fields": {
         "text": {
           "name": "Text",
@@ -37,7 +37,7 @@
     "step": {
       "user": {
         "title": "Set-up 1 of 2: what is there",
-        "description": "Plugwhen works out when to plug in so that the car is ready at departure, and plans the charging with the sun first.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = found and linked: the Wächter gives grid import, prices, limit and load forecast; evcc gives vehicles and the loadpoint. Plugwhen works without both. A solar forecast is taken from the Energy dashboard if there is one.",
+        "description": "Plugwhen plans the charging so that the car is ready at departure, the sun first.\n\n**Viertelstunden-Wächter:** {guard}\n**evcc:** {evcc}\n\n✓ = found and linked. Plugwhen also works without both.",
         "data": {
           "evcc_url": "Address of evcc (optional)",
           "evcc_password": "Password of evcc"
@@ -48,7 +48,7 @@
       },
       "cars": {
         "title": "Set-up 2 of 2: your cars",
-        "description": "Added so far: {cars}.\n\nEvery car gets its own plan. **Needed per car:** its odometer and its state of charge (from the car's integration). The rest is prefilled from the Wächter and evcc where possible.",
+        "description": "Added so far: {cars}.\n\nEach car gets its own plan. **Needed per car:** odometer and state of charge.",
         "menu_options": {
           "add_car": "Add a car",
           "finish": "Finish set-up"
@@ -82,23 +82,23 @@
         "data_description": {
           "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
           "soc_entity": "Sensor with the state of charge of the battery in percent.",
-          "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
+          "soc_max_age_h": "An older state of charge counts as unknown: no plan, no warning. While charging, 90 minutes without a new value already count as stale. 0 = no limit.",
           "capacity_kwh": "Usable battery capacity.",
           "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
           "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
           "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
           "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
-          "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
+          "charge_kw_pref": "The plan does not spread the charging flatter than this value, because the car loses more at very low power. Default 4 kW.",
           "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
           "charging_entity": "On while the car is charging. No warning is sent while it charges.",
           "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
-          "more_wallbox_energy_entities": "If the car also charges at other wallboxes (a second one at home, at work), their energy counters here. Plugwhen finds out by itself which one it is at: the one whose counter rises while the car charges. If two cars share a wallbox, enter it for both: Plugwhen then never plans them at the same time and counts its energy only for the car whose state of charge rises.",
+          "more_wallbox_energy_entities": "If the car also charges at other wallboxes, enter their energy counters here. Plugwhen finds out by itself which one it is charging at. If two cars share a wallbox, enter it for both: they are then never planned at the same time.",
           "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
           "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
           "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
           "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
-          "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
-          "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
+          "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
+          "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
         }
       },
       "finish": {
@@ -132,7 +132,7 @@
     "step": {
       "init": {
         "title": "Connections",
-        "description": "Optional. Plugwhen also works alone. Connect it to what you have: the load forecast of the quarter-hour peak guard (keeps the car's charging under the peak target) and a sensor of the availability interface (when power is cheap or free).",
+        "description": "Optional. Plugwhen also works alone. Connect it with what you have.",
         "data": {
           "waechter_entry": "Quarter-hour peak guard",
           "load_entity": "Other load forecast",
@@ -155,18 +155,18 @@
           "waechter_entry": "Choose the quarter-hour peak guard and Plugwhen finds its load forecast by itself (and keeps the charging under its peak target). Suggested automatically if exactly one is installed.",
           "load_entity": "Only for another source: a sensor with the attributes hours (t, typical, high) and target_kw. Not needed when you chose the peak guard.",
           "availability_entity": "A sensor with the attributes schema (1), valid_until and forecast (a list of start, end, kw), for example from an energy community or a solar forecast.",
-          "outdoor_temp_entity": "Optional. With an outdoor temperature Plugwhen learns how the car's consumption per km depends on the cold and plans a cold morning with more energy. Empty: taken from the quarter-hour peak guard if it has one. Without a temperature nothing changes.",
-          "weather_entity": "Optional: the temperature expected at the departure (hourly forecast). Empty: taken from the peak guard; without a forecast the outdoor sensor's current value is used for departures within a day.",
-          "use_solar_forecast": "Charge from the expected solar surplus first while the car is at home, then spread the rest over the parking time. Works with any solar forecast set up in the Energy dashboard; without one the rest is simply spread.",
+          "outdoor_temp_entity": "Optional. With an outdoor temperature Plugwhen plans a cold morning with more energy. Empty: taken from the Wächter.",
+          "weather_entity": "Optional: the temperature expected at departure. Empty: taken from the Wächter.",
+          "use_solar_forecast": "Charge with the expected solar surplus first, spread the rest. Uses the solar forecast of the Energy dashboard.",
           "solar_deduct_kw": "kW taken off the solar forecast first, for what the house and a home battery use. Empty: learned from the night-time base load of the grid import counter (default 0.5 kW until then).",
           "grid_energy_entity": "For the potential calculator: the meter's import counter (Wh or kWh, with long-term statistics). Taken from the quarter-hour peak guard if it is chosen.",
           "price_low": "For the potential calculator, in your currency per kW and year (up to the threshold). Empty: taken from the peak guard, otherwise only kW are shown.",
           "price_high": "Price per kW and year above the threshold. Empty: the same price.",
           "price_threshold": "kW from which the higher price applies. 0 = one price.",
-          "evcc_url": "Only if you use evcc and the guard does not know it already (empty = the guard's address). evcc may run anywhere on the network, e.g. http://192.168.1.20:7070. A local evcc is suggested.",
+          "evcc_url": "Only if you use evcc and the Wächter does not know it already, for example http://192.168.1.20:7070. Empty = the address from the Wächter.",
           "evcc_password": "Only if evcc asks for one.",
-          "route_waze": "For calendar events without kilometres: the route from home to the event's location via the Waze travel time integration (add it once, no account). The location may be a place, an address or coordinates; Plugwhen looks the place up at OpenStreetMap first (only the destination goes there) and asks Waze with the coordinates (home and destination go to Waze). Kilometres written in the event always win.",
-          "direct_early": "For trying it out: the mode “direct” (Plugwhen controls the wallbox) can be chosen although “ready to switch” is not green yet. Only what Plugwhen set itself is changed back.",
+          "route_waze": "For events without kilometres Plugwhen works out the route with the integration Waze Travel Time. For this the destination goes to OpenStreetMap, home and destination go to Waze. Kilometres in the event always come first.",
+          "direct_early": "For trying it out: “direct” can be chosen although “ready to switch” is not green yet.",
           "waze_hint": "Kilometres of calendar trips via Waze: add the integration “Waze Travel Time” once (no account), then the switch appears here."
         }
       }
@@ -208,23 +208,23 @@
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
             "soc_entity": "Sensor with the state of charge of the battery in percent.",
-            "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
+            "soc_max_age_h": "An older state of charge counts as unknown: no plan, no warning. While charging, 90 minutes without a new value already count as stale. 0 = no limit.",
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
             "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
             "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
-            "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
+            "charge_kw_pref": "The plan does not spread the charging flatter than this value, because the car loses more at very low power. Default 4 kW.",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
-            "more_wallbox_energy_entities": "If the car also charges at other wallboxes (a second one at home, at work), their energy counters here. Plugwhen finds out by itself which one it is at: the one whose counter rises while the car charges. If two cars share a wallbox, enter it for both: Plugwhen then never plans them at the same time and counts its energy only for the car whose state of charge rises.",
+            "more_wallbox_energy_entities": "If the car also charges at other wallboxes, enter their energy counters here. Plugwhen finds out by itself which one it is charging at. If two cars share a wallbox, enter it for both: they are then never planned at the same time.",
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
             "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
             "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
-            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
-            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
+            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
           }
         },
         "reconfigure": {
@@ -255,23 +255,23 @@
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
             "soc_entity": "Sensor with the state of charge of the battery in percent.",
-            "soc_max_age_h": "If the state of charge was not written for longer than this, Plugwhen treats it as unknown: no plan, no warning. A parked car that sleeps is fine up to this age. While the car is charging, 90 minutes without a new value already count as stale (many cars send nothing while charging). 0 = no limit.",
+            "soc_max_age_h": "An older state of charge counts as unknown: no plan, no warning. While charging, 90 minutes without a new value already count as stale. 0 = no limit.",
             "capacity_kwh": "Usable battery capacity.",
             "reserve_km": "The car should leave with at least this range. You can change it later with the Reserve entity.",
             "consumption_kwh_100": "Used until the car's own consumption is known (typical: 15 to 25 kWh per 100 km).",
             "charge_kw_max": "What the wallbox can deliver at most. The plan never plans more.",
             "charge_kw_min": "Lowest charging power of the wallbox (1 phase, 6 A is about 1.4 kW).",
-            "charge_kw_pref": "The plan spreads the charging no flatter than this (the car's charger wastes more energy at very low power); only if the energy does not fit that way it goes down to the minimum. Default 4 kW.",
+            "charge_kw_pref": "The plan does not spread the charging flatter than this value, because the car loses more at very low power. Default 4 kW.",
             "plugged_entity": "On when the car is plugged in. Needed for the warning \"plug in\".",
             "charging_entity": "On while the car is charging. No warning is sent while it charges.",
             "wallbox_energy_entity": "Energy counter of the wallbox (Wh or kWh). It tells charging at home from charging away.",
-            "more_wallbox_energy_entities": "If the car also charges at other wallboxes (a second one at home, at work), their energy counters here. Plugwhen finds out by itself which one it is at: the one whose counter rises while the car charges. If two cars share a wallbox, enter it for both: Plugwhen then never plans them at the same time and counts its energy only for the car whose state of charge rises.",
+            "more_wallbox_energy_entities": "If the car also charges at other wallboxes, enter their energy counters here. Plugwhen finds out by itself which one it is charging at. If two cars share a wallbox, enter it for both: they are then never planned at the same time.",
             "departure_entity": "A time or date-time entity (for example a helper). If set, it replaces the departure Plugwhen has learned.",
             "notify_service": "One or more notify services, separated by commas, for example notify.mobile_app_phone, notify.mobile_app_tablet. Used for the warning that the car will not be ready. Leave empty for none.",
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
             "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
-            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title or description (“Linz 200 km”), else from the location (Waze, if switched on), there and back unless it says “one way”. All-day events are ignored.",
-            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip. 0 = off (the plan only needs the next departure plus the reserve)."
+            "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
           }
         }
       },
