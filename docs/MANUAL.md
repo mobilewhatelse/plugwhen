@@ -91,6 +91,9 @@ only kW are shown**; the verdict still works because it depends on kW. It is an 
 
 ## Trips from a calendar, stock
 
+**Why?** Plugwhen learns your typical week. A trip that does not fit (a long drive on a Saturday, a holiday) it cannot foresee.
+Put it in the calendar and the car is still ready in time.
+
 - **Calendar with trips** (per car, optional): every event in a calendar of Home Assistant is a trip. Start = departure. Kilometres written
   in the title or description ("Linz 200 km") win; otherwise the route from home to the event's location via the **Waze travel time**
   integration (switch, default off; add the integration once, no account; home and destination go to Waze), there and back unless it says
@@ -250,21 +253,23 @@ wallbox counter).
 
 The design is in [docs/ZUSCHNITT.md](ZUSCHNITT.md) (German).
 
-## Anonymous usage statistics (voluntary) and feedback
+## Share anonymous data (voluntary) and feedback
 
-**Usage statistics, off unless you switch them on.** The last step of the set-up asks; afterwards the switch *Share anonymous
-usage statistics* on the integration's device. While it is on, once a week this goes to `aiwhatelse.eu`:
+**Off unless you switch it on.** The last step of the set-up asks, afterwards the switch *Share anonymous data* on the
+integration's device. While it is on, this goes to `aiwhatelse.eu`:
 
-| Sent | Never sent |
-|---|---|
-| a random id of this installation (not traceable to you) | names, entity ids, addresses, location |
-| version of the integration and of Home Assistant, country and language of Home Assistant | measurements, consumption, peaks, trips |
-| which kinds of devices are set up and how many (e.g. 1 wallbox, 2 switches) | passwords, tokens, evcc address |
-| which integrations their entities come from (e.g. `shelly`, `fronius`) | |
-| which features are used (e.g. evcc, solar forecast, mode) | |
+| What | When | Content |
+|---|---|---|
+| Usage statistics | once a week | a random id of the installation, versions, country and language, which kinds of devices and features are used, which integrations the entities come from (e.g. `shelly`) |
+| Trip days | once a day | per day with at least 30 km: car model (maker and model of the device with the state of charge), battery size, kilometres, consumption per km, mean outdoor temperature of the day |
 
-No IP address is stored. Switching it off sends one request to delete the data of this id. Why: to see which wallboxes,
-meters and cars are used, so that they are tested first.
+**Never sent:** names, entity ids, addresses, location, date or time of a trip, passwords, tokens. No IP address is stored.
+Trip days have no id and are mixed, they cannot be traced to a car and therefore cannot be deleted either. Switching it off
+sends one request to delete the usage statistics of this id, and Plugwhen forgets the fleet values.
+
+**What you get:** while your car has no values of its own yet, Plugwhen uses the consumption of many cars of the same model
+(from 5 cars of a model, otherwise all cars), in cold and warm weather. Order: own curve, own model, all cars, start values. The
+attribute `fleet` of the sensor *Learned days* shows what is used.
 
 **Feedback.** Write into the text field *Feedback* on the integration's device and press *Send feedback*, or use the action
 `send_feedback` (longer texts, an optional contact address, with or without the setup overview above). It goes to the author,

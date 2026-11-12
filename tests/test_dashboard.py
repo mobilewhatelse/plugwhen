@@ -56,6 +56,18 @@ class DashboardTest(unittest.TestCase):
                         self.assertEqual(t.count("{{"), t.count("}}"), t[:80])
                         self.assertEqual(t.count("{%"), t.count("%}"), t[:80])
 
+    def test_fleet_card_only_while_sharing_is_off(self):
+        main = {"feedback_text": "text.fb", "feedback_send": "button.fb", "share_usage": "switch.share"}
+        for lang, words in (("de", "Flottenwerte sind aus"), ("en", "Fleet values are off")):
+            views = build_views([{"name": "X", "ids": ids("x")}], lang, main_ids=main)
+            first = views[1]["sections"][0]["cards"][0]              # tab Learning, at the top
+            self.assertEqual(first["type"], "conditional")
+            self.assertEqual(first["conditions"], [{"condition": "state", "entity": "switch.share", "state": "off"}])
+            self.assertIn(words, json.dumps(first, ensure_ascii=False))
+            self.assertNotIn("Ladeverlust", json.dumps(first, ensure_ascii=False))   # the fleet values are consumption only
+        views = build_views([{"name": "X", "ids": ids("x")}], "en")   # without the main device: no card
+        self.assertNotIn("Fleet values", json.dumps(views))
+
 
 if __name__ == "__main__":
     unittest.main()

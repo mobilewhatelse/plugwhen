@@ -103,7 +103,7 @@
       },
       "finish": {
         "title": "May I ask a favour?",
-        "description": "An anonymous usage statistic helps me keep developing and running Plugwhen. Only versions, country and which cars and wallboxes are used are sent, **never** names, measurements or passwords.\n\nVoluntary, and you can switch it off any time. Thank you!",
+        "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week: versions, country, which cars and wallboxes are used;\n- once a day per day with a trip: car model, battery size, kilometres, consumption and outdoor temperature, **without** date, place or id.\n\nIn return Plugwhen uses the consumption of many cars of the same model while your car is still learning. **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nVoluntary, and you can switch it off any time. Thank you!",
         "data": {
           "share_usage": "Yes, I agree"
         }
@@ -374,7 +374,7 @@
         "name": "Warn when the car will not be ready"
       },
       "share_usage": {
-        "name": "Share anonymous usage statistics"
+        "name": "Share anonymous data"
       }
     },
     "number": {
@@ -406,12 +406,12 @@
   },
   "issues": {
     "share_usage_question": {
-      "title": "Share anonymous usage statistics? (a request)",
+      "title": "Share anonymous data? (a request)",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "May I ask a favour?",
-            "description": "An anonymous usage statistic helps me keep developing and running Plugwhen. Only versions, country and which cars and wallboxes are used are sent, **never** names, measurements or passwords.\n\nVoluntary, and you can switch it off any time. Thank you!",
+            "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week: versions, country, which cars and wallboxes are used;\n- once a day per day with a trip: car model, battery size, kilometres, consumption and outdoor temperature, **without** date, place or id.\n\nIn return Plugwhen uses the consumption of many cars of the same model while your car is still learning. **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nVoluntary, and you can switch it off any time. Thank you!",
             "data": {
               "share_usage": "Yes, I agree"
             }

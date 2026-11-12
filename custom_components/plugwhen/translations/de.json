@@ -103,7 +103,7 @@
       },
       "finish": {
         "title": "Darf ich Sie um etwas bitten?",
-        "description": "Eine anonyme Nutzungsstatistik hilft mir, Plugwhen weiterzuentwickeln und zu betreiben. Gesendet werden nur Versionen, Land und welche Autos und Wallboxen verwendet werden, **nie** Namen, Messwerte oder Kennwörter.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+        "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche: Versionen, Land, welche Autos und Wallboxen verwendet werden;\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch und Außentemperatur, **ohne** Datum, Ort oder Kennung.\n\nDafür nutzt Plugwhen den Verbrauch vieler gleicher Autos, solange Ihr Auto noch lernt. **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
         "data": {
           "share_usage": "Ja, ich bin einverstanden"
         }
@@ -374,7 +374,7 @@
         "name": "Warnen, wenn das Auto nicht bereit sein wird"
       },
       "share_usage": {
-        "name": "Anonyme Nutzungsstatistik senden"
+        "name": "Anonyme Daten teilen"
       }
     },
     "number": {
@@ -406,12 +406,12 @@
   },
   "issues": {
     "share_usage_question": {
-      "title": "Anonyme Nutzungsstatistik senden? (eine Bitte)",
+      "title": "Anonyme Daten teilen? (eine Bitte)",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Darf ich Sie um etwas bitten?",
-            "description": "Eine anonyme Nutzungsstatistik hilft mir, Plugwhen weiterzuentwickeln und zu betreiben. Gesendet werden nur Versionen, Land und welche Autos und Wallboxen verwendet werden, **nie** Namen, Messwerte oder Kennwörter.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+            "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche: Versionen, Land, welche Autos und Wallboxen verwendet werden;\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch und Außentemperatur, **ohne** Datum, Ort oder Kennung.\n\nDafür nutzt Plugwhen den Verbrauch vieler gleicher Autos, solange Ihr Auto noch lernt. **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
             "data": {
               "share_usage": "Ja, ich bin einverstanden"
             }

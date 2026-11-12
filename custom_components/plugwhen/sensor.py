@@ -276,6 +276,7 @@ class WeekPlanSensor(PlugwhenEntity, SensorEntity):
             "consumption_source": v.consumption_source,
             "consumption_days_with_temp": len(v.model.consumption_temp),
             "departure_temp_c": v.departure_temp_c,
+            "fleet": self.plug.fleet_info(v),
         }
 
 

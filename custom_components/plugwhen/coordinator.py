@@ -26,6 +26,7 @@ from .const import (
 )
 from dataclasses import replace
 
+from . import flotte
 from . import rueckmeldung as rm
 
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
@@ -123,6 +124,8 @@ class Vehicle:
     wallbox_active: str | None = None        # energy counter of the wallbox the car is at (several wallboxes, see wallboxes.py)
     wallbox_seen: dict = field(default_factory=dict)   # last counter values, to see which one rises
     others_kw: dict | None = None            # what the cars planned before this one (per quarter hour), for the attributes
+    fleet_model: str | None = None           # car model for the fleet values (maker and model of the state of charge's device)
+    fleet_cars: int | None = None            # how many cars the fleet value in use comes from
 
 
 class Plugwhen:
@@ -134,6 +137,9 @@ class Plugwhen:
         self.feedback_text = ""
         self._usage: dict[str, Any] = {}
         self._usage_busy = False
+        # fleet values (flotte.py): {"autos": {sub_id: {"bis", "gemeldet"}}, "schluessel", "gueltig_bis", "modelle", "at"}
+        self._fleet: dict[str, Any] = {}
+        self._fleet_busy = False
         self.vehicles: dict[str, Vehicle] = {}
         self._unsub = None
         self._unsub_states = None
@@ -175,6 +181,7 @@ class Plugwhen:
         self._direct = ev.get("direct", {}) if isinstance(ev.get("direct"), dict) else {}
         self._geo = ev.get("geo", {}) if isinstance(ev.get("geo"), dict) else {}
         self._usage = ev.get("usage", {}) if isinstance(ev.get("usage"), dict) else {}
+        self._fleet = ev.get("flotte", {}) if isinstance(ev.get("flotte"), dict) else {}
         self.ask_usage_once()
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
@@ -255,6 +262,7 @@ class Plugwhen:
             await self._refresh_weather()
         await self._refresh_evcc(now)
         self._usage_step(now)
+        self._fleet_step(now)
         for v in self.vehicles.values():
             if v.cfg.get(V_CALENDAR) and (v.trips_at is None or now - v.trips_at >= TRIPS_REFRESH):
                 await self._refresh_trips(v, now)
@@ -463,7 +471,85 @@ class Plugwhen:
         return await rm.senden(async_get_clientsession(self.hass), rm.ZIEL_RUECKMELDUNG, daten)
 
     def _evcc_data(self) -> dict[str, Any]:
-        return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo, "usage": self._usage}
+        return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo, "usage": self._usage,
+                "flotte": self._fleet}
+
+    # ---------- fleet values (flotte.py): trip days out, models in; only with sharing, never disturbs ----------
+
+    def _car_model(self, v: Vehicle) -> str | None:
+        """Maker and model of the device the state of charge belongs to (e.g. "mercedes-benz eqa 250+")."""
+        from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+        ent = er.async_get(self.hass).async_get(v.cfg.get(V_SOC) or "")
+        dev = dr.async_get(self.hass).async_get(ent.device_id) if ent and ent.device_id else None
+        return flotte.model_name(dev.manufacturer, dev.model) if dev else None
+
+    def _fleet_step(self, now: datetime) -> None:
+        if not self.share_usage:
+            if self._fleet.get("schluessel") or self._fleet.get("modelle"):   # switched off: forget key and models
+                self._fleet = {"autos": self._fleet.get("autos", {})}
+                self._evcc_store.async_delay_save(self._evcc_data, 5)
+            return
+        if self._fleet_busy or not flotte.due(self._fleet.get("at"), now):
+            return
+        if not any(v.records for v in self.vehicles.values()):
+            return   # the history is not read yet: next run
+        self._fleet_busy = True
+        self.entry.async_create_background_task(self.hass, self._fleet_run(now), f"{DOMAIN} fleet")
+
+    async def _fleet_run(self, now: datetime) -> None:
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        session = async_get_clientsession(self.hass)
+        ver, _ha = self._version()
+        headers = {"User-Agent": f"{DOMAIN}/{ver}"}
+        try:
+            cars = self._fleet.setdefault("autos", {})
+            for v in self.vehicles.values():
+                if not v.fleet_model or not v.records:
+                    continue
+                car = cars.setdefault(v.sub_id, {})
+                after = None
+                try:
+                    after = datetime.fromisoformat(car["bis"]).date() if car.get("bis") else None
+                except ValueError:
+                    pass
+                days, last = flotte.trip_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
+                if days:
+                    async with asyncio.timeout(15):
+                        async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet")),
+                                                headers=headers) as r:
+                            if r.status != 200:
+                                _LOGGER.debug("Plugwhen: fleet send answered %s", r.status)
+                                continue   # service off or full: the same days again tomorrow
+                            ans = await r.json(content_type=None)
+                    if isinstance(ans, dict) and ans.get("schluessel"):
+                        self._fleet["schluessel"], self._fleet["gueltig_bis"] = str(ans["schluessel"]), ans.get("gueltig_bis")
+                    car["gemeldet"] = True
+                if last is not None:
+                    car["bis"] = last.isoformat()
+            if self._fleet.get("schluessel"):
+                async with asyncio.timeout(15):
+                    async with session.get(flotte.ZIEL_MODELLE, headers=headers | {"X-Schluessel": self._fleet["schluessel"]}) as r:
+                        if r.status == 200:
+                            m = await r.json(content_type=None)
+                            if isinstance(m, dict) and m.get("schema") == 1:
+                                self._fleet["modelle"] = m
+                        elif r.status in (401, 403):
+                            self._fleet.pop("schluessel", None)   # expired: a new one comes with the next days sent
+        except Exception as err:  # noqa: BLE001 - the fleet values must never disturb Plugwhen
+            _LOGGER.debug("Plugwhen: fleet values: %s", err)
+        finally:
+            self._fleet["at"] = now.isoformat()   # sent or not: next try tomorrow
+            self._fleet_busy = False
+            self._evcc_store.async_delay_save(self._evcc_data, 5)
+
+    def fleet_info(self, v: Vehicle) -> dict[str, Any]:
+        """For the sensor and the dashboard: is sharing on, which model, whether fleet values are in use."""
+        models = self._fleet.get("modelle") if self.share_usage else None
+        return {"sharing": self.share_usage, "model": v.fleet_model,
+                "in_use": v.consumption_source in ("fleet_model", "fleet_all"), "cars": v.fleet_cars,
+                "fetched": (models or {}).get("erzeugt")}
 
     def _trip_at(self, v: Vehicle, dep: datetime | None) -> dict[str, Any] | None:
         """The calendar trip departing at `dep` (same minute), if any."""
@@ -828,6 +914,10 @@ class Plugwhen:
                 model.add_day(r)
         v.trip_days_skipped = sum(1 for r in records if r.day in skip)
         v.model, v.history_days, v.history_error = model, len(records), None
+        try:
+            v.fleet_model = self._car_model(v)
+        except Exception:  # noqa: BLE001 - only for the fleet values
+            v.fleet_model = None
         _LOGGER.debug("Plugwhen: %s learned from %s days", v.name, len(records))
 
     # ---------- departure, need, plan, warning ----------
@@ -1320,6 +1410,13 @@ class Plugwhen:
         v.departure_temp_c = self._temp_at(v.departure or now + timedelta(hours=12), now)
         v.consumption, v.consumption_source = v.model.consumption_at(
             v.departure_temp_c, float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
+        v.fleet_cars = None
+        if v.consumption_source in ("config", "rule_config") and self.share_usage:   # no own values yet: the fleet's, if any
+            entry, src = flotte.entry_for(self._fleet.get("modelle"), v.fleet_model)
+            c = flotte.consumption(entry, v.departure_temp_c) if entry else None
+            if c is not None:
+                v.consumption, v.consumption_source = c, src
+                v.fleet_cars = entry.get("autos") if src == "fleet_model" else (self._fleet.get("modelle") or {}).get("autos")
         v.need = compute_need(
             v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption,
             learn_km=v.learn_km or v.departure_source == "calendar", efficiency=self.efficiency_of(v), min_soc=self._min_soc(v))

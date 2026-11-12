@@ -212,8 +212,8 @@ def main():
     everything = [charge, rng, soc_t, reserve, learn, week, plan_s, ready_s, notice_sw]
     log(all(everything), "all kinds of entities are there")
     main = states_like("plugwhen_")
-    share = [e for e in main if e["entity_id"].startswith("switch.") and "statistics" in e["entity_id"]]
-    log(len(share) == 1 and share[0]["state"] == "off", "usage statistics: switch there and off (only with consent)", str([(e["entity_id"], e["state"]) for e in main]))
+    share = [e for e in main if e["entity_id"].startswith("switch.") and "share_anonymous_data" in e["entity_id"]]
+    log(len(share) == 1 and share[0]["state"] == "off", "share anonymous data: switch there and off (only with consent)", str([(e["entity_id"], e["state"]) for e in main]))
     fb = [e["entity_id"] for e in main if e["entity_id"].startswith(("text.", "button.")) and "feedback" in e["entity_id"]]
     log(len(fb) == 2, "feedback: text field and button there", str(fb))
     if not all(everything):

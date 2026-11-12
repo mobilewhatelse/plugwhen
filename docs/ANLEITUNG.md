@@ -132,6 +132,9 @@ Wächter hat weiter das letzte Wort.
 
 ## Fahrten aus dem Kalender, Vorrat
 
+**Wozu?** Plugwhen lernt deine typische Woche. Eine Fahrt, die nicht dazu passt (Linz am Samstag, Urlaub), kann es nicht vorhersehen.
+Trag sie in den Kalender ein, dann ist das Auto trotzdem rechtzeitig voll.
+
 - **Kalender mit Fahrten** (je Auto, optional): Jeder Termin in einem Kalender von Home Assistant (zum Beispiel ein lokaler Kalender
   „Fahrten“ oder ein eingebundener Google-/Outlook-Kalender) ist eine Fahrt. Beginn = Abfahrt. **Kilometer** stehen im Titel oder in der
   Beschreibung („Linz 200 km“) und gelten zuerst; sonst rechnet Plugwhen die Strecke von zu Hause zum **Ort** des Termins über die
@@ -283,22 +286,24 @@ Das ist der Beleg, auf dem das Schalten später angeboten werden kann: erst wenn
 mehrere Tage lang richtig gewesen wären. **Das Schalten selbst ist noch nicht gebaut.** Das Dashboard hat eine Karte *Lernmodus* mit der
 Entscheidung, dem Vergleich der letzten 7 Tage und dem Protokoll.
 
-## Anonyme Nutzungsstatistik (freiwillig) und Rückmeldung
+## Anonyme Daten teilen (freiwillig) und Rückmeldung
 
-**Nutzungsstatistik, aus, solange Sie sie nicht einschalten.** Der letzte Schritt der Einrichtung fragt danach; danach der
-Schalter *Anonyme Nutzungsstatistik senden* am Gerät der Integration. Solange er an ist, geht einmal pro Woche an
-`aiwhatelse.eu`:
+**Aus, solange Sie es nicht einschalten.** Der letzte Schritt der Einrichtung fragt danach, danach der Schalter *Anonyme Daten
+teilen* am Gerät der Integration. Solange er an ist, geht an `aiwhatelse.eu`:
 
-| Gesendet | Nie gesendet |
-|---|---|
-| eine zufällige Kennung dieser Installation (nicht auf Sie zurückführbar) | Namen, Entitäts-IDs, Adressen, Standort |
-| Version der Integration und von Home Assistant, Land und Sprache von Home Assistant | Messwerte, Verbrauch, Spitzen, Fahrten |
-| welche Gerätearten eingerichtet sind und wie viele (z. B. 1 Wallbox, 2 Schalter) | Kennwörter, Token, Adresse von evcc |
-| aus welchen Integrationen ihre Entitäten kommen (z. B. `shelly`, `fronius`) | |
-| welche Funktionen genutzt werden (z. B. evcc, Solarprognose, Betriebsart) | |
+| Was | Wann | Inhalt |
+|---|---|---|
+| Nutzungsstatistik | einmal pro Woche | zufällige Kennung der Installation, Versionen, Land und Sprache, welche Gerätearten und Funktionen genutzt werden, aus welchen Integrationen die Entitäten kommen (z. B. `shelly`) |
+| Fahrtage | einmal am Tag | je Tag mit mindestens 30 km: Automodell (Hersteller und Modell des Geräts mit dem Ladestand), Akkugröße, Kilometer, Verbrauch je km, mittlere Außentemperatur des Tages |
 
-Es wird keine IP-Adresse gespeichert. Beim Ausschalten wird einmal das Löschen der Daten dieser Kennung angefordert. Wozu: um zu
-sehen, welche Wallboxen, Zähler und Autos verwendet werden, damit diese zuerst getestet werden.
+**Nie gesendet:** Namen, Entitäts-IDs, Adressen, Standort, Datum oder Uhrzeit einer Fahrt, Kennwörter, Token. Es wird keine
+IP-Adresse gespeichert. Die Fahrtage haben keine Kennung und werden gemischt, sie lassen sich keinem Auto zuordnen und daher
+auch nicht löschen. Beim Ausschalten wird das Löschen der Nutzungsstatistik dieser Kennung angefordert, und Plugwhen vergisst
+die Flottenwerte.
+
+**Was Sie davon haben:** Solange Ihr Auto noch keine eigenen Werte hat, rechnet Plugwhen mit dem Verbrauch vieler gleicher Autos
+(ab 5 Autos eines Modells, sonst aller Autos), bei Kälte und Wärme. Reihenfolge: eigene Kurve, eigenes Modell, alle Autos,
+Startwerte. Das Attribut `fleet` am Sensor *Gelernte Tage* zeigt, was verwendet wird.
 
 **Rückmeldung.** In das Textfeld *Rückmeldung* am Gerät der Integration schreiben und *Rückmeldung senden* drücken, oder die
 Aktion `send_feedback` (längere Texte, optional eine Kontaktadresse, mit oder ohne die Übersicht der Einrichtung oben). Sie geht

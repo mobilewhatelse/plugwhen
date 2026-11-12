@@ -469,6 +469,8 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
             tabs[key] += parts[key]
     if main_ids and all(k in main_ids for k in ("feedback_text", "feedback_send", "share_usage")):
         tabs["details"].append(feedback_section(main_ids, language))
+    if main_ids and "share_usage" in main_ids:   # quiet, only while sharing is off: what the fleet values would bring
+        tabs["learning"].insert(0, fleet_off_section(main_ids["share_usage"], language))
     return [
         {"title": t["v_overview"], "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2, "sections": tabs["overview"]},
         {"title": t["v_learning"], "path": "lernen", "icon": "mdi:school-outline", "type": "sections", "max_columns": 2, "sections": tabs["learning"]},
@@ -476,7 +478,27 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
     ]
 
 
-FEEDBACK_TEXT = {'de': ('Rückmeldung', 'Etwas funktioniert nicht, fehlt oder gefällt Ihnen? Text eingeben, Enter, dann bei *Rückmeldung senden* auf *Drücken*. Sie geht an den Autor; mitgesendet wird nur eine Übersicht der Einrichtung, keine Namen oder Messwerte.', 'Text', 'Senden', 'Anonyme Nutzungsstatistik'), 'en': ('Feedback', 'Something does not work, is missing or you like it? Type it, press Enter, then *Press* at *Send feedback*. It goes to the author; only an overview of the setup goes along, no names or measurements.', 'Text', 'Send', 'Anonymous usage statistics')}
+FEEDBACK_TEXT = {'de': ('Rückmeldung', 'Etwas funktioniert nicht, fehlt oder gefällt Ihnen? Text eingeben, Enter, dann bei *Rückmeldung senden* auf *Drücken*. Sie geht an den Autor; mitgesendet wird nur eine Übersicht der Einrichtung, keine Namen oder Messwerte.', 'Text', 'Senden', 'Anonyme Daten teilen'), 'en': ('Feedback', 'Something does not work, is missing or you like it? Type it, press Enter, then *Press* at *Send feedback*. It goes to the author; only an overview of the setup goes along, no names or measurements.', 'Text', 'Send', 'Share anonymous data')}
+
+
+FLEET_OFF_TEXT = {
+    "de": ("**Flottenwerte sind aus.** Plugwhen lernt dann nur von Ihrem Auto, das dauert ein paar Wochen.\n\n"
+           "Mit *Anonyme Daten teilen* startet es mit dem Verbrauch vieler gleicher Autos, bei Kälte und Wärme, schon ab dem ersten Tag.",
+           "Anonyme Daten teilen"),
+    "en": ("**Fleet values are off.** Plugwhen then learns from your car alone, which takes a few weeks.\n\n"
+           "With *Share anonymous data* it starts with the consumption of many cars of the same model, in cold and warm weather, "
+           "from the first day.", "Share anonymous data"),
+}
+
+
+def fleet_off_section(share_id: str, lang: str | None) -> dict:
+    """A quiet card, shown only while sharing is off (no pop-up, no question): what the fleet values would bring."""
+    text, name = FLEET_OFF_TEXT["de" if str(lang or "").lower().startswith("de") else "en"]
+    return {"type": "grid", "cards": [{
+        "type": "conditional", "conditions": [{"condition": "state", "entity": share_id, "state": "off"}],
+        "card": {"type": "vertical-stack", "cards": [
+            {"type": "markdown", "content": text},
+            {"type": "entities", "show_header_toggle": False, "entities": [{"entity": share_id, "name": name}]}]}}]}
 
 
 def feedback_section(ids: dict[str, str], lang: str | None) -> dict:
