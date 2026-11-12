@@ -56,6 +56,34 @@ class DashboardTest(unittest.TestCase):
                         self.assertEqual(t.count("{{"), t.count("}}"), t[:80])
                         self.assertEqual(t.count("{%"), t.count("%}"), t[:80])
 
+    def test_learn_card_renders_strictly_when_learn_mode_is_off(self):
+        """The frontend renders templates strictly: in the mode 'direct' the would-switch sensor is 'off' and has no
+        reason/until/summary, the text card must still render, and the empty chart must not leave an empty card."""
+        import jinja2
+
+        i = ids("x")
+        views = build_views([{"name": "X", "ids": i}], "de")
+        cards = [c for s in views[1]["sections"] for g in s["cards"] for c in g.get("cards", [g])]
+        md = [c for c in cards if c["type"] == "markdown" and "Probelauf aus. Fahrten und Verbrauch lernt Plugwhen trotzdem weiter." in c["content"]]
+        self.assertEqual(len(md), 1)
+
+        class Ent:
+            attributes = {"friendly_name": "x"}
+
+        class States:
+            def __call__(self, eid):
+                return "off"
+
+            def __getattr__(self, domain):
+                return type("D", (), {"__getattr__": lambda self, name: Ent()})()
+
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+        env.filters.update(as_datetime=lambda v: v, as_local=lambda v: v)
+        self.assertEqual(env.from_string(md[0]["content"]).render(states=States()), "Probelauf aus. Fahrten und Verbrauch lernt Plugwhen trotzdem weiter.")
+        chart = [c for c in cards if c["type"] == "conditional" and "chart" in c["card"].get("content", "")]
+        self.assertEqual(len(chart), 1)
+        self.assertEqual(chart[0]["conditions"][0], {"condition": "state", "entity": i["would_switch"], "state_not": "off"})
+
     def test_fleet_card_only_while_sharing_is_off(self):
         main = {"feedback_text": "text.fb", "feedback_send": "button.fb", "share_usage": "switch.share"}
         for lang, words in (("de", "Flottenwerte sind aus"), ("en", "Fleet values are off")):

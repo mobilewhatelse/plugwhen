@@ -53,7 +53,7 @@ TEXT = {
         until_t="bis", lm_week="Vergleich mit der Wirklichkeit, letzte 7 Tage", lm_agree="Übereinstimmung", lm_days="Tage mit Daten",
         lm_pause_ch="Stunden, in denen die Wallbox lud, obwohl Plugwhen pausiert hätte", lm_kwh_pause="kWh in diesen Zeiten",
         lm_charge_idle="Stunden ohne Laden im geplanten Fenster", lm_kwh_charge="kWh in den geplanten Fenstern",
-        lm_journal="Letzte Entscheidungen", lm_none="Noch keine Entscheidungen.", lm_off="Der Lernmodus ist aus.",
+        lm_journal="Letzte Entscheidungen", lm_none="Noch keine Entscheidungen.", lm_off="Probelauf aus. Fahrten und Verbrauch lernt Plugwhen trotzdem weiter.",
         lm_needless="Ohne Bedarf geladen (zum Beispiel mit Sonne)", lm_needless_in="kWh in den letzten 7 Tagen",
         lm_note="Im Lernmodus wird nichts geschaltet: Plugwhen schreibt nur auf, was es tun würde, und vergleicht das mit dem, was die Wallbox wirklich getan hat. Die Wallbox läuft weiter wie bisher.",
         soc="Ladestand jetzt", plugged="angesteckt", yes="ja", no="nein", unknown="unbekannt", goal="Ziel bei Abfahrt",
@@ -150,7 +150,7 @@ TEXT = {
         until_t="until", lm_week="Comparison with reality, last 7 days", lm_agree="Agreement", lm_days="days with data",
         lm_pause_ch="hours the wallbox charged although Plugwhen would have paused", lm_kwh_pause="kWh in those times",
         lm_charge_idle="hours without charging in a planned window", lm_kwh_charge="kWh in the planned windows",
-        lm_journal="Latest decisions", lm_none="No decisions yet.", lm_off="Learn mode is off.",
+        lm_journal="Latest decisions", lm_none="No decisions yet.", lm_off="Trial run off. Plugwhen still keeps learning trips and consumption.",
         lm_needless="Charged although nothing was needed (for example with the sun)", lm_needless_in="kWh in the last 7 days",
         lm_note="Nothing is switched in learn mode: Plugwhen only writes down what it would do and compares it with what the wallbox really did. The wallbox keeps working as before.",
         soc="State of charge now", plugged="plugged in", yes="yes", no="no", unknown="unknown", goal="Target at departure",
@@ -254,9 +254,9 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% set a = " + _s(ids["would_switch"]) + ".attributes %}{% set st = states('" + ids["would_switch"] + "') %}"
         "{% set rs = " + reasons + " %}{% set wn = " + would_names + " %}"
         f"{{% if st == 'off' %}}{t['lm_off']}{{% else %}}"
-        f"**{t['would']}:** {{{{ wn.get(st, st) }}}} · {{{{ rs.get(a.reason, a.reason) }}}}"
-        f"{{% if a.until %}} · {t['until_t']} {{{{ (a.until | as_datetime | as_local).strftime('%H:%M') }}}}{{% endif %}}{{% endif %}}"
-        f"{{% if a.summary and a.summary.kwh_needless %}}\n\n{t['lm_needless']}: **{{{{ a.summary.kwh_needless }}}}** {t['lm_needless_in']}{{% endif %}}"
+        f"**{t['would']}:** {{{{ wn.get(st, st) }}}} · {{{{ rs.get(a.reason, a.reason) if a.reason is defined else '' }}}}"
+        f"{{% if a.until is defined and a.until %}} · {t['until_t']} {{{{ (a.until | as_datetime | as_local).strftime('%H:%M') }}}}{{% endif %}}{{% endif %}}"
+        f"{{% if a.summary is defined and a.summary and a.summary.kwh_needless %}}\n\n{t['lm_needless']}: **{{{{ a.summary.kwh_needless }}}}** {t['lm_needless_in']}{{% endif %}}"
     )
     lc_id = ids["learning_check"]
     lc_line = (
@@ -407,7 +407,9 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "tile", "entity": ids["would_switch"], "name": t["would"]},
             {"type": "entities", "show_header_toggle": False, "entities": [{"entity": ids["mode"], "name": t["mode_name"]}]},
             {"type": "markdown", "content": learn_line},
-            {"type": "markdown", "content": _chart(ids["would_switch"])},
+            # the chart is empty while the learn mode is off (for example in the mode 'direct'): no empty card then
+            {"type": "conditional", "conditions": [{"condition": "state", "entity": ids["would_switch"], "state_not": "off"}],
+             "card": {"type": "markdown", "content": _chart(ids["would_switch"])}},
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["lc_h"]), "icon": "mdi:school-outline"},
