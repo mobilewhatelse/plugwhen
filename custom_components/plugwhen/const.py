@@ -41,6 +41,7 @@ V_SOC_MAX_AGE = "soc_max_age_h"             # a state of charge older than this 
 V_PLUGGED = "plugged_entity"              # optional: on = car is plugged in
 V_CHARGING = "charging_entity"            # optional: on = car is charging
 V_WALLBOX_ENERGY = "wallbox_energy_entity"  # optional: wallbox energy counter (tells home from away charging)
+V_WALLBOX_MORE = "more_wallbox_energy_entities"  # optional: counters of further wallboxes the car charges at (see wallboxes.py)
 V_DEPARTURE = "departure_entity"          # optional: time or date-time of the next departure (replaces the learned one)
 V_CHARGE_MAX = "charge_kw_max"            # what the wallbox can deliver
 V_CHARGE_MIN = "charge_kw_min"            # lowest charging power (1 phase, 6 A = 1.4 kW)

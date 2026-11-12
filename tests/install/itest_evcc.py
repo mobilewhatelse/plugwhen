@@ -153,6 +153,29 @@ def main():
     need2 = ((it.state("sensor.kalenderauto_energy_to_charge") or {}).get("attributes") or {})
     log((need2.get("target_soc") or 0) >= 60, "the stock of 60 % is the lowest target", str(need2.get("target_soc")))
 
+    # ---------- two cars: each one takes plugged in / charging from the loadpoint evcc names it at ----------
+    def loadpoints():
+        out = subprocess.run(["curl", "-s", "-m", "5", "http://localhost:17070/api/state"], capture_output=True, text=True).stdout
+        try:
+            d = json.loads(out)
+            return d.get("result", d).get("loadpoints") or []
+        except ValueError:
+            return []
+    seen = {}
+
+    def both_assigned():
+        lps = {lp.get("vehicleName"): lp for lp in loadpoints() if lp.get("vehicleName")}
+        for key, slug in (("vehicle_1", "blue_e_golf"), ("vehicle_2", "kalenderauto")):
+            a = ((it.state(f"sensor.{slug}_energy_to_charge") or {}).get("attributes") or {})
+            lp = lps.get(key)
+            want = bool(lp.get("connected")) if lp else None
+            seen[key] = {"loadpoint": (lp or {}).get("title"), "evcc_connected": want, "plugwhen": a.get("plugged"), "source": a.get("plugged_source")}
+            if lp is None or a.get("plugged_source") != "evcc" or a.get("plugged") is not want:
+                return False
+        return len(lps) >= 2
+    ok = it.wait_for(both_assigned, 240, step=10)
+    log(bool(ok), "with two cars in evcc each one is assigned to its own loadpoint (plugged in from there)", json.dumps(seen))
+
     # an own plan in evcc for the first car must never be touched; the second car gets Plugwhen's plan
     own_t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 3 * 86400))
     subprocess.run(["curl", "-s", "-m", "5", "-X", "POST", f"http://localhost:17070/api/vehicles/vehicle_1/plan/soc/90/{own_t}"], capture_output=True)

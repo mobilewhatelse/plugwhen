@@ -74,7 +74,7 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "sources": data_sources(v.cfg, v.evcc_live is not None, self.plug.evcc_info, executed=False),
             "reserve_km": v.reserve_km,
             "learn_km": v.learn_km,
-            "efficiency": v.efficiency or 0.9, "efficiency_learned": v.efficiency is not None,
+            "efficiency": self.plug.efficiency_of(v), "efficiency_learned": v.efficiency is not None,
             "departure": v.departure.isoformat() if v.departure else None,
             "samples": v.plan.samples if v.plan else 0,
         }
@@ -159,6 +159,9 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "solar_factor": self.plug.solar_factor(), "solar_check": self.plug.solar_check or None, "solar_deduct_kw": self.plug.solar_deduct_kw(),
             "solar_deduct_source": self.plug.solar_deduct_source(), "spread_floor_kw": p.get("spread_floor_kw"),
             "pref_kw": float(v.cfg.get("charge_kw_pref") or 4.0),
+            # several cars: the wallbox this car is at, and the energy other cars planned before it (it plans around them)
+            "wallbox": self.plug.wallbox_now(v),
+            "other_cars_kwh": round(sum(v.others_kw.values()) * 0.25, 2) if v.others_kw else 0.0,
             # what Plugwhen would write into evcc (learn mode: nothing is written); None without an evcc car
             "evcc_plan": self._evcc_plan(),
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),

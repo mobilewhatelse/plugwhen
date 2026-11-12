@@ -236,26 +236,27 @@ def main():
         "enough charge: 100 km, target 33 %, charge 0 kWh", f"{num(cid)} / {num(tid)} / {num(rid)}")
     log(state(lid)["state"] == "on", "kilometre learning is on by default")
     ca, pa0 = state(cid)["attributes"], state(pid)["attributes"]
-    log("efficiency" in ca and ca.get("efficiency_learned") is False and pa0.get("solar_deduct_source") == "default" and pa0.get("pref_kw") == 4.0,
+    log(abs((ca.get("efficiency") or 0) - 0.889) < 0.002 and ca.get("efficiency_learned") is False and pa0.get("solar_deduct_source") == "default" and pa0.get("pref_kw") == 4.0,
         "house numbers start as defaults (efficiency, solar deduction, preferred power) and say so",
         f"eff {ca.get('efficiency')} learned {ca.get('efficiency_learned')} deduct {pa0.get('solar_deduct_source')} pref {pa0.get('pref_kw')}")
     log(num(resid) == 100.0, "reserve starts at the value of the set-up")
 
-    # a low battery: 10 % -> (33.3 - 10) % of 60 kWh / 0.9 = 15.6 kWh (recomputed when a setting changes)
+    # a low battery: 10 % -> (33.3 - 10) % of 60 kWh / 0.889 = 15.7 kWh (start value of the charge loss at the preferred 4 kW;
+    # recomputed when a setting changes)
     svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 10})
     time.sleep(3)
     svc("switch", "turn_off", {"entity_id": lid})
     svc("switch", "turn_on", {"entity_id": lid})
-    ok = wait_for(lambda: abs((num(cid) or 0) - 15.6) < 0.2, 30)
-    log(bool(ok), "low battery: 15.6 kWh to charge", str(num(cid)))
+    ok = wait_for(lambda: abs((num(cid) or 0) - 15.7) < 0.2, 30)
+    log(bool(ok), "low battery: 15.7 kWh to charge", str(num(cid)))
     a = state(cid)["attributes"]
     log(a.get("plugged") is False and a.get("soc") == 10.0 and a.get("source") == "reserve", "attributes: plug, state of charge, source",
         json.dumps({k: a.get(k) for k in ("plugged", "soc", "source")}))
 
-    # reserve 150 km = 30 kWh = 50 %: (50 - 10) % of 60 kWh / 0.9 = 26.7 kWh
+    # reserve 150 km = 30 kWh = 50 %: (50 - 10) % of 60 kWh / 0.889 = 27.0 kWh
     svc("number", "set_value", {"entity_id": resid, "value": 150})
-    ok = wait_for(lambda: abs((num(cid) or 0) - 26.7) < 0.2, 30)
-    log(bool(ok), "reserve 150 km: 26.7 kWh to charge", str(num(cid)))
+    ok = wait_for(lambda: abs((num(cid) or 0) - 27.0) < 0.2, 30)
+    log(bool(ok), "reserve 150 km: 27.0 kWh to charge", str(num(cid)))
 
     svc("input_boolean", "turn_on", {"entity_id": "input_boolean.auto_angesteckt"})
     time.sleep(2)
@@ -268,7 +269,7 @@ def main():
     log(state(pid)["state"] == "planned" and state(pid)["attributes"].get("departure_source") == "entity",
         "charge plan exists, departure from the entity", str(state(pid)["state"]))
     pa = state(pid)["attributes"]
-    log(abs(pa["needed_kwh"] - 26.7) < 0.3 and abs(pa["planned_kwh"] - pa["needed_kwh"]) < 0.3 and len(pa["windows"]) >= 1,
+    log(abs(pa["needed_kwh"] - 27.0) < 0.3 and abs(pa["planned_kwh"] - pa["needed_kwh"]) < 0.3 and len(pa["windows"]) >= 1,
         "plan covers the need with at least one window", f"needed {pa['needed_kwh']} planned {pa['planned_kwh']} windows {len(pa['windows'])}")
     log(pa["load_forecast_used"] is False and pa["availability_used"] is False, "without connections no load forecast and no availability is used")
 
@@ -325,7 +326,7 @@ def main():
     time.sleep(6)
     log((num("counter.meldungen") or 0) == 1, "the same warning is not sent twice (same day, same kind)", f"counter {num('counter.meldungen')}")
 
-    # departure in half an hour, plugged in, 26.7 kWh to charge at 11 kW: too late
+    # departure in half an hour, plugged in, 27.0 kWh to charge at 11 kW: too late
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
     tzv = ZoneInfo("Europe/Vienna")
@@ -419,7 +420,7 @@ def main():
             "the service answers and names what is missing", str(resp.get("Testauto")))
 
     # connections: load forecast and availability as options
-    svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})   # (33.3 - 25) % of 60 kWh / 0.9 = 5.5 kWh
+    svc("input_number", "set_value", {"entity_id": "input_number.auto_soc", "value": 25})   # (33.3 - 25) % of 60 kWh / 0.889 = 5.6 kWh
     svc("number", "set_value", {"entity_id": resid, "value": 100})
     s, d = api("POST", "/api/config/config_entries/options/flow", {"handler": entry_id})
     s2, d2 = api("POST", f"/api/config/config_entries/options/flow/{d['flow_id']}",
@@ -446,6 +447,60 @@ def main():
             "with all entities but no history yet: too little data (no made-up numbers)", str(resp.get("Testauto")))
         ok = wait_for(lambda: state(pot["entity_id"])["state"] == "too_little_data", 30)
         log(bool(ok), "the potential sensor shows it", state(pot["entity_id"])["state"])
+
+    # ---------- several cars and wallboxes ----------
+    def wins(eid):
+        a = (state(eid) or {}).get("attributes") or {}
+        return [(datetime.fromisoformat(w["start"]), datetime.fromisoformat(w["end"]), float(w["peak_kw"])) for w in a.get("windows") or []]
+
+    def overlaps(a, b):
+        return [(x, y) for x in a for y in b if x[0] < y[1] and y[0] < x[1]]
+
+    def sun_kw(t):
+        """The available power of the test (sensor.test_verfuegbar, 5 kW for three hours) at time t."""
+        fc = ((state("sensor.test_verfuegbar") or {}).get("attributes") or {}).get("forecast") or []
+        return sum(float(f["kw"]) for f in fc if datetime.fromisoformat(f["start"]) <= t < datetime.fromisoformat(f["end"]))
+
+    base2 = {"odometer_entity": "sensor.auto_kilometerstand", "capacity_kwh": 60, "reserve_km": 100, "consumption_kwh_100": 20,
+             "plugged_entity": "binary_sensor.auto_stecker", "departure_entity": "input_datetime.abfahrt", "charge_kw_max": 11, "charge_kw_min": 1.4}
+    r2, e2 = flow_finish("/api/config/config_entries/subentries/flow", {"handler": [entry_id, "vehicle"]},
+                         dict(base2, name="Zweitauto", soc_entity="sensor.auto2_ladestand", wallbox_energy_entity="sensor.wallbox_zaehler"))
+    log(r2 is not None, "a second car at the same wallbox is added", e2)
+    z = wait_for(lambda: find("sensor", "zweitauto_charge_plan"), 60)
+    zid = z["entity_id"] if z else None
+    ok = wait_for(lambda: zid and state(zid)["state"] in ("planned", "infeasible") and wins(zid) and wins(pid), 180)
+    zw, tw = (wins(zid), wins(pid)) if zid else ([], [])
+    log(bool(ok) and not overlaps(zw, tw), "two cars at one wallbox are never planned at the same time",
+        f"{[(a.strftime('%H:%M'), b.strftime('%H:%M')) for a, b, _ in tw]} / {[(a.strftime('%H:%M'), b.strftime('%H:%M')) for a, b, _ in zw]}")
+    za = (state(zid) or {}).get("attributes") or {} if zid else {}
+    log(za.get("wallbox") == "sensor.wallbox_zaehler" and (za.get("other_cars_kwh") or 0) > 0,
+        "the second car sees the plan of the first and its wallbox", json.dumps({k: za.get(k) for k in ("wallbox", "other_cars_kwh")}))
+    # from the grid (outside the sun) at least 0.75 x the maximum, apart from one remainder quarter; with sun it follows the sun
+    grid_w = [p for a, _, p in zw if sun_kw(a) <= 0]
+    log(bool(zw) and sum(1 for p in grid_w if p < 0.75 * 11 - 0.05) <= 1, "at a shared wallbox it charges compactly from the grid (so both fit into the night)",
+        str([(a.strftime("%H:%M"), p, sun_kw(a)) for a, _, p in zw]))
+
+    r3, e3 = flow_finish("/api/config/config_entries/subentries/flow", {"handler": [entry_id, "vehicle"]},
+                         dict(base2, name="Drittauto", soc_entity="sensor.auto3_ladestand", wallbox_energy_entity="sensor.wallbox_2_zaehler",
+                              more_wallbox_energy_entities=["sensor.wallbox_3_zaehler"]))
+    log(r3 is not None, "a third car with two wallboxes of its own is added", e3)
+    d3s = wait_for(lambda: find("sensor", "drittauto_charge_plan"), 60)
+    did = d3s["entity_id"] if d3s else None
+    ok = wait_for(lambda: did and state(did)["state"] in ("planned", "infeasible") and wins(did), 180)
+    log(bool(ok) and state(did)["attributes"].get("wallbox") == "sensor.wallbox_2_zaehler", "without a rising counter its first wallbox counts",
+        str(state(did)["attributes"].get("wallbox") if did else None))
+    # the peak target (9.5 kW, house 1.0 kW): the grid import of house and all cars (minus the sun) never above it, at no time
+    worst = 0.0
+    if ok:
+        allw = wins(pid) + wins(zid) + wins(did)
+        t = min(a for a, _, _ in allw)
+        while t < max(b for _, b, _ in allw):
+            worst = max(worst, max(0.0, 1.0 + sum(p for a, b, p in allw if a <= t < b) - sun_kw(t)))
+            t += timedelta(minutes=15)
+    log(bool(ok) and worst <= 9.5 + 0.3, "all cars together stay under the peak target (grid import)", f"highest {worst:.2f} kW")
+    svc("input_number", "set_value", {"entity_id": "input_number.wb3_kwh", "value": 301.5})   # the car charges at its second wallbox
+    ok = wait_for(lambda: state(did)["attributes"].get("wallbox") == "sensor.wallbox_3_zaehler", 420)
+    log(bool(ok), "the wallbox whose counter rises while the car is plugged in is found", str(state(did)["attributes"].get("wallbox") if did else None))
 
     wk = state(week["entity_id"])
     log(isinstance(wk["attributes"].get("week"), list) and len(wk["attributes"]["week"]) == 7, "weekly plan has seven days", str(wk["state"]))

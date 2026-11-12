@@ -71,6 +71,7 @@
           "plugged_entity": "Angesteckt (optional)",
           "charging_entity": "Lädt (optional)",
           "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+          "more_wallbox_energy_entities": "Weitere Wallboxen (optional)",
           "departure_entity": "Abfahrt (optional)",
           "notify_service": "Benachrichtigungsdienst (optional)",
           "notify_hour": "Warnen ab Uhrzeit",
@@ -91,6 +92,7 @@
           "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
           "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
           "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+          "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
           "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
           "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
           "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
@@ -130,7 +132,7 @@
     "step": {
       "init": {
         "title": "Verbindungen",
-        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).\n\n{waze}",
+        "description": "Optional. Plugwhen funktioniert auch allein. Verbinden Sie es mit dem, was Sie haben: die Last-Prognose des Viertelstunden-Wächters (hält das Laden des Autos unter der Spitzengrenze) und ein Sensor der Verfügbarkeits-Schnittstelle (wann Strom günstig oder gratis ist).",
         "data": {
           "waechter_entry": "Viertelstunden-Wächter",
           "load_entity": "Andere Last-Prognose",
@@ -146,7 +148,8 @@
           "evcc_url": "Adresse von evcc (optional)",
           "evcc_password": "Passwort von evcc",
           "route_waze": "Kilometer von Kalender-Fahrten über Waze",
-          "direct_early": "„Direkt“ vorzeitig freigeben"
+          "direct_early": "„Direkt“ vorzeitig freigeben",
+          "waze_hint": "Waze für Kalender-Fahrten"
         },
         "data_description": {
           "waechter_entry": "Wählen Sie den Viertelstunden-Wächter, dann findet Plugwhen seine Last-Prognose selbst (und hält das Laden unter seiner Spitzengrenze). Wird automatisch vorgeschlagen, wenn genau einer installiert ist.",
@@ -163,7 +166,8 @@
           "evcc_url": "Nur wenn Sie evcc nutzen und der Wächter es nicht schon kennt (leer = Adresse aus dem Wächter). evcc kann irgendwo im Netz laufen, z. B. http://192.168.1.20:7070. Ein evcc auf diesem Rechner wird vorgeschlagen.",
           "evcc_password": "Nur wenn evcc eines verlangt.",
           "route_waze": "Für Termine ohne Kilometer: die Strecke von zu Hause zum Ort des Termins über die Integration Waze Travel Time (einmal hinzufügen, ohne Konto). Der Ort kann ein Ortsname, eine Adresse oder Koordinaten sein; Plugwhen sucht den Ort zuerst bei OpenStreetMap (dorthin geht nur das Ziel) und fragt Waze mit den Koordinaten (an Waze gehen Zuhause und Ziel). Im Termin eingetragene Kilometer gelten immer zuerst.",
-          "direct_early": "Zum Ausprobieren: Die Betriebsart „Direkt“ (Plugwhen steuert die Wallbox) ist wählbar, obwohl „Bereit zum Schalten“ noch nicht grün ist. Zurückgestellt wird nur, was Plugwhen selbst gesetzt hat."
+          "direct_early": "Zum Ausprobieren: Die Betriebsart „Direkt“ (Plugwhen steuert die Wallbox) ist wählbar, obwohl „Bereit zum Schalten“ noch nicht grün ist. Zurückgestellt wird nur, was Plugwhen selbst gesetzt hat.",
+          "waze_hint": "Kilometer von Kalender-Fahrten über Waze: dafür einmal die Integration „Waze Travel Time“ hinzufügen (ohne Konto), dann erscheint hier der Schalter."
         }
       }
     }
@@ -193,6 +197,7 @@
             "plugged_entity": "Angesteckt (optional)",
             "charging_entity": "Lädt (optional)",
             "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+            "more_wallbox_energy_entities": "Weitere Wallboxen (optional)",
             "departure_entity": "Abfahrt (optional)",
             "notify_service": "Benachrichtigungsdienst (optional)",
             "notify_hour": "Warnen ab Uhrzeit",
@@ -213,6 +218,7 @@
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
@@ -238,6 +244,7 @@
             "plugged_entity": "Angesteckt (optional)",
             "charging_entity": "Lädt (optional)",
             "wallbox_energy_entity": "Energiezähler der Wallbox (optional)",
+            "more_wallbox_energy_entities": "Weitere Wallboxen (optional)",
             "departure_entity": "Abfahrt (optional)",
             "notify_service": "Benachrichtigungsdienst (optional)",
             "notify_hour": "Warnen ab Uhrzeit",
@@ -258,6 +265,7 @@
             "plugged_entity": "An, wenn das Auto angesteckt ist. Nötig für die Warnung „bitte anstecken“.",
             "charging_entity": "An, solange das Auto lädt. Währenddessen wird nicht gewarnt.",
             "wallbox_energy_entity": "Energiezähler der Wallbox (Wh oder kWh). Er unterscheidet Laden zu Hause von Laden unterwegs.",
+            "more_wallbox_energy_entities": "Lädt das Auto auch an anderen Wallboxen (zweite Wallbox zu Hause, in der Arbeit), hier deren Energiezähler. Plugwhen erkennt selbst, an welcher es gerade hängt: an der, deren Zähler steigt, während das Auto lädt. Teilen sich zwei Autos eine Wallbox, dieselbe Wallbox bei beiden eintragen: Plugwhen plant sie dann nicht gleichzeitig ein und zählt ihre Energie nur dem Auto zu, dessen Ladestand gerade steigt.",
             "departure_entity": "Eine Zeit- oder Datum-Zeit-Entität (zum Beispiel ein Helfer). Wenn gesetzt, ersetzt sie die gelernte Abfahrt.",
             "notify_service": "Ein oder mehrere Benachrichtigungsdienste, durch Komma getrennt, zum Beispiel notify.mobile_app_handy, notify.mobile_app_tablet. Für die Warnung, dass das Auto nicht bereit sein wird. Leer lassen für keine.",
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",

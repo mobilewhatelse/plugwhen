@@ -43,11 +43,15 @@ def make_plan(
     target_kw: float | None = None,
     available_kw: dict[datetime, float] | None = None,
     pref_kw: float | None = None,
+    others_kw: dict[datetime, float] | None = None,
+    blocked: set[datetime] | None = None,
 ) -> dict[str, Any]:
     """Return the plan. `load` is a list of quarter hours {t, typical, high, n}; quarter hours not listed there count as
     unknown (`DEFAULT_HIGH_KW`). `available_kw` maps a quarter-hour start to the usable available power in kW.
     `pref_kw`: the preferred lowest charging power (the car's charger wastes more below a few kW); the rest is spread no
-    flatter than this, and only if the energy does not fit that way the wallbox minimum `min_kw` is used."""
+    flatter than this, and only if the energy does not fit that way the wallbox minimum `min_kw` is used.
+    `others_kw`: what other cars already planned per quarter hour; it takes the available power first, the rest counts as
+    load of the house. `blocked`: quarter hours in which another car charges at a wallbox this car shares (left out)."""
     result: dict[str, Any] = {
         "status": "planned", "needed_kwh": round(need_kwh, 2), "planned_kwh": 0.0, "available_kwh": 0.0, "grid_kwh": 0.0,
         "shortfall_kwh": 0.0, "windows": [], "quarters": {}, "ready_at": None, "latest_start": None,
@@ -72,10 +76,14 @@ def make_plan(
     while t < departure:
         end = t + timedelta(minutes=15)
         frac = (min(end, departure) - max(t, now)).total_seconds() / 900.0
-        if frac > 0.05:
+        if frac > 0.05 and not (blocked and t in blocked):
             q = known.get(t)
             high = q["high"] if q is not None and q.get("high") is not None else DEFAULT_HIGH_KW
             avail = max(0.0, available_kw.get(t, 0.0)) if available_kw is not None else 0.0
+            other = max(0.0, (others_kw or {}).get(t, 0.0))
+            if other:   # another car charges then: it uses the available power first, the rest is load like the house
+                high += max(0.0, other - avail)
+                avail = max(0.0, avail - other)
             quarters.append({"t": t, "frac": frac, "high": high, "avail": avail})
         t = end
 

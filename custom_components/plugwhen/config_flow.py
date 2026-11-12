@@ -11,7 +11,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
-    BooleanSelector, ConfigEntrySelector, ConfigEntrySelectorConfig, EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode,
+    BooleanSelector, ConfigEntrySelector, ConstantSelector, ConstantSelectorConfig, ConfigEntrySelectorConfig, EntitySelector, EntitySelectorConfig, NumberSelector, NumberSelectorConfig, NumberSelectorMode,
     SelectOptionDict, SelectSelector, SelectSelectorConfig, SelectSelectorMode, TextSelector, TextSelectorConfig, TextSelectorType,
 )
 
@@ -19,7 +19,7 @@ from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
     O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
-    V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY,
+    V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_WALLBOX_MORE,
     O_OUTDOOR_TEMP, O_WEATHER,
 )
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
@@ -43,10 +43,9 @@ def _opt(key: str, d: dict[str, Any]) -> vol.Optional:
     return vol.Optional(key, description={"suggested_value": d.get(key)})
 
 
-WAZE_HINT = {
-    "de": "Kilometer von Kalender-Fahrten über Waze: dafür einmal die Integration „Waze Travel Time“ hinzufügen (ohne Konto), dann erscheint hier der Schalter.",
-    "en": "Kilometres of calendar trips via Waze: add the integration \u201cWaze Travel Time\u201d once (no account), then the switch appears here.",
-}
+# Without Waze a read-only row says how to get the switch; its text comes from the translations (the user's language,
+# not the server's): "data.waze_hint" and "data_description.waze_hint" of the options step.
+WAZE_HINT = "waze_hint"
 
 
 def waze_ready(hass: HomeAssistant) -> bool:
@@ -83,6 +82,7 @@ def _vehicle_fields(d: dict[str, Any]) -> dict[Any, Any]:
         _opt(V_PLUGGED, d): _ent(["binary_sensor", "switch", "input_boolean"]),
         _opt(V_CHARGING, d): _ent(["binary_sensor", "switch", "input_boolean"]),
         _opt(V_WALLBOX_ENERGY, d): _ent("sensor"),
+        _opt(V_WALLBOX_MORE, d): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
         _opt(V_DEPARTURE, d): _ent(["time", "datetime", "input_datetime", "sensor"]),
         _opt(V_CALENDAR, d): _ent("calendar"),
         vol.Required(V_STOCK, default=d.get(V_STOCK, 0)): _num(0, 100, 5, "%"),
@@ -220,7 +220,7 @@ class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
 
 OPTION_UNITS = {O_GRID_ENERGY: (ENERGY_UNITS, "not_energy")}
 VEHICLE_UNITS = {V_ODOMETER: (DISTANCE_UNITS, "not_distance"), V_SOC: (PERCENT_UNITS, "not_percent"),
-                 V_WALLBOX_ENERGY: (ENERGY_UNITS, "not_energy")}
+                 V_WALLBOX_ENERGY: (ENERGY_UNITS, "not_energy"), V_WALLBOX_MORE: (ENERGY_UNITS, "not_energy")}
 
 
 class PlugwhenOptionsFlow(OptionsFlow):
@@ -229,6 +229,7 @@ class PlugwhenOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            user_input = {k: v for k, v in user_input.items() if k != WAZE_HINT}   # the hint row is not an option
             errors = unit_errors(self.hass.states.get, user_input, OPTION_UNITS)
             if not errors and str(user_input.get(O_EVCC_URL) or "").strip():   # an own evcc address is tried right away
                 try:
@@ -264,8 +265,8 @@ class PlugwhenOptionsFlow(OptionsFlow):
             _opt(O_EVCC_PASSWORD, current): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
             vol.Required(O_DIRECT_EARLY, default=bool(current.get(O_DIRECT_EARLY, False))): BooleanSelector(),
             **({vol.Required(O_ROUTE_WAZE, default=bool(current.get(O_ROUTE_WAZE, False))): BooleanSelector()}
-               if waze_ready(self.hass) else {}),
-        }), description_placeholders={"waze": "" if waze_ready(self.hass) else WAZE_HINT.get(self.hass.config.language[:2], WAZE_HINT["en"])})
+               if waze_ready(self.hass) else {vol.Optional(WAZE_HINT): ConstantSelector(ConstantSelectorConfig(value=""))}),
+        }))
 
 
 

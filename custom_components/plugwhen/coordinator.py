@@ -21,7 +21,7 @@ from .const import (
     HISTORY_DAYS, HISTORY_INTERVAL, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW, O_PRICE_THRESHOLD,
     O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_SOLAR, O_SOLAR_DEDUCT, DEFAULT_SOLAR_DEDUCT, SOLAR_REFRESH, O_WAECHTER, POTENTIAL_DAYS, POTENTIAL_FIXED_KW, POTENTIAL_INTERVAL, POTENTIAL_QUARTER_ADD_KW, SUBENTRY_VEHICLE, UPDATE_INTERVAL, V_CAPACITY, V_CHARGE_MAX,
     V_CHARGE_MIN, V_CHARGING, V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED,
-    V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
+    V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_WALLBOX_MORE, V_CHARGE_PREF, DEFAULT_CHARGE_PREF, CALIBRATE_INTERVAL,
     O_OUTDOOR_TEMP, O_WEATHER, WEATHER_REFRESH,
 )
 from dataclasses import replace
@@ -44,11 +44,13 @@ from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
 from .horizon import Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
-from .need import DEFAULT_EFFICIENCY, MIN_SAMPLES, Need, compute_need
+from .need import MIN_SAMPLES, Need, compute_need
+from .startwerte import charge_efficiency
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, should_check
 from .plan import make_plan
 from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
+from .wallboxes import active_wallbox, car_hourly, cumulative, plan_order, shared, soc_rise_hours, taken_by_others, wallbox_ids
 
 _LOGGER = logging.getLogger(__name__)
 _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
@@ -66,6 +68,7 @@ HORIZON_TRIPS = 10            # departures in the look-ahead
 SOLAR_CHECK_DAYS = 7                    # past days the solar check looks at
 TRIPS_REFRESH = timedelta(minutes=15)   # the calendar is read this often
 MIN_DRIVE_SHARE = 0.5        # a weekday counts as a day of departure if the car is used on at least half of its days
+SHARED_COMPACT = 0.75        # at a shared wallbox a plan charges with at least this share of the wallbox power
 SENT_KEEP = 8                # warnings remembered per vehicle (so that a restart does not repeat them)
 
 
@@ -117,6 +120,9 @@ class Vehicle:
     trips_error: str | None = None
     evcc_write: dict | None = None           # last write into evcc: {at, action, reason, error}
     direct_last: dict | None = None          # last action of the mode 'direct' on the wallbox
+    wallbox_active: str | None = None        # energy counter of the wallbox the car is at (several wallboxes, see wallboxes.py)
+    wallbox_seen: dict = field(default_factory=dict)   # last counter values, to see which one rises
+    others_kw: dict | None = None            # what the cars planned before this one (per quarter hour), for the attributes
 
 
 class Plugwhen:
@@ -207,8 +213,7 @@ class Plugwhen:
     async def _after_change(self, _now: datetime) -> None:
         self._pending = None
         now = dt_util.now()
-        for v in self.vehicles.values():
-            self._compute(v, now)
+        self._compute(None, now)
         async_dispatcher_send(self.hass, self.signal)
         acted = False
         for v in self.vehicles.values():
@@ -256,7 +261,8 @@ class Plugwhen:
         for v in self.vehicles.values():
             if v.history_at is None or now - v.history_at >= HISTORY_INTERVAL:
                 await self._load_history(v, now)
-            self._compute(v, now)
+        self._compute(None, now)
+        for v in self.vehicles.values():
             if v.potential_at is None or now - v.potential_at >= POTENTIAL_INTERVAL:
                 v.potential_at = now
                 self.entry.async_create_background_task(self.hass, self._potential_and_tell(v), f"{DOMAIN} potential")
@@ -486,14 +492,39 @@ class Plugwhen:
 
     # ---------- mode 'direct': Plugwhen controls the wallbox ----------
 
+    def wallboxes(self, v: Vehicle) -> list[str]:
+        """The energy counters of the car's wallboxes (its own field first, then the further ones)."""
+        return wallbox_ids(v.cfg.get(V_WALLBOX_ENERGY), v.cfg.get(V_WALLBOX_MORE))
+
+    def shared_wallboxes(self) -> set[str]:
+        """Counters of wallboxes more than one car uses."""
+        return shared({x.sub_id: self.wallboxes(x) for x in self.vehicles.values()})
+
+    def wallbox_now(self, v: Vehicle) -> str | None:
+        """The counter of the wallbox the car is at (the last one found rising), else its first one."""
+        ids = self.wallboxes(v)
+        return v.wallbox_active if v.wallbox_active in ids else (ids[0] if ids else None)
+
+    def _car_energy(self, v: Vehicle, stats: dict[str, Any], soc: list[tuple[datetime, float | None]]) -> dict[datetime, float] | None:
+        """Energy per hour into this car from its wallboxes (a shared wallbox counts only while the car's state of charge rose)."""
+        ids = self.wallboxes(v)
+        if not ids:
+            return None
+        changes = {}
+        for wid in ids:
+            unit = self._unit(wid)
+            changes[wid] = {dt_util.as_local(dt_util.utc_from_timestamp(r["start"])): to_kwh(float(r["change"]), unit)
+                            for r in stats.get(wid, []) if r.get("change") is not None}
+        return car_hourly(changes, self.shared_wallboxes(), soc_rise_hours(soc))
+
     def wallbox_control(self, v: Vehicle) -> dict[str, Any]:
-        """What the car's wallbox offers, found on its device (the device of the wallbox energy counter, the plug or charging sensor)."""
+        """What the car's wallbox offers, found on its device (the device of the wallbox it is at, the plug or charging sensor)."""
         from homeassistant.helpers import entity_registry as er
 
         reg = er.async_get(self.hass)
         device = None
-        for key in (V_WALLBOX_ENERGY, V_CHARGING, V_PLUGGED):
-            ent = reg.async_get(v.cfg.get(key) or "")
+        for eid in (self.wallbox_now(v), v.cfg.get(V_CHARGING), v.cfg.get(V_PLUGGED)):
+            ent = reg.async_get(eid or "")
             if ent is not None and ent.device_id:
                 device = ent.device_id
                 break
@@ -745,9 +776,9 @@ class Plugwhen:
 
     async def _load_history(self, v: Vehicle, now: datetime) -> None:
         v.history_at = now  # also after a failure: try again in an hour
-        odo_id, soc_id, wb_id = v.cfg.get(V_ODOMETER), v.cfg.get(V_SOC), v.cfg.get(V_WALLBOX_ENERGY)
+        odo_id, soc_id, wbs = v.cfg.get(V_ODOMETER), v.cfg.get(V_SOC), self.wallboxes(v)
         temp_id = self._outdoor_entity()
-        ids = {e for e in (odo_id, soc_id, wb_id, temp_id) if e}
+        ids = {e for e in (odo_id, soc_id, temp_id, *wbs) if e}
         try:
             from homeassistant.components.recorder import get_instance
             from homeassistant.components.recorder.statistics import statistics_during_period
@@ -773,10 +804,9 @@ class Plugwhen:
                 out.append((dt_util.as_local(dt_util.utc_from_timestamp(row["start"])), convert(val, unit)))
             return out
 
-        if wb_id:
-            wb_unit = self._unit(wb_id)
-            hourly_wb = {dt_util.as_local(dt_util.utc_from_timestamp(r["start"])): to_kwh(float(r["change"]), wb_unit)
-                         for r in stats.get(wb_id, []) if r.get("change") is not None}
+        soc_series = series(soc_id, "mean", "state", lambda x, _u: x)
+        hourly_wb = self._car_energy(v, stats, soc_series)
+        if hourly_wb is not None:
             v.habit = charging_habit(hourly_wb, now)
         odometer = series(odo_id, "state", "max", to_km)
         if not odometer:
@@ -784,8 +814,8 @@ class Plugwhen:
             return
         records = records_from_hourly(
             odometer,
-            series(soc_id, "mean", "state", lambda x, _u: x),
-            series(wb_id, "state", "max", to_kwh) or None,
+            soc_series,
+            cumulative(hourly_wb) if hourly_wb else None,
             float(v.cfg.get(V_CAPACITY) or 0) or None,
             temp_c=series(temp_id, "mean", "state", _to_celsius) or None,
         )
@@ -871,7 +901,8 @@ class Plugwhen:
         v.potential_at = now
         w = self._waechter_values()
         grid_id = self.entry.options.get(O_GRID_ENERGY) or w.get("grid_energy")
-        wb_id, odo_id = v.cfg.get(V_WALLBOX_ENERGY), v.cfg.get(V_ODOMETER)
+        wbs, odo_id, soc_id = self.wallboxes(v), v.cfg.get(V_ODOMETER), v.cfg.get(V_SOC)
+        wb_id = wbs[0] if wbs else None
         missing = [k for k, e in (("grid_energy", grid_id), ("wallbox_energy", wb_id), ("odometer", odo_id)) if not e]
         if missing:
             v.potential = {"status": "no_data", "missing": missing, "computed_at": now.isoformat()}
@@ -881,8 +912,8 @@ class Plugwhen:
             from homeassistant.components.recorder.statistics import statistics_during_period
 
             stats = await get_instance(self.hass).async_add_executor_job(
-                statistics_during_period, self.hass, now - timedelta(days=days), now, {grid_id, wb_id, odo_id}, "hour", None,
-                {"change", "state"},
+                statistics_during_period, self.hass, now - timedelta(days=days), now, {grid_id, odo_id, *wbs, *([soc_id] if soc_id else [])},
+                "hour", None, {"change", "state", "mean"},
             )
         except Exception as err:  # noqa: BLE001 - a calculation that cannot run must not disturb the planner
             v.potential = {"status": "no_data", "error": str(err), "computed_at": now.isoformat()}
@@ -898,7 +929,9 @@ class Plugwhen:
             return out
 
         grid = clean_grid(hourly(grid_id, "change", to_kwh))
-        car = {t: max(0.0, x) for t, x in hourly(wb_id, "change", to_kwh).items()}
+        soc_rows = [(dt_util.as_local(dt_util.utc_from_timestamp(r["start"])), r.get("mean") if r.get("mean") is not None else r.get("state"))
+                    for r in stats.get(soc_id, [])] if soc_id else []
+        car = {t: max(0.0, x) for t, x in (self._car_energy(v, stats, soc_rows) or {}).items()}
         odo = hourly(odo_id, "state", to_km)
         ks = sorted(odo)
         trips = [b for a, b in zip(ks, ks[1:]) if 0.5 < odo[b] - odo[a] < 400]
@@ -919,7 +952,7 @@ class Plugwhen:
         )
         result.update({
             "computed_at": now.isoformat(), "history_days": days,
-            "sources": {"grid_energy": grid_id, "wallbox_energy": wb_id, "odometer": odo_id,
+            "sources": {"grid_energy": grid_id, "wallbox_energy": wbs if len(wbs) > 1 else wb_id, "odometer": odo_id,
                         "prices": "settings" if self.entry.options.get(O_PRICE_LOW) else ("guard" if w.get("price_low") else None),
                         "guard_kw": guard_kw, "quarter_add": self._add_model.summary(), "quarter_add_default_kw": POTENTIAL_QUARTER_ADD_KW},
         })
@@ -1155,7 +1188,7 @@ class Plugwhen:
                 scale = 0.001 if unit == "w" else 1.0
                 series = [(dt_util.as_local(dt_util.utc_from_timestamp(r["start"])), (float(r["mean"]) * scale) if r.get("mean") is not None else None)
                           for r in stats.get(grid_power, [])]
-                wb_ids = {x.cfg.get(V_WALLBOX_ENERGY) for x in self.vehicles.values()} - {None, ""}
+                wb_ids = {w for x in self.vehicles.values() for w in self.wallboxes(x)}
                 wb_hourly = None
                 if wb_ids:   # hours without wallbox energy are the house alone
                     wstats = await rec.async_add_executor_job(
@@ -1226,9 +1259,20 @@ class Plugwhen:
     def _save_plugs(self) -> None:
         self._plug_store.async_delay_save(lambda: {"vehicles": {v.sub_id: v.plug_log.items for v in self.vehicles.values()}}, 10)
 
-    def _compute(self, v: Vehicle, now: datetime) -> None:
-        self._compute_plan(v, now)
-        self._shadow_step(v, now)
+    def _compute(self, v: Vehicle | None, now: datetime) -> None:
+        """Compute the plans of all cars (one car's change can move the others: the same house, the same peak, maybe the same
+        wallbox). One after the other: plugged in first, then by departure; a later car sees what the earlier ones planned."""
+        order = plan_order([{"id": x.sub_id, "plugged": x.plugged, "departure": x.departure, "name": x.name} for x in self.vehicles.values()])
+        done: list[tuple[set[str], dict]] = []
+        for sid in order:
+            x = self.vehicles[sid]
+            mine = set(self.wallboxes(x))
+            others, blocked = taken_by_others(done, mine)
+            self._compute_plan(x, now, others or None, blocked or None)
+            self._shadow_step(x, now)
+            cp = x.charge_plan or {}
+            if cp.get("status") in ("planned", "infeasible") and cp.get("quarters"):
+                done.append((mine, cp["quarters"]))
 
     def insight(self, v: Vehicle) -> dict[str, Any]:
         """Does the learning bring anything for this car (walks through the history; cached until the reserve or the history changes)."""
@@ -1246,19 +1290,25 @@ class Plugwhen:
         charging = (self._is_on(v.cfg.get(V_CHARGING)) if v.cfg.get(V_CHARGING)
                     else (v.evcc_live["charging"] if v.evcc_live else None))
         energy = None
-        wb = v.cfg.get(V_WALLBOX_ENERGY)
+        wb = self.wallbox_now(v)
         if wb:
             energy = to_kwh(self._float(wb), self._unit(wb))
         if v.shadow.update(now, v.decision, charging, energy):
             self._shadow_store.async_delay_save(
                 lambda: {"vehicles": {x.sub_id: x.shadow.to_dict() for x in self.vehicles.values()}}, 30)
 
-    def _compute_plan(self, v: Vehicle, now: datetime) -> None:
+    def _compute_plan(self, v: Vehicle, now: datetime, others: dict[datetime, float] | None = None,
+                      blocked: set[datetime] | None = None) -> None:
+        v.others_kw = others
         v.evcc_live = live_vehicle(self.evcc_state, v.cfg[V_EVCC_VEHICLE]) if v.cfg.get(V_EVCC_VEHICLE) else None
         # a sensor wins; evcc only fills in what no sensor says (and only while evcc has the car at a loadpoint)
         v.plugged = self._is_on(v.cfg.get(V_PLUGGED)) if v.cfg.get(V_PLUGGED) else (v.evcc_live["plugged"] if v.evcc_live else None)
         self._track_plug(v, now)
         v.charging = (self._is_on(v.cfg.get(V_CHARGING)) is True) if v.cfg.get(V_CHARGING) else bool(v.evcc_live and v.evcc_live["charging"])
+        seen = {w: to_kwh(self._float(w), self._unit(w)) for w in self.wallboxes(v)}
+        if seen:   # which wallbox the car is at: the one whose counter rises while it charges (or is plugged in)
+            v.wallbox_active = active_wallbox(v.wallbox_seen, seen, v.charging or v.plugged is True, v.wallbox_active)
+            v.wallbox_seen = seen
         v.soc = self._float(v.cfg.get(V_SOC))
         v.soc_age_s = self._age_s(v.cfg.get(V_SOC), now) if v.soc is not None else None
         v.soc_stale = soc_is_stale(v.soc_age_s, float(v.cfg.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)), v.charging)
@@ -1272,7 +1322,7 @@ class Plugwhen:
             v.departure_temp_c, float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
         v.need = compute_need(
             v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption,
-            learn_km=v.learn_km or v.departure_source == "calendar", efficiency=v.efficiency or DEFAULT_EFFICIENCY, min_soc=self._min_soc(v))
+            learn_km=v.learn_km or v.departure_source == "calendar", efficiency=self.efficiency_of(v), min_soc=self._min_soc(v))
 
         max_kw = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
         if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
@@ -1287,7 +1337,11 @@ class Plugwhen:
         v.charge_plan = make_plan(
             now, v.departure or now, v.need.charge_kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
             load=load, target_kw=target_kw if load is not None else None, available_kw=avail,
-            pref_kw=float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)),
+            # a wallbox shared with another car: charge compactly (at least three quarters of the wallbox power), so that the other
+            # car still fits into the night
+            pref_kw=(max(SHARED_COMPACT * max_kw, float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
+                     if set(self.wallboxes(v)) & self.shared_wallboxes() else float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF))),
+            others_kw=others, blocked=blocked,
         )
         v.horizon = self._horizon(v, now, avail, max_kw)
         hours = (v.departure - now).total_seconds() / 3600.0 if v.departure else None
@@ -1329,6 +1383,15 @@ class Plugwhen:
         # a calendar trip replaces the learned departure only when it is the same trip (within two hours); calendar trips never replace each other
         return with_calendar(out, cal)[:HORIZON_TRIPS]
 
+    def efficiency_of(self, v: Vehicle) -> float:
+        """Share of the wallbox energy that reaches the battery: learned from the own history, else the start value at the power
+        the car usually charges with (the preferred power, within min..max): about 89 % at 4 kW, 76 % at 1.4 kW, 93 % at 11 kW."""
+        if v.efficiency:
+            return v.efficiency
+        lo = float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN))
+        hi = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
+        return charge_efficiency(max(lo, min(hi, float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))))
+
     def _horizon(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None, max_kw: float) -> dict[str, Any] | None:
         """Where the energy for the next departures comes from and whether charging with the sun in advance saves grid energy. Works without
         a solar plant (then nothing is pre-charged). It recommends only."""
@@ -1338,7 +1401,7 @@ class Plugwhen:
         try:
             return horizon_plan(
                 now, v.soc / 100.0 * capacity, capacity, v.consumption, self._trips(v, now, capacity), avail, max_kw,
-                efficiency=v.efficiency or DEFAULT_EFFICIENCY, pref_kw=float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
+                efficiency=self.efficiency_of(v), pref_kw=float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
         except Exception as err:  # noqa: BLE001 - a look-ahead that fails must never disturb the plan
             _LOGGER.debug("Plugwhen: look-ahead of %s failed: %s", v.name, err)
             return None

@@ -26,13 +26,14 @@ def unit_errors(
     and a sensor without a unit are not either (the unit is assumed, see above)."""
     errors: dict[str, str] = {}
     for key, (units, error) in specs.items():
-        entity_id = values.get(key)
-        if not entity_id:
-            continue
-        state = get_state(entity_id)
-        if state is None:
-            continue
-        unit = str(state.attributes.get("unit_of_measurement") or "").strip().lower()
-        if unit and unit not in units:
-            errors[key] = error
+        chosen = values.get(key)
+        for entity_id in (chosen if isinstance(chosen, (list, tuple)) else [chosen]):   # a field may hold several sensors
+            if not entity_id:
+                continue
+            state = get_state(entity_id)
+            if state is None:
+                continue
+            unit = str(state.attributes.get("unit_of_measurement") or "").strip().lower()
+            if unit and unit not in units:
+                errors[key] = error
     return errors

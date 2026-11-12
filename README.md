@@ -275,6 +275,18 @@ meters and cars are used, so that they are tested first.
 `send_feedback` (longer texts, an optional contact address, with or without the setup overview above). It goes to the author,
 nothing else is sent.
 
+## Safety and liability
+
+In the modes **Via evcc** and **Direct** Plugwhen decides by itself when the car charges: it writes charging
+plans into evcc or switches the wallbox. It is a free hobby project and comes **without any warranty**, as
+stated in sections 15 and 16 of the AGPL-3.0. It can be wrong, charge late or not at all. The car may then have
+less charge at departure than planned.
+
+- Start in **Learn** and choose a controlling mode only when the plans look right to you.
+- Check during the first days that it charges as intended, and charge yourself when it is urgent.
+- Your installation and your car stay your responsibility. Liability that the law does not allow to be excluded
+  (for example for intent or gross negligence) is not affected.
+
 ## Licence
 
 Dual licence: AGPL-3.0 and a commercial licence, see [LICENSING.md](LICENSING.md).

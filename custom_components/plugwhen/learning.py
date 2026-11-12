@@ -26,6 +26,11 @@ from datetime import date
 from statistics import median
 from typing import Any
 
+try:  # inside Home Assistant the module lives in a package, the tests import it flat
+    from .startwerte import temperature_factor
+except ImportError:  # pragma: no cover
+    from startwerte import temperature_factor
+
 MAX_DAYS = 8                 # records kept per weekday
 MAX_CONSUMPTION = 20         # consumption values kept
 MIN_DRIVE_KM = 2.0           # below this the car did not really move
@@ -44,15 +49,13 @@ MIN_FIT_SAMPLES = 8           # the car's own curve needs this many days ...
 MIN_FIT_SPAN_K = 8.0          # ... spread over at least this many kelvin
 MAX_SLOPE = 0.012             # kWh per km and kelvin: steeper learned slopes are cut (a few odd days must not dominate)
 EXTRAPOLATE_K = 5.0           # the own curve is used at most this far outside the learned temperatures
-COLD_REF_C = 18.0             # rule of thumb below this temperature: heating and a cold battery cost more ...
-COLD_PER_K = 0.01             # ... about 1 % per kelvin (about +25 % at -7 deg C against 18 deg C)
-COLD_MAX_FACTOR = 1.4
 CONFIG_REF_C = 15.0           # a consumption typed in by hand counts as the value of a mild day
 
 
 def cold_factor(temp_c: float) -> float:
-    """Rule of thumb for the extra consumption in the cold, 1.0 from `COLD_REF_C` up."""
-    return min(COLD_MAX_FACTOR, 1.0 + COLD_PER_K * max(0.0, COLD_REF_C - temp_c))
+    """Consumption by temperature before the car has its own curve: the start curve from open data (startwerte.py, the
+    same as on the server), relative to 20 deg C. About +22 % at 0 deg C, +60 % at -15 deg C, a little more above 25 deg C."""
+    return temperature_factor(temp_c)
 
 
 @dataclass(frozen=True)
