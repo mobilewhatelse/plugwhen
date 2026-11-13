@@ -289,7 +289,8 @@ integration's device. While it is on, this goes to `aiwhatelse.eu`:
 | What | When | Content |
 |---|---|---|
 | Usage statistics | once a week | a random id of the installation, versions, country and language, which kinds of devices and features are used, which integrations the entities come from (e.g. `shelly`) |
-| Trip days | once a day | per day with at least 30 km: car model (maker and model of the device with the state of charge), battery size, kilometres, consumption per km, mean outdoor temperature of the day |
+| Trip days | once a day | per day with at least 30 km: car model (maker and model of the device with the state of charge), battery size, kilometres, consumption per km, mean outdoor temperature of the day, odometer only to the nearest 10,000 km |
+| Charging days | once a day | per day charged only at home (at least 3 kWh and 20 % state of charge): car model, battery size, wallbox energy per full charge, mean outdoor temperature, odometer to the nearest 10,000 km. They give the charging losses and the ageing of the battery |
 
 **Never sent:** names, entity ids, addresses, location, date or time of a trip, passwords, tokens. No IP address is stored.
 Trip days have no id and are mixed, they cannot be traced to a car and therefore cannot be deleted either. Switching it off

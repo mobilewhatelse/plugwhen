@@ -63,7 +63,8 @@ The action `plugwhen.create_dashboard` builds a ready-made dashboard.
 ## Anonymous data (voluntary)
 
 Off unless you switch it on. Then a weekly usage statistic and, once a day, the trip days: car model, kilometres,
-consumption and outdoor temperature, without date, place or id. In return Plugwhen uses the consumption of many cars
+consumption, outdoor temperature and odometer (only to the nearest 10,000 km), and for days charged only at home the wallbox
+energy per full charge; without date, place or id. In return Plugwhen uses the consumption of many cars
 of the same model while your car is still learning. Never names, places or passwords.
 [What exactly is sent](docs/MANUAL.md#share-anonymous-data-voluntary-and-feedback)
 

@@ -294,7 +294,8 @@ teilen* am Gerät der Integration. Solange er an ist, geht an `aiwhatelse.eu`:
 | Was | Wann | Inhalt |
 |---|---|---|
 | Nutzungsstatistik | einmal pro Woche | zufällige Kennung der Installation, Versionen, Land und Sprache, welche Gerätearten und Funktionen genutzt werden, aus welchen Integrationen die Entitäten kommen (z. B. `shelly`) |
-| Fahrtage | einmal am Tag | je Tag mit mindestens 30 km: Automodell (Hersteller und Modell des Geräts mit dem Ladestand), Akkugröße, Kilometer, Verbrauch je km, mittlere Außentemperatur des Tages |
+| Fahrtage | einmal am Tag | je Tag mit mindestens 30 km: Automodell (Hersteller und Modell des Geräts mit dem Ladestand), Akkugröße, Kilometer, Verbrauch je km, mittlere Außentemperatur des Tages, Kilometerstand nur auf 10.000 km genau |
+| Ladetage | einmal am Tag | je Tag, an dem nur zu Hause geladen wurde (mindestens 3 kWh und 20 % Ladestand): Automodell, Akkugröße, Wallbox-Energie je voller Ladung, mittlere Außentemperatur, Kilometerstand auf 10.000 km genau. Daraus folgen Ladeverluste und die Alterung des Akkus |
 
 **Nie gesendet:** Namen, Entitäts-IDs, Adressen, Standort, Datum oder Uhrzeit einer Fahrt, Kennwörter, Token. Es wird keine
 IP-Adresse gespeichert. Die Fahrtage haben keine Kennung und werden gemischt, sie lassen sich keinem Auto zuordnen und daher
