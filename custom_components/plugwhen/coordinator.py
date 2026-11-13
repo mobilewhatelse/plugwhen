@@ -515,9 +515,10 @@ class Plugwhen:
                 except ValueError:
                     pass
                 days, last = flotte.trip_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
+                charges = flotte.charge_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0), after, now.date())
                 if days:
                     async with asyncio.timeout(15):
-                        async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet")),
+                        async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet"), charges),
                                                 headers=headers) as r:
                             if r.status != 200:
                                 _LOGGER.debug("Plugwhen: fleet send answered %s", r.status)
@@ -525,6 +526,8 @@ class Plugwhen:
                             ans = await r.json(content_type=None)
                     if isinstance(ans, dict) and ans.get("schluessel"):
                         self._fleet["schluessel"], self._fleet["gueltig_bis"] = str(ans["schluessel"]), ans.get("gueltig_bis")
+                    if isinstance(ans, dict) and isinstance(ans.get("modell"), dict):   # which model of its list the service took
+                        self._fleet.setdefault("gruppe", {}).update({str(k): str(x) for k, x in ans["modell"].items() if x})
                     car["gemeldet"] = True
                 if last is not None:
                     car["bis"] = last.isoformat()
@@ -1412,7 +1415,8 @@ class Plugwhen:
             v.departure_temp_c, float(v.cfg.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)) / 100.0)
         v.fleet_cars = None
         if v.consumption_source in ("config", "rule_config") and self.share_usage:   # no own values yet: the fleet's, if any
-            entry, src = flotte.entry_for(self._fleet.get("modelle"), v.fleet_model)
+            models = self._fleet.get("modelle")
+            entry, src = flotte.entry_for(models, flotte.group_of(models, v.fleet_model, self._fleet.get("gruppe")))
             c = flotte.consumption(entry, v.departure_temp_c) if entry else None
             if c is not None:
                 v.consumption, v.consumption_source = c, src

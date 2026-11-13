@@ -110,7 +110,7 @@ def records_from_hourly(
         tl = temps.get(d)
         out.append(DayRecord(d, km=km, first_move_hour=r["first_move"] if km is not None and km >= 2.0 else None,
                              home_kwh=home, away_kwh=away, consumption=cons, charged_kwh=charged,
-                             temp_c=round(sum(tl) / len(tl), 1) if tl else None))
+                             temp_c=round(sum(tl) / len(tl), 1) if tl else None, odometer_km=r["last_o"]))
     return [r for r in out if r.km is not None or r.home_kwh is not None]
 
 

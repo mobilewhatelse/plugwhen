@@ -127,5 +127,51 @@ class SameRulesAsServerTest(unittest.TestCase):
         self.assertIn("MAX_TAGE_JE_SENDUNG = 400", t)
 
 
+
+class NewFieldsTest(unittest.TestCase):
+    """Odometer step, charge days and the model the service files the car under (Plugwhen 0.x with the fleet review 13.11.)."""
+
+    def test_odometer_only_as_step(self):
+        r = DayRecord(D0, km=50.0, consumption=0.2, temp_c=5.0, odometer_km=48_312.4)
+        days, _ = flotte.trip_days([r], "vw e-golf", 35.8, None, D0 + timedelta(days=1))
+        self.assertEqual(days[0]["km_stand"], 40_000)
+        days, _ = flotte.trip_days([rec(0)], "vw e-golf", 35.8, None, D0 + timedelta(days=1))
+        self.assertNotIn("km_stand", days[0])
+
+    def test_charge_days_home_only(self):
+        ok = DayRecord(D0, home_kwh=33.0, charged_kwh=30.0, temp_c=4.0, odometer_km=61_000)       # 50 % of 60 kWh
+        small = DayRecord(D0 + timedelta(days=1), home_kwh=5.0, charged_kwh=4.5)                   # rise below 20 %
+        away = DayRecord(D0 + timedelta(days=2), home_kwh=10.0, charged_kwh=30.0)                  # charged elsewhere too
+        today = DayRecord(D0 + timedelta(days=3), home_kwh=33.0, charged_kwh=30.0)
+        c = flotte.charge_days([ok, small, away, today], "mercedes-benz eqa 250+", 60.0, None, D0 + timedelta(days=3))
+        self.assertEqual(c, [{"modell": "mercedes-benz eqa 250+", "akku_kwh": 60, "wb_kwh_je_100": 66.0, "temp_c": 4,
+                              "km_stand": 60_000}])
+        self.assertEqual(flotte.charge_days([ok], "x y", 0.0, None, D0 + timedelta(days=3)), [])
+        self.assertEqual(flotte.charge_days([ok], "x y", 60.0, D0, D0 + timedelta(days=3)), [])   # already sent
+
+    def test_payload_with_charges(self):
+        self.assertNotIn("ladungen", flotte.payload([], True))
+        self.assertEqual(flotte.payload([], True, [{"a": 1}])["ladungen"], [{"a": 1}])
+
+    def test_group_of(self):
+        models = {"schema": 1, "modelle": {"mercedes-benz eqa": {}, "tesla model 3 long range": {}, "kia ev6": {}}}
+        self.assertEqual(flotte.group_of(models, "mercedes-benz eqa 250+"), "mercedes-benz eqa")
+        self.assertEqual(flotte.group_of(models, "mercedes eqa 250"), "mercedes-benz eqa")
+        self.assertEqual(flotte.group_of(models, "tesla model 3"), "tesla model 3")          # less exact: own name
+        self.assertEqual(flotte.group_of(None, "renault zoe"), "renault zoe")
+        self.assertEqual(flotte.group_of(models, "mercedes eqa 250", {"mercedes eqa 250": "mercedes-benz eqa x"}), "mercedes-benz eqa x")
+        self.assertIsNone(flotte.group_of(models, None))
+
+    def test_record_round_trip_keeps_odometer(self):
+        from learning import MobilityModel
+        m = MobilityModel()
+        m.add_day(DayRecord(D0, km=40.0, odometer_km=12_345.0))
+        back = MobilityModel.from_dict(json.loads(json.dumps(m.to_dict())))
+        rows = [r for lst in back.days.values() for r in lst]
+        self.assertEqual(rows[0].odometer_km, 12_345.0)
+        old = {"days": {"6": [[D0.isoformat(), 40.0, None, None, None, None, None, None]]}}   # stored before: 8 values
+        rows = [r for lst in MobilityModel.from_dict(old).days.values() for r in lst]
+        self.assertIsNone(rows[0].odometer_km)
+
 if __name__ == "__main__":
     unittest.main()

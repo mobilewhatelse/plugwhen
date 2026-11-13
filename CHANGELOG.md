@@ -18,8 +18,10 @@
 - **Share anonymous data, voluntary (default off):** asked in the last step of the set-up, afterwards the switch *Share
   anonymous data*. Weekly a usage statistic: a random id, versions, country and language, kinds of devices and the integrations
   their entities come from; switching off requests its deletion. Once a day the **trip days** (days with at least 30 km): car
-  model, battery size, km, kWh per km and the day's mean outdoor temperature, without date, place or id (they cannot be deleted,
-  they belong to no one). Never names, entity ids, places or passwords. **Feedback:** a text field and a button on the device,
+  model, battery size, km, kWh per km, the day's mean outdoor temperature and the odometer only as a 10,000 km step; for days
+  charged only at home the wallbox energy per full charge (charging losses, battery ageing). Without date, place or id (they
+  cannot be deleted, they belong to no one). The service files the car under a model of a public list (open data) and says
+  which; a car it does not know keeps its own name, and a model added to the list later is filed correctly without an update. Never names, entity ids, places or passwords. **Feedback:** a text field and a button on the device,
   and the action `send_feedback`.
 - **Fleet values:** with sharing on, Plugwhen fetches the consumption of many cars of the same model (from 5 cars, else all cars)
   and uses it while the car has no values of its own: own curve, own model, all cars, start values. Attribute `fleet` on the

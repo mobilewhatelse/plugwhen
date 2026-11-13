@@ -68,6 +68,7 @@ class DayRecord:
     consumption: float | None = None     # kWh per km on that day, if known
     charged_kwh: float | None = None     # energy that went into the battery that day (rise of the state of charge x capacity)
     temp_c: float | None = None          # mean outdoor temperature of the day (None without an outdoor temperature)
+    odometer_km: float | None = None     # odometer at the end of the day (only for the fleet values, as a 10 000 km step)
 
     def clean_km(self) -> float | None:
         if self.km is None or self.km < 0 or self.km > MAX_PLAUSIBLE_KM_DAY:
@@ -206,7 +207,7 @@ class MobilityModel:
 
     def to_dict(self) -> dict[str, Any]:
         return {"days": {str(wd): [[r.day.isoformat(), r.km, r.first_move_hour, r.home_kwh, r.away_kwh, r.consumption, r.charged_kwh,
-                                    r.temp_c] for r in lst] for wd, lst in self.days.items() if lst}}
+                                    r.temp_c, r.odometer_km] for r in lst] for wd, lst in self.days.items() if lst}}
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> MobilityModel:
@@ -214,7 +215,7 @@ class MobilityModel:
         for _, rows in (d.get("days") or {}).items():
             for row in rows:
                 try:
-                    m.add_day(DayRecord(date.fromisoformat(row[0]), *[None if x is None else float(x) for x in row[1:8]]))
+                    m.add_day(DayRecord(date.fromisoformat(row[0]), *[None if x is None else float(x) for x in row[1:9]]))
                 except (TypeError, ValueError, IndexError):
                     continue
         return m

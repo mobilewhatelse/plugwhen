@@ -9,6 +9,7 @@ the repository energie-cloud next to this one. Nothing goes to the internet. Not
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -52,7 +53,8 @@ def call(port: int, path: str, data: dict | None = None, head: dict | None = Non
 
 def start(name: str, port: int, work: Path, on: bool) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
-    cmd = ["docker", "run", "-d", "--name", name, "-p", f"{port}:80", "-v", f"{work}:/var/www/html/autodaten"]
+    cmd = ["docker", "run", "-d", "--name", name, "-p", f"{port}:80", "-v", f"{work}:/var/www/html/autodaten",
+           "-v", f"{SRC.parent / 'startwerte'}:/var/www/html/startwerte:ro"]
     subprocess.run(cmd + (["-e", "AUTODATEN_AKTIV=1"] if on else []) + ["php:8.3-apache"], check=True, capture_output=True)
     subprocess.run(["docker", "exec", name, "sh", "-c", "mkdir -p /var/www/html/autodaten/daten && chown -R www-data /var/www/html/autodaten/daten"],
                    capture_output=True)
@@ -85,7 +87,11 @@ def main() -> int:
         shutil.copytree(SRC, work, ignore=shutil.ignore_patterns("daten"))
         try:
             start("pw-flotte-on", PORT_ON, work, True)
-            start("pw-flotte-off", PORT_OFF, work, False)
+            off = Path(tmp) / "aus" / "autodaten"          # as delivered: own copy with AKTIV = false
+            shutil.copytree(work, off)
+            g = off / "v1" / "gemeinsam.php"
+            g.write_text(re.sub(r"const AKTIV = (true|false);", "const AKTIV = false;", g.read_text(encoding="utf-8")), encoding="utf-8")
+            start("pw-flotte-off", PORT_OFF, off, False)
             model = flotte.model_name("Volkswagen", "e-Golf")
             today = date(2026, 6, 1)
 
@@ -104,7 +110,7 @@ def main() -> int:
 
             s, m = call(PORT_ON, "modelle.php", head={"X-Schluessel": key or ""})
             log(s == 200 and isinstance(m, dict) and m.get("schema") == 1, "Models fetched with the key", f"{s} {str(m)[:200]}")
-            entry, src = flotte.entry_for(m if isinstance(m, dict) else None, model)
+            entry, src = flotte.entry_for(m if isinstance(m, dict) else None, flotte.group_of(m if isinstance(m, dict) else None, model))
             log(src == "fleet_model" and entry and entry.get("autos") == 6, "Own model found (6 cars)", f"{src} {entry}")
             cold, mild = flotte.consumption(entry, -8.0), flotte.consumption(entry, 12.0)
             log(cold is not None and mild is not None and cold > mild and 0.14 < mild < 0.25, "Colder costs more, plausible values",
@@ -115,7 +121,7 @@ def main() -> int:
             s, _ = call(PORT_ON, "modelle.php", head={"X-Schluessel": "0" * 48})
             log(s == 403, "Unknown key: 403 (Plugwhen forgets it and gets a new one with the next days)", str(s))
             raw = (work / "daten" / "fahrtage.jsonl").read_text(encoding="utf-8") if (work / "daten" / "fahrtage.jsonl").exists() else ""
-            log("2026" not in raw and key not in raw, "Stored without date and without key")
+            log(not re.search(r"20\d\d-\d\d", raw) and key not in raw, "Stored without date and without key")
         finally:
             subprocess.run(["docker", "rm", "-f", "pw-flotte-on", "pw-flotte-off"], capture_output=True)
     print(f"\n{'ALL OK' if not FAILS else f'{FAILS} FAILED'}")
