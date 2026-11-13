@@ -193,7 +193,7 @@ Der Dienst **Dashboard erstellen** (`plugwhen.create_dashboard`, nur Administrat
 für alle Fahrzeuge, auf Deutsch oder Englisch und in Ihrer Währung: nächste Abfahrt, Ladeplan (woher der Strom kommt), Potenzial mit
 Vergleichstabelle, Steckzeiten, Einstellungen und gelernte Woche. Nur Standardkarten.
 
-**So geht's:** Entwicklerwerkzeuge → Aktionen → *Dashboard erstellen* ausführen, das YAML aus der Antwort oder der Benachrichtigung kopieren.
+**So geht's:** Entwicklerwerkzeuge → Aktionen → *Dashboard erstellen* ausführen, die ganze Antwort (oder das YAML aus der Benachrichtigung) kopieren.
 Dann Einstellungen → Dashboards → Dashboard hinzufügen, öffnen, drei Punkte → Bearbeiten → drei Punkte → Roher Konfigurationseditor, einfügen,
 speichern. Der Dienst **schreibt nie in ein bestehendes Dashboard**. Nach dem Hinzufügen eines Fahrzeugs neu erstellen.
 

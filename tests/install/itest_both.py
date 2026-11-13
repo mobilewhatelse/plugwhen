@@ -110,13 +110,14 @@ def main():
 
     # ---------- dashboards: the guard shows the planner's plans, Plugwhen delivers its own dashboard ----------
     s_w, d_w = it.api("POST", "/api/services/viertelstunden_waechter/create_dashboard?return_response", {})
-    wtext = json.dumps(((d_w or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_w, dict) else ""
+    wresp = ((d_w or {}).get("service_response") or {}) if isinstance(d_w, dict) else {}
+    wtext = json.dumps(wresp.get("config", wresp))  # the guard answers with the dashboard itself from 0.14.2 (before: under "config")
     ready = (it.find("sensor", "testauto_ready_for_departure") or {}).get("entity_id", "?")
     log(s_w == 200 and pid in wtext and f'"entity": "{ready}"' not in wtext and "ladeplan_berechnen" not in wtext and "charge_plan_enabled" not in wtext,
         "the guard's dashboard shows only the charge plan of Plugwhen (no own plan, readiness stays on Plugwhen's dashboard)",
         f"{s_w} {len(wtext)} chars")
     s_p, d_p = it.api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
-    ptext = json.dumps(((d_p or {}).get("service_response") or {}).get("config") or {}) if isinstance(d_p, dict) else ""
+    ptext = json.dumps((d_p or {}).get("service_response") or {}) if isinstance(d_p, dict) else ""
     log(s_p == 200 and pid in ptext and "zweitauto" in ptext.lower(), "Plugwhen's dashboard has both vehicles", f"{s_p} {len(ptext)} chars")
 
     # ---------- taking over from the guard: a car the guard knows is filled in when it is added to Plugwhen ----------

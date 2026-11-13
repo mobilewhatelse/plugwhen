@@ -139,7 +139,7 @@ Both stay fully usable alone. Choosing the other integration in the settings is 
 Service **Create dashboard** (`plugwhen.create_dashboard`, administrators) builds the dashboard with the entities of *your*
 installation, all vehicles, in German or English and in your currency: next departure, charge plan (where the power comes from),
 potential with the comparison table, plug-in times, settings and the learned week. Only standard cards.
-**How to use it:** Developer tools → Actions → *Create dashboard*, copy the YAML from the response or from the notification. Then
+**How to use it:** Developer tools → Actions → *Create dashboard*, copy the whole response (or the YAML from the notification). Then
 Settings → Dashboards → Add dashboard, open it, three dots → Edit → three dots → Raw configuration editor, paste, save. The service
 **never writes into an existing dashboard**. Create it again after adding a vehicle.
 

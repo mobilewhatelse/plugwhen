@@ -2,6 +2,8 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Create dashboard answers with the dashboard itself:** the whole response from the developer tools can be pasted into the
+  raw configuration editor as it is (before it held the YAML text and the dashboard side by side, which the editor did not take).
 - **Consumption per km is learned (it was not before):** from the falls of the state of charge on days with at least 30 km
   (times the capacity), median of the last 20 days; until 3 days are known the typed-in value. Attributes `consumption_source`,
   `consumption_days_with_temp`, `departure_temp_c` on the learned week sensor.

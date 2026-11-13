@@ -120,7 +120,8 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
         "persistent_notification", "create",
         {"title": "Plugwhen", "notification_id": f"{DOMAIN}_dashboard", "message": f"{hint}\n\n```yaml\n{text}```"},
     )
-    return {"yaml": text, "config": config}
+    # the response is the dashboard itself: copied whole from the developer tools it fits the raw configuration editor as it is
+    return config
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:

@@ -366,12 +366,12 @@ def main():
     # the dashboard comes with the integration: a service builds it with this installation's entity ids
     s_d, d_d = api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
     dash = ((d_d or {}).get("service_response") or {}) if isinstance(d_d, dict) else {}
-    text = json.dumps(dash.get("config") or {})
-    log(s_d == 200 and "views" in (dash.get("config") or {}) and rdid in text and pid in text and "yaml" in dash,
+    text = json.dumps(dash)
+    log(s_d == 200 and list(dash) == ["views"] and rdid in text and pid in text,
         "the dashboard service builds the dashboard with this installation's entities", f"{s_d} {len(text)} chars")
     log("evcc_plan" in text and ("Ohne evcc" in text or "Without evcc" in text) and ".sources" in text,
         "the dashboard has the cards 'plan for evcc' (says what happens without evcc) and 'where the data comes from'")
-    cards_md = [c for v in (dash.get("config") or {}).get("views", []) for sec in v.get("sections", []) for c in sec.get("cards", [])
+    cards_md = [c for v in dash.get("views", []) for sec in v.get("sections", []) for c in sec.get("cards", [])
                 if c.get("type") == "markdown"]
     bad = []
     for c in cards_md:
