@@ -100,8 +100,8 @@ Urteil: *lohnt sich*, *Einstellung reicht* (die eigene Funktion der Wallbox scha
 
 ## Bereit zum Schalten?
 
-Ganz oben in der Übersicht steht je Auto eine Checkliste, wann Plugwhen die Wallbox **selbst** schalten darf (Betriebsart „Direkt“, kommt
-später): Fahrten an jedem genutzten Wochentag gelernt (mindestens 3 Beispiele), **7 Tage mit Vergleich** im Lernmodus (Tage, an denen
+Ganz oben in der Übersicht steht je Auto eine Checkliste, wann Plugwhen die Wallbox **selbst** schalten darf (Betriebsart „Direkt“):
+Fahrten an jedem genutzten Wochentag gelernt (mindestens 3 Beispiele), **7 Tage mit Vergleich** im Lernmodus (Tage, an denen
 geladen oder pausiert würde), **mindestens 80 % gleich entschieden** wie die Wirklichkeit und, mit Solaranlage, **5 Tage geprüfte
 Sonnenprognose**. Dazu ein ungefähres Datum. Ist alles erfüllt, kommt einmal eine Nachricht. Bis dahin plant und warnt Plugwhen, und in
 der Betriebsart „Über evcc“ lädt evcc nach dem Plan.
@@ -268,8 +268,8 @@ sie abwichen (rot).
 
 ## Lernmodus
 
-Je Auto hat die Auswahl *Betriebsart* heute zwei Stellungen: **Aus** und **Lernen** (Standard; die letzte Wahl bleibt über einen Neustart
-erhalten). Im Lernmodus **schaltet Plugwhen nichts**. Es berechnet nur für jeden Moment, was es tun *würde*, und schreibt es auf:
+Je Auto hat die Auswahl *Betriebsart* die Stellungen **Aus**, **Lernen** (Standard), **Über evcc** (nur mit evcc-Fahrzeug) und
+**Direkt** (siehe oben, erst wenn „Bereit zum Schalten?“ grün ist). Die letzte Wahl bleibt über einen Neustart erhalten. Im Lernmodus **schaltet Plugwhen nichts**. Es berechnet nur für jeden Moment, was es tun *würde*, und schreibt es auf:
 
 - der Sensor **Würde schalten** sagt `laden`, `pausieren` oder `keine Entscheidung`, mit Grund (im geplanten Fenster, wartet auf das nächste
   Fenster, der Plan ist abgearbeitet, das Ziel ist knapp also so viel wie möglich sofort, Ladestand unbekannt, Auto nicht angesteckt, nichts
@@ -282,8 +282,8 @@ erhalten). Im Lernmodus **schaltet Plugwhen nichts**. Es berechnet nur für jede
 Unbekanntes ist nie eine Entscheidung: unbekannter Ladestand, Auto nicht angesteckt, nichts zu laden, keine Abfahrt ergeben *keine Entscheidung*,
 die Wallbox macht weiter, was sie macht. Ein Ziel, das bis zur Abfahrt nicht erreichbar ist, ergibt `laden` sofort (nie warten, wenn die Zeit knapp ist).
 
-Das ist der Beleg, auf dem das Schalten später angeboten werden kann: erst wenn das Protokoll zeigt, dass die Entscheidungen von Plugwhen
-mehrere Tage lang richtig gewesen wären. **Das Schalten selbst ist noch nicht gebaut.** Das Dashboard hat eine Karte *Lernmodus* mit der
+Das ist der Beleg, auf dem die Betriebsart „Direkt“ angeboten wird: erst wenn der Vergleich zeigt, dass die Entscheidungen von Plugwhen
+mehrere Tage lang richtig gewesen wären (siehe „Bereit zum Schalten?“). Das Dashboard hat eine Karte *Lernmodus* mit der
 Entscheidung, dem Vergleich der letzten 7 Tage und dem Protokoll.
 
 ## Anonyme Daten teilen (freiwillig) und Rückmeldung

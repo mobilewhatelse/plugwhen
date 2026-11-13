@@ -1529,8 +1529,8 @@ class Plugwhen:
             return
         de = (self.hass.config.language or "").lower().startswith("de")
         title = f"Plugwhen · {v.name}"
-        msg = ("Der Lernmodus ist durch: Plugwhen hat oft genug gleich entschieden wie die Wirklichkeit. Die Betriebsart „Direkt“ kann gewählt werden, sobald es sie gibt."
-               if de else "The learn mode is through: Plugwhen decided like reality often enough. The mode \u201cdirect\u201d can be chosen as soon as it exists.")
+        msg = ("Der Lernmodus ist durch: Plugwhen hat oft genug gleich entschieden wie die Wirklichkeit. Ohne evcc kann jetzt die Betriebsart „Direkt“ gewählt werden."
+               if de else "The learn mode is through: Plugwhen decided like reality often enough. Without evcc the mode “direct” can be chosen now.")
         await self._deliver(v, services, title, msg, key)
 
     async def _deliver(self, v: Vehicle, services: list[str], title: str, message: str, key: str) -> bool:

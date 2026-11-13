@@ -1,4 +1,4 @@
-"""Select per vehicle: the mode (off, learn, evcc; the last choice is restored after a restart, default learn)."""
+"""Select per vehicle: the mode (off, learn, evcc, direct; the last choice is restored after a restart, default learn)."""
 
 from __future__ import annotations
 

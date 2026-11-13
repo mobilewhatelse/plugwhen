@@ -212,8 +212,8 @@ differed (red).
 
 ## Learn mode
 
-Per car the select *Mode* has two settings today: **Off** and **Learn** (default; the last choice is kept over a restart). In **Learn**
-mode Plugwhen **switches nothing**. It only works out, for every moment, what it *would* do and writes it down:
+Per car the select *Mode* has the settings **Off**, **Learn** (default), **Via evcc** (only for a car linked to evcc) and **Direct**
+(see below, only once *Ready to switch?* is green). The last choice is kept over a restart. In **Learn** mode Plugwhen **switches nothing**. It only works out, for every moment, what it *would* do and writes it down:
 
 - the sensor **Would switch** says `charge`, `pause` or `none` (no decision), with the reason (in a planned window, waiting for the next
   window, the plan is done, the target is tight so as much as possible at once, state of charge unknown, car not plugged in, nothing
@@ -226,9 +226,37 @@ mode Plugwhen **switches nothing**. It only works out, for every moment, what it
 Unknown things are never decisions: unknown state of charge, car not plugged in, nothing to charge, no departure give *no decision* and
 the wallbox keeps doing what it does. A target that cannot be reached by departure gives `charge` at once (never wait when time is short).
 
-This is the evidence on which switching can be offered later: only when the log shows that Plugwhen's decisions would have been right
-for several days. **Switching itself is not built yet.** The dashboard has a *Learn mode* card with the decision, the comparison of the
-last 7 days and the journal.
+This is the evidence on which the mode **Direct** is offered: only when the comparison shows that Plugwhen's decisions would have been
+right for several days. The dashboard has a *Learn mode* card with the decision, the comparison of the last 7 days and the journal.
+
+## Ready to switch?
+
+At the top of the overview each car has a checklist of when Plugwhen may switch the wallbox **itself** (mode *Direct*): trips learned on
+every weekday the car is used (at least 3 examples), **7 days with a comparison** in learn mode (days on which it would charge or pause),
+**at least 80 % decided like reality** and, with a solar plant, **5 days of checked solar forecast**. With an approximate date. When all
+is met, a message comes once. Until then Plugwhen plans and warns, and in the mode *Via evcc* evcc charges according to the plan.
+
+## Mode "Direct": Plugwhen controls the wallbox
+
+Offered only when *Ready to switch?* is green **and** the wallbox can be controlled. Plugwhen finds out from the device of the wallbox
+what it can do (the card *Ready to switch?* shows it):
+
+- **Departure mode of the wallbox** (for example Fronius Wattpilot "Next Trip"): Plugwhen only enters the departure time and the energy
+  and switches to this mode when charging is needed for a departure in the next 24 hours. The wallbox still uses the sun first and
+  charges the rest in time. Afterwards Plugwhen sets the previous mode (for example Eco) back.
+- **Mode change** (charging mode with a solar and a grid mode): grid mode in the planned grid windows, otherwise back.
+- **Start/stop only:** start at the beginning, stop at the end of a planned window.
+
+Plugwhen only changes back what it set itself. If you change the wallbox yourself in between, Plugwhen leaves it alone.
+
+**The mode decides who controls, and sets the wallbox accordingly:** *Direct* sets the wallbox to its solar mode (for example Eco) as the
+basic setting; evcc may then only **read** this wallbox (or not be there at all), because "Off" in evcc means "charging blocked", not
+"evcc keeps out". If evcc controls the wallbox, *Via evcc* is the right mode; it sets the wallbox to its grid mode (for example Default)
+and lets evcc control. *Off* and *Learn* give everything back. For trying it out, *Direct* can be **released early** in the settings,
+before *Ready to switch?* is green.
+
+**With evcc, evcc controls; without evcc, Plugwhen does.** A car linked to an evcc vehicle gets the mode *Via evcc*, a car without that
+link gets *Direct*. Never both. To test *Direct*, remove the evcc link of the car. The peak guard still has the last word.
 
 ## Entities per vehicle
 
@@ -240,7 +268,7 @@ last 7 days and the journal.
 | `sensor` Potential of spreading the charging | see *Potential calculator* |
 | `sensor` Learned days | attribute `week` |
 | `sensor` Would switch | learn mode: `charge`, `pause`, `none`, `off`; attributes `reason`, `planned_kw`, `until`, `summary`, `journal` |
-| `select` Mode | `off` or `learn` |
+| `select` Mode | `off`, `learn`, `evcc` (car linked to evcc) or `direct` (once offered) |
 | `sensor` Charging habit | share of the energy charged at night; attributes `by_weekday`, `day_share_pct`, `weekend_share_pct`, `chart` |
 | `sensor` Does learning help? | `learning_helps`, `reserve_enough`, `little`, `too_little_data`; attributes `coverage_reserve_pct`, `coverage_learned_pct`, `departure_right_pct`, `chart` |
 | `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready | settings |
