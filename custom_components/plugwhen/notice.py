@@ -119,6 +119,20 @@ def check_ahead(horizon: dict[str, Any] | None, now: datetime, from_hour: float,
     return None
 
 
+def tip_ahead(horizon: dict[str, Any] | None, now: datetime) -> Ahead | None:
+    """The same heads-up for the dashboard, at any hour: a pre-charge with the sun today whose window has not ended yet comes first
+    (the notification of last evening is then still valid), otherwise what the evening notification says for tomorrow."""
+    if not horizon or horizon.get("status") != "ok":
+        return None
+    today = now.date()
+    for p in horizon.get("precharge") or []:
+        start, end, dep = _dt(p.get("sun_from")), _dt(p.get("sun_to")), _dt(p.get("for_departure"))
+        if (start is not None and dep is not None and start.date() == today and (end or start) > now
+                and float(p.get("kwh") or 0) >= 2.0):
+            return Ahead("sun", today, dep, float(p["kwh"]), None, None, start, end)
+    return check_ahead(horizon, now, 0.0)
+
+
 def ahead_key(a: Ahead) -> str:
     """Once per day of charging and kind."""
     return f"ahead:{a.day.isoformat()}:{a.kind}"

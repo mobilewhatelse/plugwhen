@@ -4,6 +4,14 @@
 
 - **Create dashboard answers with the dashboard itself:** the whole response from the developer tools can be pasted into the
   raw configuration editor as it is (before it held the YAML text and the dashboard side by side, which the editor did not take).
+- **The heads-up also in the dashboard (from feedback):** the evening notification "charge tomorrow" (with the sun, or when
+  charging is needed) was only on the phone. The charge plan sensor now has the attribute `tip` with the same text, and the
+  dashboard shows it under the state of the car: from the morning before, and on the day itself until the sun window is over
+  ("Today it pays to charge ahead with the sun ..."). Also without a notify service. Create the dashboard again to get the line.
+- **A drive home after midnight is not a departure (from feedback):** a first trip between 0:00 and 4:00 belongs to the evening
+  before when that weekday mostly starts by day. Two drives home shortly after midnight had set the early departure on Sundays to
+  0:00 (and the heads-up said "before the departure Sun 00:00"); 0.8.1 only caught trips already running before midnight. A
+  weekday that mostly starts at night (shift work) keeps its night departures. The kilometres still count for the day.
 - **Consumption per km is learned (it was not before):** from the falls of the state of charge on days with at least 30 km
   (times the capacity), median of the last 20 days; until 3 days are known the typed-in value. Attributes `consumption_source`,
   `consumption_days_with_temp`, `departure_temp_c` on the learned week sensor.

@@ -40,6 +40,7 @@ MIN_PLAUSIBLE_CONSUMPTION = 0.08   # kWh per km
 MAX_PLAUSIBLE_CONSUMPTION = 0.60
 DEFAULT_CONSUMPTION = 0.20   # kWh per km, used until the car's own values are known
 MIN_DEPARTURE_DAYS = 2
+NIGHT_END_HOUR = 4.0         # a first trip before 4:00 is the way home of the evening before, unless that weekday mostly starts at night
 MIN_CHARGE_DAYS = 2
 HIGH_QUANTILE = 0.8
 
@@ -145,6 +146,9 @@ class MobilityModel:
             return WeekdayPlan(weekday, 0, None, None, None, None, None)
         used = [r for r in recs if (r.clean_km() or 0.0) >= MIN_DRIVE_KM]
         hours = [r.first_move_hour for r in used if r.first_move_hour is not None]
+        night = [h for h in hours if h < NIGHT_END_HOUR]
+        if len(night) < len(hours) - len(night):   # mostly day trips: a trip after midnight is the way home, not a departure
+            hours = [h for h in hours if h >= NIGHT_END_HOUR]
         shares = []
         for r in recs:
             if r.home_kwh is None or r.away_kwh is None:

@@ -31,6 +31,22 @@ class QuantileTest(unittest.TestCase):
 
 
 class PlanTest(unittest.TestCase):
+    def test_a_trip_after_midnight_is_the_way_home_not_the_departure(self):
+        # from feedback: on Sundays three day trips and one drive home at 0:30 after a Saturday evening -> early departure was 0:00
+        m = MobilityModel()
+        for i, h in enumerate((18.0, 0.0, 11.0, 16.0)):
+            m.add_day(DayRecord(MON + timedelta(weeks=i), km=30, first_move_hour=h))
+        p = m.plan(MON.weekday())
+        self.assertEqual(p.departure_hour, 16.0)                              # median of 11, 16, 18
+        self.assertGreaterEqual(p.departure_early, 4.0)
+        self.assertEqual(p.km_typical, 30)                                    # the km of that day still count
+
+    def test_a_weekday_that_mostly_starts_at_night_keeps_its_night_departures(self):   # shift work
+        m = MobilityModel()
+        for i, h in enumerate((3.0, 2.0, 3.0, 14.0)):
+            m.add_day(DayRecord(MON + timedelta(weeks=i), km=30, first_move_hour=h))
+        self.assertLess(m.plan(MON.weekday()).departure_early, 4.0)
+
     def test_typical_and_high(self):
         m = MobilityModel()
         for rec, km in zip(mondays(8), [30, 40, 35, 45, 120, 38, 42, 36]):

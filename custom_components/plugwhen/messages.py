@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 try:  # inside Home Assistant the module lives in a package, the tests import it flat
     from .notice import Ahead, Notice
@@ -22,6 +23,7 @@ TEXTS = {
         "ahead_charge": "Morgen ({day}) wird Laden nötig: für die Abfahrt {dep_day} {dep} fehlen {kwh} kWh. Spätestens ab {start_pref} mit {pref} kW, mit voller Leistung ab {start}.",
         "ahead_charge_nostart": "Morgen ({day}) wird Laden nötig: für die Abfahrt {dep_day} {dep} fehlen {kwh} kWh.",
         "ahead_sun": "Morgen ({day}) lohnt Vorladen mit Sonne: von {from} bis {to} Uhr etwa {kwh} kWh. Das ersetzt Netzstrom vor der Abfahrt {dep_day} {dep}.",
+        "ahead_sun_today": "Heute lohnt Vorladen mit Sonne: von {from} bis {to} Uhr etwa {kwh} kWh. Das ersetzt Netzstrom vor der Abfahrt {dep_day} {dep}.",
         "weekdays": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
     },
     "en": {
@@ -36,6 +38,7 @@ TEXTS = {
         "ahead_charge": "Tomorrow ({day}) charging will be needed: {kwh} kWh are missing for the departure {dep_day} {dep}. Latest start {start_pref} at {pref} kW, at full power {start}.",
         "ahead_charge_nostart": "Tomorrow ({day}) charging will be needed: {kwh} kWh are missing for the departure {dep_day} {dep}.",
         "ahead_sun": "Tomorrow ({day}) it pays to charge ahead with the sun: from {from} to {to} about {kwh} kWh. That replaces grid energy before the departure {dep_day} {dep}.",
+        "ahead_sun_today": "Today it pays to charge ahead with the sun: from {from} to {to} about {kwh} kWh. That replaces grid energy before the departure {dep_day} {dep}.",
         "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     },
 }
@@ -51,7 +54,7 @@ def notice_text(language: str, n: Notice, name: str, departure: datetime | None)
     return t["title"].format(**values), t[n.kind].format(**values)
 
 
-def ahead_text(language: str, a: Ahead, name: str, pref_kw: float | None = None) -> tuple[str, str]:
+def ahead_text(language: str, a: Ahead, name: str, pref_kw: float | None = None, today: Any = None) -> tuple[str, str]:
     """(title, message) of the heads-up for tomorrow in German or English."""
     t = TEXTS["de" if (language or "").lower().startswith("de") else "en"]
     wd = t["weekdays"]
@@ -60,7 +63,8 @@ def ahead_text(language: str, a: Ahead, name: str, pref_kw: float | None = None)
                   pref=f"{pref_kw:g}" if pref_kw else "?")
     if a.kind == "sun":
         values.update({"from": hm(a.sun_from) if a.sun_from else "?", "to": hm(a.sun_to) if a.sun_to else "?"})
-        return t["ahead_title"].format(**values), t["ahead_sun"].format(**values)
+        key = "ahead_sun_today" if today is not None and a.day == today else "ahead_sun"
+        return t["ahead_title"].format(**values), t[key].format(**values)
     def when(x):
         return f"{wd[x.weekday()]} {hm(x)}" if x is not None else "?"
     values.update(start=when(a.latest_start), start_pref=when(a.latest_start_pref))

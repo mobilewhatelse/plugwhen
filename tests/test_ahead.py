@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components"
 
 from horizon import Trip, horizon_plan, with_calendar, without_same_trip  # noqa: E402
 from messages import ahead_text  # noqa: E402
-from notice import ahead_key, check_ahead  # noqa: E402
+from notice import ahead_key, check_ahead, tip_ahead  # noqa: E402
 
 TZ = timezone(timedelta(hours=1))
 SAT = datetime(2027, 1, 9, 9, 0, tzinfo=TZ)
@@ -55,6 +55,24 @@ class AheadTest(unittest.TestCase):
         self.assertEqual(a.day, (monday_evening_before + timedelta(days=1)).date())
         self.assertGreater(a.latest_start, a.latest_start_pref)                     # at full power it can start later than at 4 kW
         self.assertLess(a.latest_start_pref, a.departure)
+
+    def test_tip_for_the_dashboard_at_any_hour_and_still_on_the_day_itself(self):
+        friday_noon = at(-1, 12)
+        h = horizon(now=friday_noon, trips=[Trip(at(0, 13), 22, 100), *week()[1:]], sun_kw=sun())
+        self.assertIsNone(check_ahead(h, friday_noon, 19))                         # no notification before the evening hour
+        a = tip_ahead(h, friday_noon)                                              # but the dashboard shows it already
+        self.assertIsNotNone(a)
+        self.assertEqual((a.kind, a.day), ("sun", SAT.date()))
+        self.assertTrue(ahead_text("de", a, "Auto", 4.0, today=friday_noon.date())[1].startswith("Morgen (Sa) lohnt Vorladen mit Sonne"))
+        morning = at(0, 8)                                                         # Saturday morning: the window is still to come
+        h = horizon(now=morning, trips=[Trip(at(0, 13), 22, 100), *week()[1:]], sun_kw=sun())
+        a = tip_ahead(h, morning)
+        self.assertEqual((a.kind, a.day), ("sun", SAT.date()))
+        self.assertTrue(ahead_text("de", a, "Auto", 4.0, today=morning.date())[1].startswith("Heute lohnt Vorladen mit Sonne"))
+        self.assertTrue(ahead_text("en", a, "Car", 4.0, today=morning.date())[1].startswith("Today it pays"))
+        self.assertNotEqual(tip_ahead(h, at(0, 14)).day if tip_ahead(h, at(0, 14)) else None, SAT.date())  # window over: not today
+        self.assertIsNone(tip_ahead(None, morning))
+        self.assertIsNone(tip_ahead({"status": "no_data"}, morning))
 
     def test_not_before_the_evening_hour(self):
         early = at(-1, 12)

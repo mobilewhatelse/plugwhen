@@ -15,6 +15,8 @@ from . import PlugwhenEntry
 from .charts import (chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow,
                      chart_sun_windows)
 from .evcc_plan import evcc_plan
+from .messages import ahead_text
+from .notice import tip_ahead
 from .sources import data_sources
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
 from .entity import PlugwhenEntity
@@ -164,11 +166,24 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "other_cars_kwh": round(sum(v.others_kw.values()) * 0.25, 2) if v.others_kw else 0.0,
             # what Plugwhen would write into evcc (learn mode: nothing is written); None without an evcc car
             "evcc_plan": self._evcc_plan(),
+            # the heads-up of the notification as text (today's sun window or tomorrow), also without a notify service
+            "tip": self._tip(),
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
             "sun_chart": chart_sun_windows(v.horizon, dt_util.now(), self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),
         }
 
+
+    def _tip(self) -> str | None:
+        """Same text as the heads-up notification (without the title), None when there is nothing to say."""
+        v, now = self.vehicle, dt_util.now()
+        try:
+            a = tip_ahead(v.horizon, now)
+            if a is None:
+                return None
+            return ahead_text(self.hass.config.language, a, v.name, float(v.cfg.get("charge_kw_pref") or 4.0), today=now.date())[1]
+        except Exception:  # noqa: BLE001 - a tip must never break the plan sensor
+            return None
 
     def _evcc_plan(self) -> dict[str, Any] | None:
         """What Plugwhen would write into evcc: the plan for the first needed departure and the repeating plans (None without evcc car)."""

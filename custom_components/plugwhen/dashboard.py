@@ -236,6 +236,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"**{t['plugged']}:** {{{{ '{t['yes']}' if at.plugged else ('{t['no']}' if at.plugged is false else '{t['unknown']}') }}}} · "
         f"**{t['goal']}:** {{{{ at.target_soc }}}} % ({{{{ at.range_km }}}} km)"
         f"{{% if at.reachable is false %}}\n\n**{t['unreachable']}**{{% endif %}}"
+        "{% set tip = state_attr('" + ids["charge_plan"] + "', 'tip') %}{% if tip %}\n\n**{{ tip }}**{% endif %}"
     )
     pot_line = (
         "{% set a = " + _s(ids["potential"]) + ".attributes %}"
