@@ -89,6 +89,37 @@ def coordinates(text: str | None) -> str | None:
     return f"{lat},{lon}" if -90 <= lat <= 90 and -180 <= lon <= 180 else None
 
 
+_SUFFIX = re.compile(   # door, staircase, floor: "Stiege 2", "Top 14", "Tür 3a", "3. Stock", "2. OG", "Apt 4"
+    r"\s*(?:\b(?:stiege|stg\.?|tür|tuer|top|haus|block|wohnung|whg\.?|apt\.?|apartment|flat|unit|suite)\s*\d+[a-zA-Z]?\b"
+    r"|\b\d+\.?\s*(?:stock|stockwerk|og|obergeschoss|floor)\b|\b(?:eg|dg|erdgeschoss|dachgeschoss)\b)", re.IGNORECASE)
+_DOOR = re.compile(r"(\b\d+[a-zA-Z]?)(?:\s*/\s*[\w]+)+")      # "Hauptstraße 5/2/7" -> "Hauptstraße 5"
+_POSTCODE = re.compile(r"\b\d{4,5}\b")
+
+
+GEO_MISS = "miss:"   # remembered location that OpenStreetMap did not find, followed by the time
+
+
+def address_variants(text: str | None) -> list[str]:
+    """What to ask OpenStreetMap for, in this order: the text as written, without door, staircase or floor
+    ("Hauptstraße 5/2/7, Stiege 2" -> "Hauptstraße 5"), and only the part with the postcode and town (good enough for the
+    kilometres). Each one only once."""
+    t = " ".join(str(text or "").split())
+    if not t:
+        return []
+    out = [t]
+    parts = [p.strip() for p in t.split(",")]
+    clean = [_DOOR.sub(r"\1", _SUFFIX.sub("", p)).strip(" ,") for p in parts]
+    out.append(", ".join(p for p in clean if p))
+    town = [p for p in clean if _POSTCODE.search(p)]
+    if town and len(clean) > 1:
+        out.append(", ".join(town))
+    seen: list[str] = []
+    for v in out:
+        if v and v not in seen:
+            seen.append(v)
+    return seen
+
+
 def parse_geocode(data) -> str | None:
     """The first hit of an OpenStreetMap (Nominatim) search as 'lat,lon', or None."""
     if isinstance(data, list) and data and isinstance(data[0], dict):

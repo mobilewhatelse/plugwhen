@@ -33,7 +33,8 @@ from .evcc import EvccClient, EvccError, connection as evcc_connection, live_veh
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
-from .trips import coordinates, event_days, parse_geocode, range_for_trip, trip_km, trips_from_events, waze_region
+from .trips import (GEO_MISS, address_variants, coordinates, event_days, parse_geocode, range_for_trip, trip_km, trips_from_events,
+                    waze_region)
 from .freshness import soc_is_stale
 from .calibrate import QuarterAddModel, SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_samples
 from .habit import charging_habit
@@ -348,25 +349,35 @@ class Plugwhen:
         return km
 
     async def _geocode(self, location: str) -> str | None:
-        """Coordinates of a location text from OpenStreetMap (Nominatim), kept for good. Only the location goes there, not home."""
-        if location in self._geo:
-            return self._geo[location]
+        """Coordinates of a location text from OpenStreetMap (Nominatim), kept for good. Only the location goes there, not home.
+        An address with door, staircase or floor ("Stiege 2") is not found as written: then the street alone, then postcode and
+        town. A location found nowhere is not asked again for a week."""
+        known = self._geo.get(location)
+        if known and not known.startswith(GEO_MISS):
+            return known
+        if known and dt_util.utcnow() - datetime.fromisoformat(known[len(GEO_MISS):]) < timedelta(days=7):
+            return None
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-        try:
-            async with asyncio.timeout(10):
-                async with async_get_clientsession(self.hass).get(
-                        "https://nominatim.openstreetmap.org/search", params={"q": location, "format": "json", "limit": "1"},
-                        headers={"User-Agent": "Plugwhen (Home Assistant integration; github.com/mobilewhatelse/plugwhen)",
-                                 "Accept-Language": self.hass.config.language or "en"}) as resp:
-                    data = await resp.json(content_type=None) if resp.status == 200 else None
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Plugwhen: location %s not found: %s", location, err)
-            return None
-        hit = parse_geocode(data)
-        if hit:
-            self._geo[location] = hit
-            self._evcc_store.async_delay_save(self._evcc_data, 10)
+        hit = None
+        for i, query in enumerate(address_variants(location)):
+            if i:
+                await asyncio.sleep(1.1)   # OpenStreetMap asks for at most one request per second
+            try:
+                async with asyncio.timeout(10):
+                    async with async_get_clientsession(self.hass).get(
+                            "https://nominatim.openstreetmap.org/search", params={"q": query, "format": "json", "limit": "1"},
+                            headers={"User-Agent": "Plugwhen (Home Assistant integration; github.com/mobilewhatelse/plugwhen)",
+                                     "Accept-Language": self.hass.config.language or "en"}) as resp:
+                        data = await resp.json(content_type=None) if resp.status == 200 else None
+            except Exception as err:  # noqa: BLE001 - offline or slow: try again next time, nothing is remembered
+                _LOGGER.debug("Plugwhen: location %s not found: %s", query, err)
+                return None
+            hit = parse_geocode(data)
+            if hit:
+                break
+        self._geo[location] = hit or GEO_MISS + dt_util.utcnow().isoformat()
+        self._evcc_store.async_delay_save(self._evcc_data, 10)
         return hit
 
     # ---------- voluntary usage statistics and feedback (rueckmeldung.py) ----------

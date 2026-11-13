@@ -12,6 +12,9 @@
   before when that weekday mostly starts by day. Two drives home shortly after midnight had set the early departure on Sundays to
   0:00 (and the heads-up said "before the departure Sun 00:00"); 0.8.1 only caught trips already running before midnight. A
   weekday that mostly starts at night (shift work) keeps its night departures. The kilometres still count for the day.
+- **Addresses with door, staircase or floor are found (from feedback):** OpenStreetMap does not find "Hauptstraße 5/2/7, Stiege 2,
+  1010 Wien" as written. Plugwhen now tries the street without door, staircase and floor, then postcode and town alone (good enough
+  for the kilometres). A location found nowhere is not asked again for a week.
 - **Consumption per km is learned (it was not before):** from the falls of the state of charge on days with at least 30 km
   (times the capacity), median of the last 20 days; until 3 days are known the typed-in value. Attributes `consumption_source`,
   `consumption_days_with_temp`, `departure_temp_c` on the learned week sensor.

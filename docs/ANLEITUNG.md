@@ -1,6 +1,6 @@
 # Plugwhen – Anleitung (Deutsch)
 
-Stand: Version 0.7.0 (in Entwicklung). Plugwhen **plant und zeigt an**, es steuert die Wallbox noch nicht.
+Stand: Version 0.9.0. Plugwhen **plant und zeigt an**. Steuern tut es erst, wenn Sie es wollen: in der Betriebsart „Über evcc“ (Plan in evcc) oder „Direkt“ (Plugwhen schaltet die Wallbox selbst, erst nach bestandenem Lernmodus). Standard ist „Lernen“: Plugwhen schaltet nichts und schreibt nur auf, was es tun würde.
 
 ## Wofür?
 
@@ -312,5 +312,5 @@ an den Autor, sonst wird nichts gesendet.
 
 ## Grenzen
 
-Plugwhen plant und zeigt an; **das Ausführen (Wallbox steuern) ist noch nicht gebaut**. Der Plan beruht auf Gewohnheiten und Prognosen, er ist keine
+Gesteuert wird nur in den Betriebsarten „Über evcc“ und „Direkt“; im Standard „Lernen“ schaltet Plugwhen nichts. Der Plan beruht auf Gewohnheiten und Prognosen, er ist keine
 Garantie. Schnellladen unterwegs wird nicht geplant, nur erkannt (der Ladestand steigt, ohne dass der Wallbox-Zähler zählt).

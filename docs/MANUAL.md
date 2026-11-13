@@ -275,7 +275,7 @@ link gets *Direct*. Never both. To test *Direct*, remove the evcc link of the ca
 
 ## Limits
 
-It plans and shows; **carrying out the plan (controlling the wallbox) is not built yet**. The plan is based on habits and
+It controls only in the modes *Via evcc* and *Direct*; in the default *Learn* it switches nothing. The plan is based on habits and
 forecasts, not a guarantee. Fast charging on the road is not planned, only recognised (the state of charge rises without the
 wallbox counter).
 

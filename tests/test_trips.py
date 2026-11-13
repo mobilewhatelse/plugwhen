@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from trips import coordinates, event_days, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
+from trips import address_variants, coordinates, event_days, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
 
 CET = timezone(timedelta(hours=1))
 NOW = datetime(2026, 11, 10, 9, 0, tzinfo=CET)
@@ -80,6 +80,26 @@ class GeoTest(unittest.TestCase):
         self.assertIsNone(parse_geocode([]))
         self.assertIsNone(parse_geocode({"error": "x"}))
         self.assertIsNone(parse_geocode([{"lat": "x"}]))
+
+
+class AddressVariantsTest(unittest.TestCase):
+    def test_door_staircase_and_floor_are_left_out_in_the_second_try(self):
+        cases = {
+            "Hauptstraße 5/2/7, Stiege 2, 1010 Wien": ["Hauptstraße 5, 1010 Wien", "1010 Wien"],
+            "Mariahilfer Straße 120 Stiege 2 Top 14, 1070 Wien": ["Mariahilfer Straße 120, 1070 Wien", "1070 Wien"],
+            "Musterweg 3, 3. Stock, 4020 Linz": ["Musterweg 3, 4020 Linz", "4020 Linz"],
+            "Bahnhofstraße 1, EG, 3100 St. Pölten": ["Bahnhofstraße 1, 3100 St. Pölten", "3100 St. Pölten"],
+            "Hauptplatz 1, 2. OG, Linz": ["Hauptplatz 1, Linz"],
+        }
+        for text, rest in cases.items():
+            self.assertEqual(address_variants(text), [text, *rest], text)
+
+    def test_names_with_such_words_stay_and_short_texts_are_asked_once(self):
+        self.assertEqual(address_variants("Haus am See, 4866 Unterach"), ["Haus am See, 4866 Unterach", "4866 Unterach"])
+        self.assertEqual(address_variants("Topfstraße 3, 4020 Linz"), ["Topfstraße 3, 4020 Linz", "4020 Linz"])
+        self.assertEqual(address_variants("Linz"), ["Linz"])
+        self.assertEqual(address_variants("  "), [])
+        self.assertEqual(address_variants(None), [])
 
 
 class EventDaysTest(unittest.TestCase):
