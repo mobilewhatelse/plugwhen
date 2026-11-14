@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from need import Need  # noqa: E402
-from notice import check_ready, dedupe_key, should_check  # noqa: E402
+from notice import check_ready, dedupe_key, remember_sent, should_check  # noqa: E402
 
 
 def need(charge=10.0, reachable=True, target=60.0, km=136.0):
@@ -80,6 +80,26 @@ class TimingTest(unittest.TestCase):
         self.assertTrue(should_check(19.5, 19.0, 11.5))
         self.assertTrue(should_check(5.0, 19.0, 2.0))      # early morning, shortly before leaving
         self.assertFalse(should_check(7.5, 19.0, -0.5))    # departure is past
+
+
+class RememberSentTest(unittest.TestCase):
+    def test_once_only_message_is_kept_for_good(self):
+        """"The learn mode is through" fell out after eight other messages and came again every week or two."""
+        sent: list[str] = []
+        remember_sent(sent, "switch_ready", 8)
+        for d in range(1, 30):
+            remember_sent(sent, f"ahead:2026-11-{d:02d}:sun", 8)
+        self.assertIn("switch_ready", sent)
+        self.assertEqual(len([k for k in sent if k != "switch_ready"]), 8)
+        self.assertEqual(sent[-1], "ahead:2026-11-29:sun")
+
+    def test_dated_messages_keep_the_last_ones(self):
+        sent: list[str] = []
+        for d in range(1, 12):
+            remember_sent(sent, f"2026-11-{d:02d}:low", 8)
+        self.assertEqual(sent, [f"2026-11-{d:02d}:low" for d in range(4, 12)])
+        remember_sent(sent, "2026-11-11:low", 8)   # the same key twice is noted once
+        self.assertEqual(len(sent), 8)
 
 
 if __name__ == "__main__":

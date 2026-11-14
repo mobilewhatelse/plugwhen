@@ -2,6 +2,16 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Review before the release (three fixes):** (1) The mode *direct* (and writing the plan into evcc) now also acts in the
+  regular run every five minutes, not only when a sensor changes: a sleeping car at night does not report for hours, and the
+  window of the plan begins at a time. Without a peak guard the wallbox could miss the start of the window. (2) "The learn mode
+  is through" is remembered for good; it fell out after eight other messages and came again every week or two. (3) With a
+  wallbox controlled by start/stop buttons, switching to *off* or *learn* now presses stop if Plugwhen had started charging.
+  *Deutsch:* Durchsicht vor der Release, drei Korrekturen: (1) Die Betriebsart *Direkt* (und das Schreiben des Plans in evcc)
+  handelt jetzt auch im regelmäßigen Lauf alle fünf Minuten, nicht nur, wenn sich ein Sensor ändert – ein schlafendes Auto meldet
+  sich nachts stundenlang nicht, das Fenster des Plans beginnt aber zu einer Uhrzeit. (2) „Der Lernmodus ist durch“ wird dauerhaft
+  gemerkt und kommt nicht mehr alle ein bis zwei Wochen. (3) Bei einer Wallbox mit Start/Stopp-Knöpfen drückt der Wechsel auf
+  *Aus* oder *Lernen* Stopp, wenn Plugwhen das Laden gestartet hatte.
 - **Create dashboard answers with the dashboard itself:** the whole response from the developer tools can be pasted into the
   raw configuration editor as it is (before it held the YAML text and the dashboard side by side, which the editor did not take).
 - **The heads-up also in the dashboard (from feedback):** the evening notification "charge tomorrow" (with the sun, or when

@@ -48,7 +48,7 @@ from .horizon import Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
 from .need import MIN_SAMPLES, Need, compute_need
 from .startwerte import charge_efficiency
-from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, should_check
+from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, should_check
 from .plan import make_plan
 from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
@@ -223,6 +223,11 @@ class Plugwhen:
         now = dt_util.now()
         self._compute(None, now)
         async_dispatcher_send(self.hass, self.signal)
+        await self._send_and_act(now)
+
+    async def _send_and_act(self, now: datetime) -> None:
+        """Warnings, the plan for evcc and the wallbox (mode 'direct'). Also in the regular run: a window of the plan begins at a time,
+        not when a sensor changes (a sleeping car at night does not report its state of charge for hours)."""
         acted = False
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
@@ -276,8 +281,7 @@ class Plugwhen:
                 v.potential_at = now
                 self.entry.async_create_background_task(self.hass, self._potential_and_tell(v), f"{DOMAIN} potential")
         async_dispatcher_send(self.hass, self.signal)
-        for v in self.vehicles.values():
-            await self._maybe_send(v, now)
+        await self._send_and_act(now)
 
     # ---------- evcc (optional, read only) ----------
 
@@ -744,6 +748,12 @@ class Plugwhen:
                 for eid in [e for e in self._direct.get(v.sub_id, {}) if "." in e]:
                     r = await self._own(v, eid, None)
                     done += [r] if r else []
+                mine = self._direct.get(v.sub_id, {})
+                if mine.get("started"):   # Plugwhen pressed start: press stop, or the wallbox keeps charging from the grid
+                    if variant == "buttons" and caps.get("stop"):
+                        await self._set_entity(caps["stop"], None)
+                        done.append(caps["stop"])
+                    mine.pop("started", None)
                 r = await self._evcc_loadpoint_mode(v, None)
                 done += [r] if r else []
         except Exception as err:  # noqa: BLE001 - a wallbox or evcc that does not answer must not stop the planner
@@ -1560,8 +1570,7 @@ class Plugwhen:
                 _LOGGER.warning("Plugwhen: the warning for %s could not be sent through %s: %s", v.name, service, err)
         if not delivered:
             return False
-        sent.append(key)
-        del sent[:-SENT_KEEP]
+        remember_sent(sent, key, SENT_KEEP)
         self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
         return True
 

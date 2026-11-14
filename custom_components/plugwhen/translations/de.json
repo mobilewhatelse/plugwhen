@@ -103,7 +103,7 @@
       },
       "finish": {
         "title": "Darf ich Sie um etwas bitten?",
-        "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche: Versionen, Land, welche Autos und Wallboxen verwendet werden;\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch, Außentemperatur und Kilometerstand (nur auf 10.000 km genau); an Tagen, an denen nur zu Hause geladen wurde, die Wallbox-Energie je voller Ladung. **Ohne** Datum, Ort oder Kennung.\n\nDafür nutzt Plugwhen den Verbrauch vieler gleicher Autos, solange Ihr Auto noch lernt. **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+        "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche, mit einer zufälligen Kennung der Installation: Versionen, Land, welche Autos und Wallboxen verwendet werden (beim Ausschalten gelöscht);\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch, Außentemperatur und Kilometerstand (nur auf 10.000 km genau); an Tagen, an denen nur zu Hause geladen wurde, die Wallbox-Energie je voller Ladung. Diese **ohne** Datum, Ort oder Kennung.\n\nAus vielen Fahrtagen entstehen Verbrauchswerte je Automodell, die Plugwhen nutzt, solange Ihr Auto noch lernt, und veröffentlichte Zusammenfassungen (nie einzelne Autos). **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen. Mehr: aiwhatelse.eu/datenschutz\n\nFreiwillig und jederzeit abschaltbar. Danke!",
         "data": {
           "share_usage": "Ja, ich bin einverstanden"
         }
@@ -411,7 +411,7 @@
         "step": {
           "confirm": {
             "title": "Darf ich Sie um etwas bitten?",
-            "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche: Versionen, Land, welche Autos und Wallboxen verwendet werden;\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch, Außentemperatur und Kilometerstand (nur auf 10.000 km genau); an Tagen, an denen nur zu Hause geladen wurde, die Wallbox-Energie je voller Ladung. **Ohne** Datum, Ort oder Kennung.\n\nDafür nutzt Plugwhen den Verbrauch vieler gleicher Autos, solange Ihr Auto noch lernt. **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nFreiwillig und jederzeit abschaltbar. Danke!",
+            "description": "Anonyme Daten helfen mir, Plugwhen weiterzuentwickeln, und Ihnen beim Start:\n- einmal pro Woche, mit einer zufälligen Kennung der Installation: Versionen, Land, welche Autos und Wallboxen verwendet werden (beim Ausschalten gelöscht);\n- einmal am Tag je Fahrtag: Automodell, Akkugröße, Kilometer, Verbrauch, Außentemperatur und Kilometerstand (nur auf 10.000 km genau); an Tagen, an denen nur zu Hause geladen wurde, die Wallbox-Energie je voller Ladung. Diese **ohne** Datum, Ort oder Kennung.\n\nAus vielen Fahrtagen entstehen Verbrauchswerte je Automodell, die Plugwhen nutzt, solange Ihr Auto noch lernt, und veröffentlichte Zusammenfassungen (nie einzelne Autos). **Nie** gesendet werden Namen, Orte oder Kennwörter. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen. Mehr: aiwhatelse.eu/datenschutz\n\nFreiwillig und jederzeit abschaltbar. Danke!",
             "data": {
               "share_usage": "Ja, ich bin einverstanden"
             }

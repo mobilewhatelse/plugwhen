@@ -143,6 +143,19 @@ def dedupe_key(n: Notice, departure_day: date) -> str:
     return f"{departure_day.isoformat()}:{n.kind}"
 
 
+ONCE_KEYS = frozenset({"switch_ready"})   # messages sent once per car, never again
+
+
+def remember_sent(sent: list[str], key: str, keep: int) -> None:
+    """Note a sent message: the last `keep` dated ones are kept (so a restart does not repeat them), the once-only ones for good.
+    Before, "the learn mode is through" fell out after eight other messages and was sent again every week or two."""
+    if key not in sent:
+        sent.append(key)
+    once = [k for k in sent if k in ONCE_KEYS]
+    dated = [k for k in sent if k not in ONCE_KEYS][-keep:]
+    sent[:] = once + dated
+
+
 def should_check(now_hour: float, from_hour: float, hours_to_departure: float | None) -> bool:
     """Look from `from_hour` in the evening until the departure (False once it is past)."""
     if hours_to_departure is not None and hours_to_departure <= 0:

@@ -103,7 +103,7 @@
       },
       "finish": {
         "title": "May I ask a favour?",
-        "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week: versions, country, which cars and wallboxes are used;\n- once a day per day with a trip: car model, battery size, kilometres, consumption, outdoor temperature and odometer (only to the nearest 10,000 km); on days charged only at home, the wallbox energy per full charge. **Without** date, place or id.\n\nIn return Plugwhen uses the consumption of many cars of the same model while your car is still learning. **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nVoluntary, and you can switch it off any time. Thank you!",
+        "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week, with a random id of the installation: versions, country, which cars and wallboxes are used (switching off deletes it);\n- once a day per day with a trip: car model, battery size, kilometres, consumption, outdoor temperature and odometer (only to the nearest 10,000 km); on days charged only at home, the wallbox energy per full charge. These **without** date, place or id.\n\nFrom many trip days come consumption values per car model, which Plugwhen uses while your car is still learning, and published summaries (never single cars). **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted. More: aiwhatelse.eu/datenschutz\n\nVoluntary, and you can switch it off any time. Thank you!",
         "data": {
           "share_usage": "Yes, I agree"
         }
@@ -411,7 +411,7 @@
         "step": {
           "confirm": {
             "title": "May I ask a favour?",
-            "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week: versions, country, which cars and wallboxes are used;\n- once a day per day with a trip: car model, battery size, kilometres, consumption, outdoor temperature and odometer (only to the nearest 10,000 km); on days charged only at home, the wallbox energy per full charge. **Without** date, place or id.\n\nIn return Plugwhen uses the consumption of many cars of the same model while your car is still learning. **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nVoluntary, and you can switch it off any time. Thank you!",
+            "description": "Anonymous data helps me develop Plugwhen, and helps you at the start:\n- once a week, with a random id of the installation: versions, country, which cars and wallboxes are used (switching off deletes it);\n- once a day per day with a trip: car model, battery size, kilometres, consumption, outdoor temperature and odometer (only to the nearest 10,000 km); on days charged only at home, the wallbox energy per full charge. These **without** date, place or id.\n\nFrom many trip days come consumption values per car model, which Plugwhen uses while your car is still learning, and published summaries (never single cars). **Never** sent: names, places or passwords. Trip days cannot be traced to a car and therefore cannot be deleted. More: aiwhatelse.eu/datenschutz\n\nVoluntary, and you can switch it off any time. Thank you!",
             "data": {
               "share_usage": "Yes, I agree"
             }
