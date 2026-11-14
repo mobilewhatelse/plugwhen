@@ -418,20 +418,6 @@
           }
         }
       }
-    },
-    "share_usage_reconfirm": {
-      "title": "Plugwhen: Zustimmung zum Datenteilen erneuern",
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "title": "Plugwhen: Zustimmung zum Datenteilen erneuern",
-            "description": "Sie teilen schon anonyme Daten mit Plugwhen, danke. Ab dieser Version wechselt die Kennung jeden Monat, und es kommen Standtage und Wallbox-Werte dazu. Mit Haken teilen Sie weiter; ohne Haken wird das Teilen ausgeschaltet und Ihre Wochendaten werden gelöscht.\n\nAnonyme Daten helfen mir, Plugwhen zu verbessern, und Ihnen beim Start: Solange Ihr Auto noch lernt, rechnet Plugwhen mit den Verbrauchswerten gleicher Automodelle.\n\n**Gesendet:** einmal pro Woche eine Übersicht der Einrichtung mit einer Kennung, die jeden Monat wechselt; täglich Fahrt-, Lade- und Standtage ohne Datum, Ort oder Kennung.\n**Nie:** Namen, Adressen, Orte oder Kennwörter.\n**Wofür:** Verbrauchswerte je Automodell, sehen, welche Geräte gut funktionieren, und Zusammenfassungen, die veröffentlicht oder an Forschung und Partner weitergegeben werden. Immer aus mindestens 10 Installationen, nie einzelne Autos oder Haushalte.\n**Löschen:** die Wochendaten beim Ausschalten, sonst nach 60 Tagen. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nAlles im Detail: aiwhatelse.eu/datenschutz. Freiwillig und jederzeit abschaltbar. Danke!",
-            "data": {
-              "share_usage": "Weiter teilen"
-            }
-          }
-        }
-      }
     }
   }
 }

@@ -1,4 +1,4 @@
-"""How the wallbox follows in the mode 'direct' (pure Python, no Home Assistant imports; only with the current consent).
+"""How the wallbox follows in the mode 'direct' (pure Python, no Home Assistant imports; only while sharing).
 
 Per wallbox model (integration, model, firmware from the device registry, never a name or serial): how many commands were sent,
 how many were not taken within `REPLY_S` seconds or failed, and the time until the entity showed the new value (median and

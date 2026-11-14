@@ -138,7 +138,6 @@ class Plugwhen:
         self.feedback_text = ""
         self._usage: dict[str, Any] = {}
         self._usage_busy = False
-        self._usage_shared_seen = self.share_usage
         # fleet values (flotte.py): {"autos": {sub_id: {"bis", "gemeldet"}}, "schluessel", "gueltig_bis", "modelle", "at"}
         self._fleet: dict[str, Any] = {}
         self._fleet_busy = False
@@ -187,8 +186,6 @@ class Plugwhen:
         if not self._usage.get("seit"):   # only for the rough class "running since"; stays here, never sent as a date
             created = getattr(self.entry, "created_at", None)
             self._usage["seit"] = (created if isinstance(created, datetime) else dt_util.now()).isoformat()
-        if int(self.entry.options.get("zustimmung") or 0) > int(self._usage.get("zustimmung") or 0):
-            self._usage["zustimmung"] = int(self.entry.options["zustimmung"])   # agreed in the set-up to the current text
         self.ask_usage_once()
         plugs = (await self._plug_store.async_load() or {}).get("vehicles", {})
         shadows = (await self._shadow_store.async_load() or {}).get("vehicles", {})
@@ -435,7 +432,6 @@ class Plugwhen:
         Repairs. Not again after an answer or after "ignore"."""
         from homeassistant.helpers import issue_registry as ir
 
-        self.ask_reconfirm()
         if "share_usage" in self.entry.options:
             self._usage["gefragt"] = True   # answered in the set-up; a later change of the settings must not ask again
             return
@@ -444,28 +440,9 @@ class Plugwhen:
         ir.async_create_issue(self.hass, DOMAIN, "share_usage_question", is_fixable=True, is_persistent=False,
                               severity=ir.IssueSeverity.WARNING, translation_key="share_usage_question")
 
-    @property
-    def consent_current(self) -> bool:
-        """Agreed to the current text (monthly id, extra values, all purposes)? Only then the extra values go out."""
-        return int(self._usage.get("zustimmung") or 0) >= rm.ZUSTIMMUNG
-
-    def ask_reconfirm(self) -> None:
-        """Shares under an older text: ask once to confirm the current one (Settings > Repairs). Until then only what the older
-        text named goes out; without a tick sharing is switched off and the data deleted."""
-        from homeassistant.helpers import issue_registry as ir
-
-        if self.share_usage and not self.consent_current:
-            ir.async_create_issue(self.hass, DOMAIN, "share_usage_reconfirm", is_fixable=True, is_persistent=False,
-                                  severity=ir.IssueSeverity.WARNING, translation_key="share_usage_reconfirm")
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, "share_usage_reconfirm")
-
     def answer_usage(self, share: bool) -> None:
         self.share_usage = bool(share)
         self._usage["gefragt"] = True
-        if share:
-            self._usage["zustimmung"] = rm.ZUSTIMMUNG
-        self.ask_reconfirm()
         self._evcc_store.async_delay_save(self._evcc_data, 1)
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -475,10 +452,7 @@ class Plugwhen:
         """Weekly while the switch is on; once 'delete' after it was switched off. Runs in the background, never blocks."""
         if self._usage_busy:
             return
-        if self.share_usage != self._usage_shared_seen:   # the switch was moved: ask again or remove the question
-            self._usage_shared_seen = self.share_usage
-            self.ask_reconfirm()
-        if not (self.share_usage and self.consent_current):
+        if not self.share_usage:
             self._usage.pop("wallbox", None)   # nothing kept that would not be sent
         old = rm.zu_loeschen(self._usage, self.share_usage)
         if old:   # the fixed id of older versions (once), or every monthly id after switching off
@@ -487,7 +461,7 @@ class Plugwhen:
             ver, ha = self._version()
             daten = rm.statistik(DOMAIN, ver, ha, rm.kennung_fuer(self._usage, now), self.hass.config.country,
                                  self.hass.config.language, self.setup_overview(), rm.laeuft_seit(self._usage.get("seit"), now),
-                                 self.usage_extras(now) if self.consent_current else None)
+                                 self.usage_extras(now))
             _LOGGER.debug("Plugwhen: usage statistics to send: %s", daten)
         else:
             return
@@ -565,8 +539,7 @@ class Plugwhen:
                     pass
                 days, last = flotte.trip_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
                 charges = flotte.charge_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0), after, now.date())
-                parked = (flotte.parked_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
-                          if self.consent_current else None)
+                parked = flotte.parked_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
                 if days:
                     async with asyncio.timeout(15):
                         async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet"), charges, parked),
@@ -599,7 +572,7 @@ class Plugwhen:
             self._evcc_store.async_delay_save(self._evcc_data, 5)
 
     def usage_extras(self, now: datetime) -> dict[str, Any] | None:
-        """The extra values of the weekly statistics (only with the current consent): condensed, rounded, as classes."""
+        """The extra values of the weekly statistics (only while sharing): condensed, rounded."""
         extra: dict[str, Any] = {}
         devices = direct_stats.summary(self._usage.get("wallbox") or {})
         if devices:
@@ -692,7 +665,7 @@ class Plugwhen:
         return bool(self.entry.options.get(O_DIRECT_EARLY)) or self.switch_ready(v, now)["ready"]
 
     async def _set_entity(self, entity_id: str, value: Any) -> None:
-        """Set a wallbox entity; with the current consent also count how the wallbox follows (direct_stats.py)."""
+        """Set a wallbox entity; while sharing also count how the wallbox follows (direct_stats.py)."""
         try:
             await self._call_entity(entity_id, value)
         except Exception:
@@ -702,8 +675,8 @@ class Plugwhen:
             self._watch_reply(entity_id, value)
 
     def _wallbox_key(self, entity_id: str) -> str | None:
-        """Integration, model and firmware of the wallbox (never a name or serial), or None without the current consent."""
-        if not (self.share_usage and self.consent_current):
+        """Integration, model and firmware of the wallbox (never a name or serial), or None while not sharing."""
+        if not self.share_usage:
             return None
         from homeassistant.helpers import device_registry as dr, entity_registry as er
 

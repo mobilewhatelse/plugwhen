@@ -301,10 +301,6 @@ forgets the fleet values. The service deletes the usage statistics after 60 days
 **What it is for:** consumption values per car model (see below), seeing which devices work well, published summaries, and
 summaries passed on to research or partners. Always from at least 10 installations, never single cars or households.
 
-**After the update:** whoever already shares is asked once under *Settings > Repairs* to confirm the new text. Until then only
-what the old text named is sent (no wallbox values, no parked days); without the tick, sharing is switched off. The fixed id of
-older versions is deleted on the service once.
-
 **What you get:** while your car has no values of its own yet, Plugwhen uses the consumption of many cars of the same model
 (from 5 cars of a model, otherwise all cars), in cold and warm weather. Order: own curve, own model, all cars, start values. The
 attribute `fleet` of the sensor *Learned days* shows what is used.

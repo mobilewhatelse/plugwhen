@@ -418,20 +418,6 @@
           }
         }
       }
-    },
-    "share_usage_reconfirm": {
-      "title": "Plugwhen: renew your consent to share data",
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "title": "Plugwhen: renew your consent to share data",
-            "description": "You already share anonymous data with Plugwhen, thank you. From this version the id changes every month, and parked days and wallbox values are added. Tick to keep sharing; without the tick, sharing is switched off and your weekly data is deleted.\n\nAnonymous data helps me improve Plugwhen, and helps you at the start: while your car is still learning, Plugwhen uses the consumption of the same car models.\n\n**Sent:** once a week an overview of the set-up with an id that changes every month; daily trip, charging and parked days without date, place or id.\n**Never:** names, addresses, places or passwords.\n**For:** consumption values per car model, seeing which devices work well, and summaries that are published or passed on to research and partners. Always from at least 10 installations, never single cars or households.\n**Deleting:** weekly data when you switch off, otherwise after 60 days. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nAll details: aiwhatelse.eu/datenschutz. Voluntary, and you can switch it off any time. Thank you!",
-            "data": {
-              "share_usage": "Keep sharing"
-            }
-          }
-        }
-      }
     }
   }
 }

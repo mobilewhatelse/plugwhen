@@ -307,10 +307,6 @@ und voriger Monat), und Plugwhen vergisst die Flottenwerte. Der Dienst löscht d
 Zusammenfassungen und Zusammenfassungen, die an Forschung oder Partner weitergegeben werden. Immer aus mindestens 10
 Installationen, nie einzelne Autos oder Haushalte.
 
-**Nach dem Update:** Wer schon teilt, wird einmal unter *Einstellungen > Reparaturen* gebeten, den neuen Text zu bestätigen. Bis
-dahin geht nur, was der alte Text nannte (keine Wallbox-Werte, keine Standtage); ohne Haken wird das Teilen ausgeschaltet. Die
-feste Kennung früherer Versionen wird am Dienst einmal gelöscht.
-
 **Was Sie davon haben:** Solange Ihr Auto noch keine eigenen Werte hat, rechnet Plugwhen mit dem Verbrauch vieler gleicher Autos
 (ab 5 Autos eines Modells, sonst aller Autos), bei Kälte und Wärme. Reihenfolge: eigene Kurve, eigenes Modell, alle Autos,
 Startwerte. Das Attribut `fleet` am Sensor *Gelernte Tage* zeigt, was verwendet wird.
