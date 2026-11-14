@@ -4,7 +4,8 @@ Assistant imports; the coordinator does the sending).
 Only with *Share anonymous data* switched on. Sent per day with a trip (at least `MIN_KM`, consumption and outdoor
 temperature known): the car model, the battery size, km, kWh per km, the mean outdoor temperature of the day and the odometer
 as a step of 10 000 km. Per day charged only at home (enough to say something): the wallbox energy per 100 % state of
-charge; against the battery size it gives the charging loss, over the odometer steps the ageing of the battery.
+charge; against the battery size it gives the charging loss, over the odometer steps the ageing of the battery. With the
+current consent (version 2) also per whole day parked and not charged: the fall of the state of charge (loss while parked).
 **No date, no time, no place, no id.** The service mixes the days and keeps no link to who sent them, so they cannot be
 deleted later.
 
@@ -102,10 +103,30 @@ def trip_days(records: list, model: str, battery_kwh: float, after: date | None,
     return out[-MAX_DAYS_PER_SEND:], last
 
 
-def payload(days: list[dict[str, Any]], first: bool, charges: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def parked_days(records: list, model: str, battery_kwh: float, after: date | None, today: date) -> list[dict[str, Any]]:
+    """Days parked a whole day and not charged: the fall of the state of charge in % (rounded to 0.5), only with the current
+    consent. Gives the loss while parked per car model (sleep, app, alarm system); no date, like the trip days."""
+    out: list[dict[str, Any]] = []
+    for r in sorted(records, key=lambda r: r.day):
+        if r.day >= today or (after is not None and r.day <= after):
+            continue
+        drop = getattr(r, "parked_drop_pct", None)
+        if drop is None:
+            continue
+        row: dict[str, Any] = {"modell": model, "akku_kwh": round(float(battery_kwh)), "verlust_pct": float(drop)}
+        if r.temp_c is not None:
+            row["temp_c"] = round(r.temp_c)
+        out.append(row)
+    return out[-MAX_DAYS_PER_SEND:]
+
+
+def payload(days: list[dict[str, Any]], first: bool, charges: list[dict[str, Any]] | None = None,
+            parked: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     p: dict[str, Any] = {"schema": 1, "integration": "plugwhen", "tage": days, "erstes_mal": bool(first)}
     if charges:
         p["ladungen"] = charges
+    if parked:
+        p["standtage"] = parked
     return p
 
 

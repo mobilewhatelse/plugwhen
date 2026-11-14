@@ -32,6 +32,8 @@ MAX_HOURLY_KM = 400.0       # an hourly odometer jump larger than this is a glit
 MIN_STEP_KM = 0.5           # an hour with fewer kilometres is not a trip start
 DEFAULT_EFFICIENCY = 0.9    # share of the wallbox energy that reaches the battery
 MIN_CONSUMPTION_KM = 30.0   # a day needs this many km for a consumption value
+PARKED_KM = 0.5             # a day with less is a parked day (for the loss while parked)
+MAX_PARKED_DROP_PCT = 15.0  # a larger fall on a parked day is not the usual loss (sensor jump, long preconditioning)
 
 Series = list[tuple[datetime, float | None]]
 
@@ -55,7 +57,8 @@ def records_from_hourly(
     prev_rose = False
     carry = False   # a trip that started the evening before is still running after midnight: not a departure of this day
     for t, o in odometer_km:
-        rec = days.setdefault(t.date(), {"last_o": None, "first_move": None, "rise": 0.0, "fall": 0.0, "prev_soc": None, "wb_last": None})
+        rec = days.setdefault(t.date(), {"last_o": None, "first_move": None, "rise": 0.0, "fall": 0.0, "prev_soc": None, "wb_last": None,
+                                         "soc_last": None})
         if o is None:
             continue
         rose = prev_o is not None and MIN_STEP_KM < o - prev_o < MAX_HOURLY_KM
@@ -77,6 +80,7 @@ def records_from_hourly(
             rec["rise"] += s - soc_prev
         elif soc_prev is not None and s < soc_prev:
             rec["fall"] += soc_prev - s
+        rec["soc_last"] = s
         soc_prev = s
     for t, w in wallbox_kwh or []:
         rec = days.get(t.date())
@@ -86,8 +90,17 @@ def records_from_hourly(
     out: list[DayRecord] = []
     prev_last: float | None = None
     prev_wb: float | None = None
+    prev_soc: tuple[date, float] | None = None
     for d in sorted(days):
         r = days[d]
+        parked = None   # whole day parked, not charged: end of yesterday against end of today
+        if (prev_soc is not None and prev_soc[0] == d - timedelta(days=1) and r["soc_last"] is not None and r["rise"] == 0
+                and r["last_o"] is not None and prev_last is not None and abs(r["last_o"] - prev_last) < PARKED_KM):
+            drop = prev_soc[1] - r["soc_last"]
+            if 0 <= drop <= MAX_PARKED_DROP_PCT:
+                parked = round(drop * 2) / 2
+        if r["soc_last"] is not None:
+            prev_soc = (d, r["soc_last"])
         km = None
         if r["last_o"] is not None:
             if prev_last is not None:
@@ -110,7 +123,8 @@ def records_from_hourly(
         tl = temps.get(d)
         out.append(DayRecord(d, km=km, first_move_hour=r["first_move"] if km is not None and km >= 2.0 else None,
                              home_kwh=home, away_kwh=away, consumption=cons, charged_kwh=charged,
-                             temp_c=round(sum(tl) / len(tl), 1) if tl else None, odometer_km=r["last_o"]))
+                             temp_c=round(sum(tl) / len(tl), 1) if tl else None, odometer_km=r["last_o"],
+                             parked_drop_pct=parked))
     return [r for r in out if r.km is not None or r.home_kwh is not None]
 
 

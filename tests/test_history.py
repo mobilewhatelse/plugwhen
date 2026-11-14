@@ -159,3 +159,31 @@ class UnitTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ParkedDropTest(unittest.TestCase):
+    def soc(self, per_day):
+        """State of charge per hour: each day falls evenly from its start to its end value."""
+        out = []
+        for d, (a, b) in enumerate(per_day):
+            for h in range(24):
+                out.append((D0 + timedelta(days=d, hours=h), a + (b - a) * h / 23))
+        return out
+
+    def test_whole_day_parked_gives_the_fall(self):
+        recs = records_from_hourly(flat_odometer(3), self.soc([(80, 80), (80, 79.2), (79.2, 78.0)]), capacity_kwh=60)
+        by = {r.day: r.parked_drop_pct for r in recs}
+        self.assertNotIn(date(2027, 1, 4), by)             # no day before: no record at all
+        self.assertEqual(by[date(2027, 1, 5)], 1.0)        # 0.8 rounded to 0.5 steps
+        self.assertEqual(by[date(2027, 1, 6)], 1.0)
+
+    def test_not_on_days_with_a_trip_or_charging(self):
+        recs = records_from_hourly(flat_odometer(3, trips={1: (8, 20.0)}), self.soc([(80, 80), (80, 75), (75, 90)]),
+                                   capacity_kwh=60)
+        by = {r.day: r.parked_drop_pct for r in recs}
+        self.assertIsNone(by[date(2027, 1, 5)])            # driven
+        self.assertIsNone(by[date(2027, 1, 6)])            # charged
+
+    def test_a_large_fall_is_not_taken(self):
+        recs = records_from_hourly(flat_odometer(2), self.soc([(80, 80), (80, 60)]), capacity_kwh=60)
+        self.assertIsNone(recs[-1].parked_drop_pct)

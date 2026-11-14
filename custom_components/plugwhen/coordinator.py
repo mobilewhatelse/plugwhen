@@ -561,9 +561,11 @@ class Plugwhen:
                     pass
                 days, last = flotte.trip_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
                 charges = flotte.charge_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0), after, now.date())
+                parked = (flotte.parked_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
+                          if self.consent_current else None)
                 if days:
                     async with asyncio.timeout(15):
-                        async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet"), charges),
+                        async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet"), charges, parked),
                                                 headers=headers) as r:
                             if r.status != 200:
                                 _LOGGER.debug("Plugwhen: fleet send answered %s", r.status)

@@ -175,3 +175,21 @@ class NewFieldsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ParkedDaysTest(unittest.TestCase):
+    def test_only_parked_days_without_date(self):
+        recs = [DayRecord(D0 + timedelta(days=i), km=0.0, temp_c=3.4, parked_drop_pct=p) for i, p in enumerate((0.5, None, 1.5))]
+        out = flotte.parked_days(recs, "tesla model 3", 57.5, None, D0 + timedelta(days=10))
+        self.assertEqual(out, [{"modell": "tesla model 3", "akku_kwh": 58, "verlust_pct": 0.5, "temp_c": 3},
+                               {"modell": "tesla model 3", "akku_kwh": 58, "verlust_pct": 1.5, "temp_c": 3}])
+
+    def test_same_cursor_as_the_trip_days_and_not_today(self):
+        recs = [DayRecord(D0 + timedelta(days=i), km=0.0, parked_drop_pct=1.0) for i in range(4)]
+        out = flotte.parked_days(recs, "m", 60, D0 + timedelta(days=1), D0 + timedelta(days=3))
+        self.assertEqual(len(out), 1)          # only day 2: day 0/1 sent before, day 3 is today
+        self.assertNotIn("temp_c", out[0])
+
+    def test_payload_only_with_parked_days(self):
+        self.assertNotIn("standtage", flotte.payload([], True, None, None))
+        self.assertEqual(flotte.payload([], True, None, [{"x": 1}])["standtage"], [{"x": 1}])

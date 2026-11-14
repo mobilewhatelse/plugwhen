@@ -70,6 +70,7 @@ class DayRecord:
     charged_kwh: float | None = None     # energy that went into the battery that day (rise of the state of charge x capacity)
     temp_c: float | None = None          # mean outdoor temperature of the day (None without an outdoor temperature)
     odometer_km: float | None = None     # odometer at the end of the day (only for the fleet values, as a 10 000 km step)
+    parked_drop_pct: float | None = None  # a whole day parked and not charged: fall of the state of charge in % (else None)
 
     def clean_km(self) -> float | None:
         if self.km is None or self.km < 0 or self.km > MAX_PLAUSIBLE_KM_DAY:
