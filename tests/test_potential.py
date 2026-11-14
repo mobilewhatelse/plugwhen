@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from potential import Prices, calculate, find_sessions  # noqa: E402
 

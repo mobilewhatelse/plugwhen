@@ -7,7 +7,7 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from calibrate import SolarAccuracy, base_load_from_hourly, efficiency_from_records, quarter_add_from_5min  # noqa: E402
 from learning import DayRecord  # noqa: E402

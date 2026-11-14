@@ -13,7 +13,7 @@ for _p in _saved:
     sys.path.remove(_p)
 import asyncio  # noqa: E402
 
-sys.path.insert(0, _INTEGRATION)
+sys.path.append(_INTEGRATION)
 
 from evcc import (  # noqa: E402
     EvccAuthError, EvccClient, EvccError, connection, live_vehicle, loadpoint_index, loadpoint_kw, match_vehicle, parse_vehicles, vehicle_from_evcc,

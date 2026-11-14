@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "custom_components" / "plugwhen"))
+sys.path.append(str(ROOT / "custom_components" / "plugwhen"))
 
 import startwerte as sw  # noqa: E402
 

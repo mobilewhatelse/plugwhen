@@ -7,7 +7,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from insight import learning_check  # noqa: E402
 from learning import DayRecord  # noqa: E402

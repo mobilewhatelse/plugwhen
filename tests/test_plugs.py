@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from inputs import merge_available, surplus_from_solar  # noqa: E402
 from plugs import PlugLog  # noqa: E402

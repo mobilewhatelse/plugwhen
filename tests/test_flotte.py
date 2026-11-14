@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "custom_components" / "plugwhen"))
+sys.path.append(str(ROOT / "custom_components" / "plugwhen"))
 
 import flotte  # noqa: E402
 from learning import DayRecord  # noqa: E402

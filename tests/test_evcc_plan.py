@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from evcc_plan import current_plan, current_weekly, decide_write, evcc_plan, hhmm, same, same_weekly, weekly_plans  # noqa: E402
 

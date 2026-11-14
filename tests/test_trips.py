@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from trips import address_variants, coordinates, event_days, one_way, parse_geocode, parse_km, range_for_trip, trip_km, trips_from_events, waze_region  # noqa: E402
 

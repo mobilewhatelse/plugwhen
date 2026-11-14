@@ -7,8 +7,8 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
+sys.path.append(str(Path(__file__).resolve().parent))
 
 from charts import chart_sun_windows  # noqa: E402
 from test_horizon import SAT, at, plan, sun  # noqa: E402
