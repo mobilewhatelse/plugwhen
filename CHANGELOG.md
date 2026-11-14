@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
+## 0.9.0 - 2026-11-14 - trips from a calendar, plans written into evcc, a stock
 
 - **Sharing, new text (version 2):** the weekly statistics now use a random id that changes every month (the fixed id of
   older versions is deleted on the service once), plus a rough class of how long Plugwhen has been running. New: with a wallbox in the mode *Direct*, how fast and how reliably it takes a new value (per model and
