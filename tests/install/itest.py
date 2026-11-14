@@ -535,7 +535,7 @@ def main():
     left = states_like("testauto")
     log(not left or all(e["state"] == "unavailable" for e in left), "entities are gone after removal")
 
-    logs = subprocess.run(["docker", "logs", CONTAINER], capture_output=True, text=True).stdout
+    logs = subprocess.run(["docker", "logs", CONTAINER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace").stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of the integration in the log", "; ".join(errs[:3]))
 

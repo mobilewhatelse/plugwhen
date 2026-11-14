@@ -139,7 +139,7 @@ def main():
     if isinstance(d, dict) and d.get("flow_id"):
         it.api("DELETE", f"/api/config/config_entries/subentries/flow/{d['flow_id']}")
 
-    logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
+    logs = subprocess.run(["docker", "logs", it.CONTAINER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace").stdout
     errs = [ln for ln in logs.splitlines() if ("plugwhen" in ln.lower() or "viertelstunden" in ln.lower()) and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of either integration in the log", "; ".join(errs[:3]))
 

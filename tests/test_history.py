@@ -184,6 +184,13 @@ class ParkedDropTest(unittest.TestCase):
         self.assertIsNone(by[date(2027, 1, 5)])            # driven
         self.assertIsNone(by[date(2027, 1, 6)])            # charged
 
+    def test_a_jittering_state_of_charge_still_gives_the_fall(self):
+        soc = self.soc([(80, 80), (80, 79)])
+        t, v = soc[30]
+        soc[30] = (t, v + 1.0)   # the sensor jumps up by one percent once
+        recs = records_from_hourly(flat_odometer(2), soc, capacity_kwh=60)
+        self.assertEqual(recs[-1].parked_drop_pct, 1.0)
+
     def test_a_large_fall_is_not_taken(self):
         recs = records_from_hourly(flat_odometer(2), self.soc([(80, 80), (80, 60)]), capacity_kwh=60)
         self.assertIsNone(recs[-1].parked_drop_pct)

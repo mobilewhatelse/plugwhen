@@ -207,7 +207,7 @@ def main():
     sw = it.state(sw.get("entity_id")) or {}
     log(sw.get("state") == "evcc", "after a reload the mode is still 'via evcc'", str(sw.get("state")))
 
-    logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
+    logs = subprocess.run(["docker", "logs", it.CONTAINER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace").stdout
     errs = [ln for ln in logs.splitlines() if "plugwhen" in ln.lower() and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of Plugwhen in the log", "; ".join(errs[:3]))
 

@@ -34,6 +34,7 @@ DEFAULT_EFFICIENCY = 0.9    # share of the wallbox energy that reaches the batte
 MIN_CONSUMPTION_KM = 30.0   # a day needs this many km for a consumption value
 PARKED_KM = 0.5             # a day with less is a parked day (for the loss while parked)
 MAX_PARKED_DROP_PCT = 15.0  # a larger fall on a parked day is not the usual loss (sensor jump, long preconditioning)
+PARKED_NOISE_PCT = 1.0      # a parked day may show this much rise in total (state of charge jittering by a percent)
 
 Series = list[tuple[datetime, float | None]]
 
@@ -94,7 +95,7 @@ def records_from_hourly(
     for d in sorted(days):
         r = days[d]
         parked = None   # whole day parked, not charged: end of yesterday against end of today
-        if (prev_soc is not None and prev_soc[0] == d - timedelta(days=1) and r["soc_last"] is not None and r["rise"] == 0
+        if (prev_soc is not None and prev_soc[0] == d - timedelta(days=1) and r["soc_last"] is not None and r["rise"] <= PARKED_NOISE_PCT
                 and r["last_o"] is not None and prev_last is not None and abs(r["last_o"] - prev_last) < PARKED_KM):
             drop = prev_soc[1] - r["soc_last"]
             if 0 <= drop <= MAX_PARKED_DROP_PCT:

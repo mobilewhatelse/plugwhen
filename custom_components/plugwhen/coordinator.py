@@ -144,6 +144,7 @@ class Plugwhen:
         self.vehicles: dict[str, Vehicle] = {}
         self._unsub = None
         self._unsub_states = None
+        self._watches: dict[str, Any] = {}   # entity_id -> cancel function of the open reply watch (direct_stats)
         self._pending = None
         self._store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.sent")
         self._sent: dict[str, list[str]] = {}
@@ -214,6 +215,9 @@ class Plugwhen:
         for unsub in (self._unsub, self._unsub_states, self._pending):
             if unsub:
                 unsub()
+        for cancel in list(self._watches.values()):   # open reply watches must not write after unloading
+            cancel()
+        self._watches.clear()
         self._unsub = self._unsub_states = self._pending = None
 
     def _state_changed(self, _event) -> None:
@@ -456,6 +460,8 @@ class Plugwhen:
             self._usage.pop("wallbox", None)   # nothing kept that would not be sent
         old = rm.zu_loeschen(self._usage, self.share_usage)
         if old:   # the fixed id of older versions (once), or every monthly id after switching off
+            if not rm.loeschen_faellig(self._usage, now):
+                return   # the last try failed a short while ago: no request on every tick
             daten = rm.loeschen(DOMAIN, old)
         elif self.share_usage and rm.faellig(self._usage.get("gesendet"), now):
             ver, ha = self._version()
@@ -540,7 +546,7 @@ class Plugwhen:
                 days, last = flotte.trip_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
                 charges = flotte.charge_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0), after, now.date())
                 parked = flotte.parked_days(v.records, v.fleet_model, float(v.cfg.get(V_CAPACITY) or 0) or 60.0, after, now.date())
-                if days:
+                if days or charges or parked:   # parked days come exactly when there are no trip days
                     async with asyncio.timeout(15):
                         async with session.post(flotte.ZIEL_SENDEN, json=flotte.payload(days, not car.get("gemeldet"), charges, parked),
                                                 headers=headers) as r:
@@ -552,7 +558,8 @@ class Plugwhen:
                         self._fleet["schluessel"], self._fleet["gueltig_bis"] = str(ans["schluessel"]), ans.get("gueltig_bis")
                     if isinstance(ans, dict) and isinstance(ans.get("modell"), dict):   # which model of its list the service took
                         self._fleet.setdefault("gruppe", {}).update({str(k): str(x) for k, x in ans["modell"].items() if x})
-                    car["gemeldet"] = True
+                    if days:   # the service counts a new car only with its first trip days
+                        car["gemeldet"] = True
                 if last is not None:
                     car["bis"] = last.isoformat()
             if self._fleet.get("schluessel"):
@@ -692,11 +699,19 @@ class Plugwhen:
 
     def _watch_reply(self, entity_id: str, value: Any) -> None:
         """Wait (without blocking) until the entity shows `value`: the time counts; nothing within REPLY_S counts as not taken."""
+        old = self._watches.pop(entity_id, None)
+        if old:   # a newer command to the same entity: the open watch ends without counting
+            old()
         k = self._wallbox_key(entity_id)
         if not k:
             return
         start = dt_util.utcnow()
         unsubs: list = []
+
+        def cancel() -> None:
+            for u in unsubs:
+                u()
+            unsubs.clear()
 
         def same(state: Any) -> bool:
             if str(state) in (str(value), f"{value}.0", f"{value}:00"):
@@ -709,9 +724,9 @@ class Plugwhen:
         def finish(ok: bool) -> None:
             if not unsubs:
                 return
-            for u in unsubs:
-                u()
-            unsubs.clear()
+            cancel()
+            if self._watches.get(entity_id) is cancel:
+                self._watches.pop(entity_id, None)
             self._wallbox_reply(entity_id, ok, (dt_util.utcnow() - start).total_seconds() if ok else None, k)
 
         @callback
@@ -730,6 +745,7 @@ class Plugwhen:
 
         unsubs.append(async_track_state_change_event(self.hass, [entity_id], changed))
         unsubs.append(async_call_later(self.hass, direct_stats.REPLY_S, too_late))
+        self._watches[entity_id] = cancel
 
     async def _call_entity(self, entity_id: str, value: Any) -> None:
         domain = entity_id.split(".", 1)[0]

@@ -149,7 +149,7 @@ def main():
     log(s == 200 and isinstance(d, dict) and d.get("type") == "form", "adding a vehicle still works without evcc (no evcc field, no error)",
         json.dumps({"evcc_field": "evcc_vehicle" in [f["name"] for f in d.get("data_schema", [])] if isinstance(d, dict) else None}))
 
-    logs = subprocess.run(["docker", "logs", it.CONTAINER], capture_output=True, text=True).stdout
+    logs = subprocess.run(["docker", "logs", it.CONTAINER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace").stdout
     errs = [ln for ln in logs.splitlines() if ("plugwhen" in ln.lower() or "viertelstunden" in ln.lower()) and (" ERROR " in ln or "Traceback" in ln)]
     log(not errs, "no errors of either integration in the log", "; ".join(errs[:3]))
 
