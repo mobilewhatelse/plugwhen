@@ -10,7 +10,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
@@ -26,7 +26,7 @@ from .const import (
 )
 from dataclasses import replace
 
-from . import flotte
+from . import direct_stats, flotte
 from . import rueckmeldung as rm
 
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
@@ -478,6 +478,8 @@ class Plugwhen:
         if self.share_usage != self._usage_shared_seen:   # the switch was moved: ask again or remove the question
             self._usage_shared_seen = self.share_usage
             self.ask_reconfirm()
+        if not (self.share_usage and self.consent_current):
+            self._usage.pop("wallbox", None)   # nothing kept that would not be sent
         old = rm.zu_loeschen(self._usage, self.share_usage)
         if old:   # the fixed id of older versions (once), or every monthly id after switching off
             daten = rm.loeschen(DOMAIN, old)
@@ -502,6 +504,8 @@ class Plugwhen:
                     rm.geloescht(self._usage, daten["kennung"])
             else:
                 self._usage["gesendet"] = now.isoformat()   # sent or not: next try in a week
+                if ok:
+                    self._usage.pop("wallbox", None)        # counted afresh for the next week
             self._evcc_store.async_delay_save(self._evcc_data, 5)
         finally:
             self._usage_busy = False
@@ -596,7 +600,11 @@ class Plugwhen:
 
     def usage_extras(self, now: datetime) -> dict[str, Any] | None:
         """The extra values of the weekly statistics (only with the current consent): condensed, rounded, as classes."""
-        return None
+        extra: dict[str, Any] = {}
+        devices = direct_stats.summary(self._usage.get("wallbox") or {})
+        if devices:
+            extra["geraete"] = devices
+        return extra or None
 
     def fleet_info(self, v: Vehicle) -> dict[str, Any]:
         """For the sensor and the dashboard: is sharing on, which model, whether fleet values are in use."""
@@ -684,6 +692,69 @@ class Plugwhen:
         return bool(self.entry.options.get(O_DIRECT_EARLY)) or self.switch_ready(v, now)["ready"]
 
     async def _set_entity(self, entity_id: str, value: Any) -> None:
+        """Set a wallbox entity; with the current consent also count how the wallbox follows (direct_stats.py)."""
+        try:
+            await self._call_entity(entity_id, value)
+        except Exception:
+            self._wallbox_reply(entity_id, False)
+            raise
+        if value is not None and entity_id.split(".", 1)[0] in ("select", "time", "number"):
+            self._watch_reply(entity_id, value)
+
+    def _wallbox_key(self, entity_id: str) -> str | None:
+        """Integration, model and firmware of the wallbox (never a name or serial), or None without the current consent."""
+        if not (self.share_usage and self.consent_current):
+            return None
+        from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+        ent = er.async_get(self.hass).async_get(entity_id)
+        dev = dr.async_get(self.hass).async_get(ent.device_id) if ent and ent.device_id else None
+        return direct_stats.key(ent.platform if ent else None, dev.model if dev else None, dev.sw_version if dev else None)
+
+    def _wallbox_reply(self, entity_id: str, ok: bool, seconds: float | None = None, k: str | None = None) -> None:
+        k = k or self._wallbox_key(entity_id)
+        if k:
+            direct_stats.record(self._usage.setdefault("wallbox", {}), k, ok, seconds)
+            self._evcc_store.async_delay_save(self._evcc_data, 30)
+
+    def _watch_reply(self, entity_id: str, value: Any) -> None:
+        """Wait (without blocking) until the entity shows `value`: the time counts; nothing within REPLY_S counts as not taken."""
+        k = self._wallbox_key(entity_id)
+        if not k:
+            return
+        start = dt_util.utcnow()
+        unsubs: list = []
+
+        def same(state: Any) -> bool:
+            if str(state) in (str(value), f"{value}.0", f"{value}:00"):
+                return True
+            try:
+                return abs(float(state) - float(value)) < 1e-6
+            except (TypeError, ValueError):
+                return False
+
+        def finish(ok: bool) -> None:
+            if not unsubs:
+                return
+            for u in unsubs:
+                u()
+            unsubs.clear()
+            self._wallbox_reply(entity_id, ok, (dt_util.utcnow() - start).total_seconds() if ok else None, k)
+
+        @callback
+        def changed(event) -> None:
+            new = event.data.get("new_state")
+            if new is not None and same(new.state):
+                finish(True)
+
+        st = self.hass.states.get(entity_id)
+        if st is not None and same(st.state):   # already there when the call returned
+            self._wallbox_reply(entity_id, True, (dt_util.utcnow() - start).total_seconds(), k)
+            return
+        unsubs.append(async_track_state_change_event(self.hass, [entity_id], changed))
+        unsubs.append(async_call_later(self.hass, direct_stats.REPLY_S, lambda _now: finish(False)))
+
+    async def _call_entity(self, entity_id: str, value: Any) -> None:
         domain = entity_id.split(".", 1)[0]
         if domain == "select":
             await self.hass.services.async_call("select", "select_option", {"entity_id": entity_id, "option": value}, blocking=True)
