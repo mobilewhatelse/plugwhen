@@ -288,13 +288,22 @@ integration's device. While it is on, this goes to `aiwhatelse.eu`:
 
 | What | When | Content |
 |---|---|---|
-| Usage statistics | once a week | a random id of the installation, versions, country and language, which kinds of devices and features are used, which integrations the entities come from (e.g. `shelly`) |
+| Usage statistics | once a week | a random id that changes every month, versions, country and language, roughly how long Plugwhen has been running (0–1, 1–3, 3–6, more than 6 months), which kinds of devices and features are used, which integrations the entities come from (e.g. `shelly`); with a wallbox in the mode *Direct* its integration, model and firmware, how many commands it got, the share not taken within 2 minutes and the time until it showed the new value (median, 95th percentile) |
 | Trip days | once a day | per day with at least 30 km: car model (maker and model of the device with the state of charge), battery size, kilometres, consumption per km, mean outdoor temperature of the day, odometer only to the nearest 10,000 km |
 | Charging days | once a day | per day charged only at home (at least 3 kWh and 20 % state of charge): car model, battery size, wallbox energy per full charge, mean outdoor temperature, odometer to the nearest 10,000 km. They give the charging losses and the ageing of the battery |
+| Parked days | once a day | per whole day parked and not charged: car model, battery size, fall of the state of charge in % (to 0.5), mean outdoor temperature. It gives the loss while parked |
 
 **Never sent:** names, entity ids, addresses, location, date or time of a trip, passwords, tokens. No IP address is stored.
 Trip days have no id and are mixed, they cannot be traced to a car and therefore cannot be deleted either. Switching it off
-sends one request to delete the usage statistics of this id, and Plugwhen forgets the fleet values.
+sends a request to delete the usage statistics of each id still remembered (this month and the one before), and Plugwhen
+forgets the fleet values. The service deletes the usage statistics after 60 days anyway.
+
+**What it is for:** consumption values per car model (see below), seeing which devices work well, published summaries, and
+summaries passed on to research or partners. Always from at least 10 installations, never single cars or households.
+
+**After the update:** whoever already shares is asked once under *Settings > Repairs* to confirm the new text. Until then only
+what the old text named is sent (no wallbox values, no parked days); without the tick, sharing is switched off. The fixed id of
+older versions is deleted on the service once.
 
 **What you get:** while your car has no values of its own yet, Plugwhen uses the consumption of many cars of the same model
 (from 5 cars of a model, otherwise all cars), in cold and warm weather. Order: own curve, own model, all cars, start values. The

@@ -2,6 +2,20 @@
 
 ## 0.9.0 (unreleased) - trips from a calendar, plans written into evcc, a stock
 
+- **Sharing, new text (version 2):** the weekly statistics now use a random id that changes every month (the fixed id of
+  older versions is deleted on the service once), plus a rough class of how long Plugwhen has been running. New, only after
+  agreeing to the new text: with a wallbox in the mode *Direct*, how fast and how reliably it takes a new value (per model and
+  firmware, no names), and per whole day parked the loss of charge (no date, like the trip days). The text names every purpose,
+  also summaries passed on to research or partners, always from at least 10 installations. Whoever already shares is asked
+  once under *Repairs*; without the tick sharing is switched off. The service keeps the weekly data at most 60 days.
+  *Deutsch:* Teilen mit neuem Text (Version 2): Die Wochenstatistik hat jetzt eine zufällige Kennung, die jeden Monat wechselt
+  (die feste Kennung früherer Versionen wird am Dienst einmal gelöscht), dazu grob, wie lange Plugwhen schon läuft. Neu, erst
+  nach Zustimmung zum neuen Text: bei einer Wallbox in der Betriebsart *Direkt*, wie schnell und verlässlich sie einen neuen
+  Wert übernimmt (je Modell und Firmware, ohne Namen), und je ganzem Standtag der Ladungsverlust (ohne Datum, wie die Fahrtage).
+  Der Text nennt alle Zwecke, auch Zusammenfassungen für Forschung oder Partner, immer aus mindestens 10 Installationen. Wer
+  schon teilt, wird einmal unter *Reparaturen* gefragt; ohne Haken wird das Teilen ausgeschaltet. Der Dienst behält die
+  Wochendaten höchstens 60 Tage.
+
 - **Review before the release (three fixes):** (1) The mode *direct* (and writing the plan into evcc) now also acts in the
   regular run every five minutes, not only when a sensor changes: a sleeping car at night does not report for hours, and the
   window of the plan begins at a time. Without a peak guard the wallbox could miss the start of the window. (2) "The learn mode

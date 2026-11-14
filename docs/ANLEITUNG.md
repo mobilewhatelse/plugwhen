@@ -293,14 +293,23 @@ teilen* am Gerät der Integration. Solange er an ist, geht an `aiwhatelse.eu`:
 
 | Was | Wann | Inhalt |
 |---|---|---|
-| Nutzungsstatistik | einmal pro Woche | zufällige Kennung der Installation, Versionen, Land und Sprache, welche Gerätearten und Funktionen genutzt werden, aus welchen Integrationen die Entitäten kommen (z. B. `shelly`) |
+| Nutzungsstatistik | einmal pro Woche | zufällige Kennung, die jeden Monat wechselt, Versionen, Land und Sprache, grob wie lange Plugwhen schon läuft (0–1, 1–3, 3–6, mehr als 6 Monate), welche Gerätearten und Funktionen genutzt werden, aus welchen Integrationen die Entitäten kommen (z. B. `shelly`); bei einer Wallbox in der Betriebsart *Direkt* ihre Integration, Modell und Firmware, wie viele Befehle sie bekam, der Anteil, der nicht binnen 2 Minuten übernommen wurde, und die Zeit, bis sie den neuen Wert zeigte (Median, 95. Perzentil) |
 | Fahrtage | einmal am Tag | je Tag mit mindestens 30 km: Automodell (Hersteller und Modell des Geräts mit dem Ladestand), Akkugröße, Kilometer, Verbrauch je km, mittlere Außentemperatur des Tages, Kilometerstand nur auf 10.000 km genau |
 | Ladetage | einmal am Tag | je Tag, an dem nur zu Hause geladen wurde (mindestens 3 kWh und 20 % Ladestand): Automodell, Akkugröße, Wallbox-Energie je voller Ladung, mittlere Außentemperatur, Kilometerstand auf 10.000 km genau. Daraus folgen Ladeverluste und die Alterung des Akkus |
+| Standtage | einmal am Tag | je ganzem Tag, an dem das Auto stand und nicht geladen wurde: Automodell, Akkugröße, Abfall des Ladestands in % (auf 0,5 genau), mittlere Außentemperatur. Daraus folgt der Verlust im Stand |
 
 **Nie gesendet:** Namen, Entitäts-IDs, Adressen, Standort, Datum oder Uhrzeit einer Fahrt, Kennwörter, Token. Es wird keine
 IP-Adresse gespeichert. Die Fahrtage haben keine Kennung und werden gemischt, sie lassen sich keinem Auto zuordnen und daher
-auch nicht löschen. Beim Ausschalten wird das Löschen der Nutzungsstatistik dieser Kennung angefordert, und Plugwhen vergisst
-die Flottenwerte.
+auch nicht löschen. Beim Ausschalten wird das Löschen der Nutzungsstatistik jeder noch gemerkten Kennung angefordert (dieser
+und voriger Monat), und Plugwhen vergisst die Flottenwerte. Der Dienst löscht die Nutzungsstatistik ohnehin nach 60 Tagen.
+
+**Wofür:** Verbrauchswerte je Automodell (siehe unten), sehen, welche Geräte gut funktionieren, veröffentlichte
+Zusammenfassungen und Zusammenfassungen, die an Forschung oder Partner weitergegeben werden. Immer aus mindestens 10
+Installationen, nie einzelne Autos oder Haushalte.
+
+**Nach dem Update:** Wer schon teilt, wird einmal unter *Einstellungen > Reparaturen* gebeten, den neuen Text zu bestätigen. Bis
+dahin geht nur, was der alte Text nannte (keine Wallbox-Werte, keine Standtage); ohne Haken wird das Teilen ausgeschaltet. Die
+feste Kennung früherer Versionen wird am Dienst einmal gelöscht.
 
 **Was Sie davon haben:** Solange Ihr Auto noch keine eigenen Werte hat, rechnet Plugwhen mit dem Verbrauch vieler gleicher Autos
 (ab 5 Autos eines Modells, sonst aller Autos), bei Kälte und Wärme. Reihenfolge: eigene Kurve, eigenes Modell, alle Autos,
