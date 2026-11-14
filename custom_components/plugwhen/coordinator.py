@@ -751,8 +751,12 @@ class Plugwhen:
         if st is not None and same(st.state):   # already there when the call returned
             self._wallbox_reply(entity_id, True, (dt_util.utcnow() - start).total_seconds(), k)
             return
+        @callback
+        def too_late(_now) -> None:   # a callback: runs in the event loop, not in a worker thread
+            finish(False)
+
         unsubs.append(async_track_state_change_event(self.hass, [entity_id], changed))
-        unsubs.append(async_call_later(self.hass, direct_stats.REPLY_S, lambda _now: finish(False)))
+        unsubs.append(async_call_later(self.hass, direct_stats.REPLY_S, too_late))
 
     async def _call_entity(self, entity_id: str, value: Any) -> None:
         domain = entity_id.split(".", 1)[0]
