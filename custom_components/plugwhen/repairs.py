@@ -1,4 +1,4 @@
-"""The one question after an update: share the anonymous usage statistics? (Settings > Repairs)"""
+"""Questions in Settings > Repairs: share the anonymous data (after an update), or confirm the current text (already sharing)."""
 
 from __future__ import annotations
 
