@@ -401,6 +401,9 @@
     "button": {
       "feedback_send": {
         "name": "Send feedback"
+      },
+      "feedback_report": {
+        "name": "Send bug report"
       }
     }
   },

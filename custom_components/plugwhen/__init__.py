@@ -109,7 +109,8 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
     if not vehicles:
         raise ServiceValidationError("Add a vehicle first (integration page: Add vehicle)")
     main_ids = {k: registry.async_get_entity_id(d, DOMAIN, f"{entry.entry_id}_{k}")
-                for k, d in (("feedback_text", "text"), ("feedback_send", "button"), ("share_usage", "switch"))}
+                for k, d in (("feedback_text", "text"), ("feedback_send", "button"), ("share_usage", "switch"),
+                             ("feedback_report", "button"))}
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency,
                                    {k: v for k, v in main_ids.items() if v})}
     text = ha_yaml.dump(config)

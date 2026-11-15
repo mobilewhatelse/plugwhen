@@ -401,6 +401,9 @@
     "button": {
       "feedback_send": {
         "name": "Rückmeldung senden"
+      },
+      "feedback_report": {
+        "name": "Fehlerbericht senden"
       }
     }
   },

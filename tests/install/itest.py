@@ -95,6 +95,26 @@ def svc(domain, service, data=None):
     return api("POST", f"/api/services/{domain}/{service}", data or {})
 
 
+def notification(nid):
+    """Message of a persistent notification (only over the websocket since HA 2023.6), or None."""
+    from websockets.sync.client import connect
+
+    with connect(BASE.replace("http", "ws") + "/api/websocket", max_size=None) as ws:
+        ws.recv()
+        ws.send(json.dumps({"type": "auth", "access_token": TOKEN}))
+        if json.loads(ws.recv()).get("type") != "auth_ok":
+            return None
+        ws.send(json.dumps({"id": 1, "type": "persistent_notification/get"}))
+        for _ in range(5):
+            m = json.loads(ws.recv())
+            if m.get("id") == 1 and m.get("type") == "result":
+                for n in m.get("result") or []:
+                    if n.get("notification_id") == nid:
+                        return n.get("message")
+                return None
+    return None
+
+
 def wait_for(pred, timeout, step=3):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -216,6 +236,13 @@ def main():
     log(len(share) == 1 and share[0]["state"] == "off", "share anonymous data: switch there and off (only with consent)", str([(e["entity_id"], e["state"]) for e in main]))
     fb = [e["entity_id"] for e in main if e["entity_id"].startswith(("text.", "button.")) and "feedback" in e["entity_id"]]
     log(len(fb) == 2, "feedback: text field and button there", str(fb))
+    rep = [e["entity_id"] for e in main if e["entity_id"].startswith("button.") and "bug_report" in e["entity_id"]]
+    log(len(rep) == 1, "bug report: button there", str([e["entity_id"] for e in main]))
+    if rep:   # the test container cannot reach the real server (--add-host): the notification shows what would have been sent
+        svc("button", "press", {"entity_id": rep[0]})
+        msg = wait_for(lambda: notification("plugwhen_feedback"), 30, 2) or ""
+        log("would have been sent" in msg and "Testauto" not in msg and "sensor.auto_" not in msg and "Home Assistant" in msg
+            and "Auto 1" in msg, "bug report: one press builds it; without the car's name or entity ids", msg[:400])
     if not all(everything):
         return
     pid, rdid, nid = plan_s["entity_id"], ready_s["entity_id"], notice_sw["entity_id"]

@@ -315,6 +315,12 @@ Startwerte. Das Attribut `fleet` am Sensor *Gelernte Tage* zeigt, was verwendet 
 Aktion `send_feedback` (längere Texte, optional eine Kontaktadresse, mit oder ohne die Übersicht der Einrichtung oben). Sie geht
 an den Autor, sonst wird nichts gesendet.
 
+**Fehlerbericht (ab 0.9.1).** Läuft etwas nicht wie erwartet, *Fehlerbericht senden* drücken (ein Text im Feld *Rückmeldung*
+geht mit, ist aber nicht nötig). Er enthält je Auto Betriebsart, Ladestand, Ziel, Plan, Entscheidung, die letzten Aktionen an der
+Wallbox, wie schnell und verlässlich ihre Einstellungen antworten, ob die Sensoren Werte liefern, und die letzten Warnungen. Namen,
+Entitäts-IDs, Adressen und Uhrzeiten sind entfernt. Danach zeigt eine Benachrichtigung genau, was gesendet wurde. Unabhängig von
+*Anonyme Daten teilen*.
+
 ## Grenzen
 
 Gesteuert wird nur in den Betriebsarten „Über evcc“ und „Direkt“; im Standard „Lernen“ schaltet Plugwhen nichts. Der Plan beruht auf Gewohnheiten und Prognosen, er ist keine

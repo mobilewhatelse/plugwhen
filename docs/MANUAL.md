@@ -309,6 +309,11 @@ attribute `fleet` of the sensor *Learned days* shows what is used.
 `send_feedback` (longer texts, an optional contact address, with or without the setup overview above). It goes to the author,
 nothing else is sent.
 
+**Bug report (from 0.9.1).** If something does not work as expected, press *Send bug report* (a text in the field *Feedback*
+goes along but is not needed). It holds per car the mode, state of charge, target, plan, decision, the last actions on the wallbox,
+how fast and reliably its settings answer, whether the sensors deliver values, and the last warnings. Names, entity ids, addresses
+and clock times are removed. Afterwards a notification shows exactly what was sent. Independent of *Share anonymous data*.
+
 ## Safety and liability
 
 In the modes **Via evcc** and **Direct** Plugwhen decides by itself when the car charges: it writes charging

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.9.1 - 15.11.2026 - fixes before the Marketplace, bug report on request
+
+- **Bug report on request:** new button *Send bug report* next to the feedback (text optional). One press sends it, and the
+  notification then shows exactly what was sent. It holds what is needed to find an error: version, per car the mode, state of
+  charge and its age, plugged in, charging, target and need, departure only as a distance in hours, the next windows of the plan,
+  the decision, the last ten actions on the wallbox, per wallbox setting its integration, model and firmware, the value now and its
+  list, how fast and how often commands arrived or failed, whether the sensors deliver values, and the last 20 warnings of
+  Plugwhen. Names, entity ids, addresses, IP addresses and identifiers are removed first, no clock times. Independent of *Share
+  anonymous data*. Create the dashboard again to see the button in the card *Feedback*.
+  *Deutsch:* Fehlerbericht auf Knopfdruck: neuer Knopf *Fehlerbericht senden* bei der Rückmeldung (Text optional). Ein Druck
+  sendet ihn, die Benachrichtigung zeigt danach genau, was gesendet wurde. Er enthält, was zur Fehlersuche nötig ist: Version, je
+  Auto Betriebsart, Ladestand und sein Alter, angesteckt, lädt, Ziel und Bedarf, Abfahrt nur als Abstand in Stunden, die nächsten
+  Fenster des Plans, die Entscheidung, die letzten zehn Aktionen an der Wallbox, je Wallbox-Einstellung Integration, Modell und
+  Firmware, aktueller Wert und Liste, wie schnell und wie oft Befehle ankamen oder fehlschlugen, ob die Sensoren Werte liefern, und
+  die letzten 20 Warnungen von Plugwhen. Namen, Entitäts-IDs, Adressen, IP-Adressen und Kennungen werden vorher entfernt, keine
+  Uhrzeiten. Unabhängig von *Anonyme Daten teilen*. Dashboard neu erstellen, damit der Knopf in der Karte *Rückmeldung* erscheint.
+
+- **A changed setting acts at once:** reserve, target or mode now reach the wallbox and evcc right away, not only at the next run
+  in up to five minutes. *Deutsch:* Eine geänderte Einstellung (Reserve, Ziel, Betriebsart) wirkt sofort auf Wallbox und evcc,
+  nicht erst im nächsten Lauf nach bis zu fünf Minuten.
+
+- **Slow wallbox over the cloud:** Plugwhen never runs two controls at once. A wallbox over the cloud may take 20 s or more per
+  command; a second run meanwhile could send the same command again (e.g. press start twice). A run asked for meanwhile
+  follows once afterwards, with the newest values. Error texts are readable: an error without a text of its own (e.g. no answer
+  in time) shows at least its kind instead of an empty text.
+  *Deutsch:* Langsame Wallbox über die Cloud: Plugwhen steuert nie zweimal gleichzeitig. Eine Wallbox über die Cloud braucht
+  für einen Befehl manchmal 20 s oder länger; ein zweiter Durchlauf in der Zeit konnte denselben Befehl noch einmal senden
+  (z. B. Start zweimal drücken). Ein Durchlauf, der in der Zeit fällig wird, folgt einmal danach, mit den neuesten Werten.
+  Fehlertexte sind lesbar: Ein Fehler ohne eigenen Text (z. B. keine Antwort rechtzeitig) zeigt zumindest seine Art statt
+  eines leeren Textes.
+
 ## 0.9.0 - 2026-11-14 - trips from a calendar, plans written into evcc, a stock
 
 - **Sharing, new text (version 2):** the weekly statistics now use a random id that changes every month (the fixed id of

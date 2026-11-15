@@ -26,7 +26,7 @@ from .const import (
 )
 from dataclasses import replace
 
-from . import direct_stats, flotte
+from . import direct_stats, fehlerbericht as fb, flotte
 from . import rueckmeldung as rm
 
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
@@ -129,6 +129,13 @@ class Vehicle:
     fleet_cars: int | None = None            # how many cars the fleet value in use comes from
 
 
+def err_text(err: BaseException) -> str:
+    """Readable error text: some errors (e.g. a timeout) have no text of their own; then at least their kind."""
+    if isinstance(err, TimeoutError):
+        return "TimeoutError (no answer in time)"
+    return (str(err).strip() or type(err).__name__)[:120]
+
+
 class Plugwhen:
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
@@ -146,6 +153,11 @@ class Plugwhen:
         self._unsub_states = None
         self._watches: dict[str, Any] = {}   # entity_id -> cancel function of the open reply watch (direct_stats)
         self._pending = None
+        self.diag_calls = fb.Calls()   # how the wallbox settings answer (only in memory, only sent with a bug report)
+        self._diag_actions: dict[str, Any] = {}   # per car the last 10 actions of the mode 'direct' (only in memory)
+        self._diag_lines = fb.Lines()  # the last warnings of Plugwhen (only in memory)
+        self._acting = False      # one run of warnings/evcc/wallbox at a time: a slow cloud wallbox must not get a command twice
+        self._act_again = False   # a run was asked for meanwhile: once more afterwards, with the newest values
         self._store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.sent")
         self._sent: dict[str, list[str]] = {}
         self._plug_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.plugs")
@@ -176,6 +188,7 @@ class Plugwhen:
     # ---------- life cycle ----------
 
     async def async_start(self) -> None:
+        logging.getLogger(__package__).addHandler(self._diag_lines)
         self._sent = (await self._store.async_load() or {}).get("sent", {})
         ev = await self._evcc_store.async_load() or {}
         self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
@@ -212,6 +225,7 @@ class Plugwhen:
         self.entry.async_create_background_task(self.hass, self._tick(), f"{DOMAIN} first run")
 
     async def async_stop(self) -> None:
+        logging.getLogger(__package__).removeHandler(self._diag_lines)
         for unsub in (self._unsub, self._unsub_states, self._pending):
             if unsub:
                 unsub()
@@ -234,7 +248,24 @@ class Plugwhen:
 
     async def _send_and_act(self, now: datetime) -> None:
         """Warnings, the plan for evcc and the wallbox (mode 'direct'). Also in the regular run: a window of the plan begins at a time,
-        not when a sensor changes (a sleeping car at night does not report its state of charge for hours)."""
+        not when a sensor changes (a sleeping car at night does not report its state of charge for hours).
+        Never two runs at once: a wallbox over the cloud may take 20 s or more per command, and a second run meanwhile would
+        send the same command again (e.g. press start twice). A run asked for meanwhile follows once afterwards."""
+        if self._acting:
+            self._act_again = True
+            return
+        self._acting = True
+        try:
+            while True:
+                self._act_again = False
+                await self._act_once(now)
+                if not self._act_again:
+                    break
+                now = dt_util.now()
+        finally:
+            self._acting = False
+
+    async def _act_once(self, now: datetime) -> None:
         acted = False
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
@@ -254,11 +285,13 @@ class Plugwhen:
         async_dispatcher_send(self.hass, self.signal)
 
     async def async_recompute(self, vehicle: Vehicle) -> None:
-        """A setting of the vehicle changed (reserve, switch): compute again and tell the entities."""
+        """A setting of the vehicle changed (reserve, target, mode, switch): compute again, tell the entities, and act at once
+        (evcc plan, wallbox), not only at the next run in up to five minutes. In the background: a slow wallbox over the cloud
+        must not hold the setting in the user interface."""
         now = dt_util.now()
         self._compute(vehicle, now)
         async_dispatcher_send(self.hass, self.signal)
-        await self._maybe_send(vehicle, now)
+        self.entry.async_create_background_task(self.hass, self._send_and_act(now), f"{DOMAIN} act after a setting")
 
     async def _tick(self, _now: datetime | None = None) -> None:
         now = dt_util.now()
@@ -308,7 +341,7 @@ class Plugwhen:
                                                        "end_date_time": now + timedelta(days=14)}, blocking=True, return_response=True)
             events = ((resp or {}).get(cal) or {}).get("events", [])
         except Exception as err:  # noqa: BLE001 - optional: without the calendar Plugwhen plans as before
-            v.trips_error = str(err)[:120]
+            v.trips_error = err_text(err)
             _LOGGER.debug("Plugwhen: calendar %s not readable: %s", cal, err)
             return
         v.trips_error = None
@@ -490,14 +523,83 @@ class Plugwhen:
         finally:
             self._usage_busy = False
 
-    async def send_feedback(self, text: str, kontakt: str | None, mit_einrichtung: bool) -> bool:
+    async def send_feedback(self, text: str, kontakt: str | None, mit_einrichtung: bool, bericht: dict | None = None) -> bool:
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
         if not str(text or "").strip():
-            return False
+            if bericht is None:
+                return False
+            text = "(Fehlerbericht)"   # the server needs a text; a report alone is fine
         ver, ha = self._version()
-        daten = rm.rueckmeldung(DOMAIN, ver, ha, text, kontakt, self.setup_overview() if mit_einrichtung else None)
+        daten = rm.rueckmeldung(DOMAIN, ver, ha, text, kontakt, self.setup_overview() if mit_einrichtung else None, bericht)
         return await rm.senden(async_get_clientsession(self.hass), rm.ZIEL_RUECKMELDUNG, daten)
+
+    def _diag_action(self, v: Vehicle, now: datetime, text: str) -> None:
+        from collections import deque
+
+        self._diag_actions.setdefault(v.sub_id, deque(maxlen=10)).append(f"{dt_util.as_local(now).strftime('%d. %H:%M')} {text}")
+
+    def build_report(self, now: datetime) -> dict[str, Any]:
+        """The bug report (fehlerbericht.py): per car what it is set to and how the wallbox answers; never names or entity ids."""
+        from homeassistant.helpers import entity_registry as er
+
+        reg = er.async_get(self.hass)
+        names = [self.hass.config.location_name or ""]
+        autos: list[dict[str, Any]] = []
+        for v in self.vehicles.values():
+            names.append(v.name)
+            a: dict[str, Any] = {"betriebsart": v.mode, "wallbox_steuerung": self.wallbox_control(v).get("variant") or "keine",
+                                 "ladestand": v.soc, "ladestand_alter_min": round(v.soc_age_s / 60) if v.soc_age_s is not None else None,
+                                 "ladestand_zu_alt": v.soc_stale, "angesteckt": v.plugged, "laedt": v.charging,
+                                 "abfahrt": fb.rel_h(v.departure, now), "abfahrt_quelle": v.departure_source,
+                                 "kapazitaet_kwh": v.cfg.get(V_CAPACITY), "verbrauch_kwh_km": round(v.consumption, 3),
+                                 "verbrauch_quelle": v.consumption_source, "reserve_km": v.reserve_km}
+            if v.need:
+                a["bedarf"] = (f"Ziel {v.need.target_soc:.0f} %, {v.need.charge_kwh:.1f} kWh laden, Quelle {v.need.source}"
+                               + ("" if v.need.reachable else ", nicht erreichbar"))
+            a["ladeplan"] = fb.windows_text(v.charge_plan, now)
+            if v.decision:
+                a["entscheidung"] = f"{v.decision.action} ({v.decision.reason})"
+            if v.evcc_live:
+                a["evcc_live"] = v.evcc_live
+            if self._diag_actions.get(v.sub_id):
+                a["letzte_aktionen"] = list(self._diag_actions[v.sub_id])
+            for key, eid in sorted(v.cfg.items()):
+                if not (str(key).endswith("_entity") and isinstance(eid, str)):
+                    continue
+                st = self.hass.states.get(eid)
+                if st is not None and st.attributes.get("friendly_name"):
+                    names.append(str(st.attributes["friendly_name"]))
+                ent = reg.async_get(eid)
+                a[f"sensor_{key[:-7]}"] = fb.sensor_state(st, dt_util.utcnow()) + (f" ({ent.platform})" if ent else "")
+            caps = self.wallbox_control(v)
+            for role in ("mode", "start", "stop", "trip_time", "trip_energy"):
+                eid = caps.get(role)
+                if isinstance(eid, str):
+                    ent = reg.async_get(eid)
+                    txt = self.diag_calls.text(eid)
+                    a[f"wallbox_{role}"] = (f"{ent.platform}: " if ent else "") + (txt or "noch kein Befehl")
+                    st = self.hass.states.get(eid)
+                    if st is not None:
+                        opts = st.attributes.get("options")
+                        a[f"wallbox_{role}_jetzt"] = fb.state_text(eid, st, now) + (f" (Liste: {', '.join(map(str, opts))[:200]})" if opts else "")
+                    if "wallbox_geraet" not in a:
+                        a["wallbox_geraet"] = self._wallbox_key_any(eid)
+            if v.direct_last:
+                d = v.direct_last
+                a["letzte_wallbox_aktion"] = (f"{str(d.get('at', ''))[:16]} {d.get('mode')}: "
+                                             + (f"Fehler {d['error']}" if d.get("error") else f"{len(d.get('done') or [])} gesetzt"))
+            if v.evcc_write:
+                e = v.evcc_write
+                a["letzte_evcc_aktion"] = f"{str(e.get('at', ''))[:16]} {e.get('action')} {e.get('reason') or ''}".strip() + (
+                    f" Fehler {e['error']}" if e.get("error") else "")
+            for k, x in (("kalender_fehler", v.trips_error), ("verlauf_fehler", v.history_error)):
+                if x:
+                    a[k] = x
+            autos.append(a)
+        ver, ha = self._version()
+        fehler = {"evcc": (self.evcc_info or {}).get("error")}
+        return fb.bericht(ver, ha, self.setup_overview(), autos, list(self._diag_lines.lines), fehler, names)
 
     def _evcc_data(self) -> dict[str, Any]:
         return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo, "usage": self._usage,
@@ -673,11 +775,14 @@ class Plugwhen:
 
     async def _set_entity(self, entity_id: str, value: Any) -> None:
         """Set a wallbox entity; while sharing also count how the wallbox follows (direct_stats.py)."""
+        start = dt_util.utcnow()
         try:
             await self._call_entity(entity_id, value)
-        except Exception:
+        except Exception as err:
+            self.diag_calls.call(entity_id, (dt_util.utcnow() - start).total_seconds(), err)
             self._wallbox_reply(entity_id, False)
             raise
+        self.diag_calls.call(entity_id, (dt_util.utcnow() - start).total_seconds())
         if value is not None and entity_id.split(".", 1)[0] in ("select", "time", "number"):
             self._watch_reply(entity_id, value)
 
@@ -691,7 +796,16 @@ class Plugwhen:
         dev = dr.async_get(self.hass).async_get(ent.device_id) if ent and ent.device_id else None
         return direct_stats.key(ent.platform if ent else None, dev.model if dev else None, dev.sw_version if dev else None)
 
+    def _wallbox_key_any(self, entity_id: str) -> str:
+        """Integration, model and firmware of the wallbox, also without sharing (only for the bug report)."""
+        from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+        ent = er.async_get(self.hass).async_get(entity_id)
+        dev = dr.async_get(self.hass).async_get(ent.device_id) if ent and ent.device_id else None
+        return direct_stats.key(ent.platform if ent else None, dev.model if dev else None, dev.sw_version if dev else None)
+
     def _wallbox_reply(self, entity_id: str, ok: bool, seconds: float | None = None, k: str | None = None) -> None:
+        self.diag_calls.reply(entity_id, ok, seconds)
         k = k or self._wallbox_key(entity_id)
         if k:
             direct_stats.record(self._usage.setdefault("wallbox", {}), k, ok, seconds)
@@ -857,11 +971,13 @@ class Plugwhen:
                 r = await self._evcc_loadpoint_mode(v, None)
                 done += [r] if r else []
         except Exception as err:  # noqa: BLE001 - a wallbox or evcc that does not answer must not stop the planner
-            v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "error": str(err)[:120]}
+            v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "error": err_text(err)}
+            self._diag_action(v, now, f"{v.mode}: Fehler {err_text(err)} nach {', '.join(done) or 'nichts gesetzt'}")
             _LOGGER.warning("Plugwhen: wallbox of %s not controlled: %s", v.name, err)
             return
         if done:
             v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "done": done, "error": None}
+            self._diag_action(v, now, f"{v.mode}: {', '.join(done)}")
             self._evcc_store.async_delay_save(self._evcc_data, 5)
 
     def _min_soc(self, v: Vehicle) -> float:
@@ -900,7 +1016,7 @@ class Plugwhen:
             v.evcc_write = {"at": now.isoformat(), "action": action, "reason": why, "error": None}
             self.evcc_state = await client.state()   # show what evcc has now
         except EvccError as err:
-            v.evcc_write = {"at": now.isoformat(), "action": action, "reason": why, "error": str(err)[:120]}
+            v.evcc_write = {"at": now.isoformat(), "action": action, "reason": why, "error": err_text(err)}
             _LOGGER.warning("Plugwhen: plan of %s not written into evcc: %s", v.name, err)
         self._evcc_store.async_delay_save(self._evcc_data, 5)
 
@@ -947,7 +1063,7 @@ class Plugwhen:
             self.evcc_info = {"source": conn[2], "used": True, "ok": True, "at": now.isoformat()}
         except EvccError as err:
             self.evcc_state = None
-            self.evcc_info = {"source": conn[2], "used": True, "ok": False, "error": str(err)[:120]}
+            self.evcc_info = {"source": conn[2], "used": True, "ok": False, "error": err_text(err)}
             _LOGGER.debug("Plugwhen: evcc not readable: %s", err)
 
     # ---------- reading ----------
@@ -998,7 +1114,7 @@ class Plugwhen:
                 {"state", "mean", "max", "change"},
             )
         except Exception as err:  # noqa: BLE001 - the planner must not break because the history is missing
-            v.history_error = str(err)
+            v.history_error = err_text(err)
             _LOGGER.warning("Plugwhen: history of %s could not be read: %s", v.name, err)
             return
 
@@ -1130,7 +1246,7 @@ class Plugwhen:
                 "hour", None, {"change", "state", "mean"},
             )
         except Exception as err:  # noqa: BLE001 - a calculation that cannot run must not disturb the planner
-            v.potential = {"status": "no_data", "error": str(err), "computed_at": now.isoformat()}
+            v.potential = {"status": "no_data", "error": err_text(err), "computed_at": now.isoformat()}
             return v.potential
 
         def hourly(eid: str, field: str, convert) -> dict[datetime, float]:
@@ -1318,7 +1434,7 @@ class Plugwhen:
                 self._save_calib()
             info.update(pending=len(self._solar_acc.pending), days=len(self._solar_acc.days), added=added)
         except Exception as err:  # noqa: BLE001 - optional; tried again in 15 minutes
-            info["error"] = str(err)[:120]
+            info["error"] = err_text(err)
             _LOGGER.debug("Plugwhen: solar check skipped: %s", err)
 
     def _save_calib(self) -> None:
