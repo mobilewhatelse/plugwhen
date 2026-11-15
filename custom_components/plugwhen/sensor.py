@@ -76,6 +76,8 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "sources": data_sources(v.cfg, v.evcc_live is not None, self.plug.evcc_info, executed=False),
             "reserve_km": v.reserve_km,
             "learn_km": v.learn_km,
+            "weekly_full": v.weekly_full, "weekly_day": v.weekly_day.isoformat() if v.weekly_day else None,
+            "weekly_active": v.weekly_active,
             "efficiency": self.plug.efficiency_of(v), "efficiency_learned": v.efficiency is not None,
             "departure": v.departure.isoformat() if v.departure else None,
             "samples": v.plan.samples if v.plan else 0,

@@ -30,6 +30,13 @@ _TS = re.compile(r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:[+-
 _CLOCK = re.compile(r"(?<![\d.:])\d{1,2}:\d{2}(?::\d{2})?(?![\d:])")
 
 
+def real_names(names: list[str] | None, keep: list[str] | None) -> list[str]:
+    """Only names that can identify somebody: a name that is part of a kind, an integration, a maker or a model ("Wallbox",
+    "Mercedes" in "Mercedes-Benz") is just a word, replacing it would erase what the report is for."""
+    words = [str(k).lower() for k in (keep or []) if k]
+    return [n for n in (names or []) if n and not any(n.strip().lower() in w for w in words)]
+
+
 def anonym(text: Any, names: list[str] | None = None, limit: int = 300) -> str | None:
     """A text without what identifies anybody: names (longest first), URLs, e-mail, IPs, long ids, entity ids (kind kept)."""
     if text is None:
@@ -182,8 +189,10 @@ def state_text(entity_id: str, state: Any, now: datetime) -> str:
 
 
 def bericht(version: str, ha_version: str, einrichtung: dict[str, Any], autos: list[dict[str, Any]], zeilen: list[tuple],
-            fehler: dict[str, Any], names: list[str]) -> dict[str, Any]:
-    """The report: everything given here is anonymised once more (a name in a log line, an id in an error text)."""
+            fehler: dict[str, Any], names: list[str], keep: list[str] | None = None) -> dict[str, Any]:
+    """The report: everything given here is anonymised once more (a name in a log line, an id in an error text). `keep`:
+    integrations, makers and models (see real_names)."""
+    names = real_names(names, keep)
     def clean(x: Any) -> Any:
         if isinstance(x, dict):
             return {str(k): clean(v) for k, v in x.items()}

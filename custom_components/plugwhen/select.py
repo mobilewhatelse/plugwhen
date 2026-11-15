@@ -9,13 +9,14 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import PlugwhenEntry
 from .const import DEFAULT_MODE, MODES
+from . import vollladen as vl
 from .entity import PlugwhenEntity
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddConfigEntryEntitiesCallback) -> None:
     plug = entry.runtime_data
     for sub_id, v in plug.vehicles.items():
-        add([ModeSelect(plug, v)], config_subentry_id=sub_id)
+        add([ModeSelect(plug, v), WeeklyDaysSelect(plug, v)], config_subentry_id=sub_id)
 
 
 class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
@@ -62,3 +63,28 @@ class ModeSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
             await self.plug.async_write_evcc_now(self.vehicle)
         else:
             await self.plug.async_recompute(self.vehicle)
+
+
+class WeeklyDaysSelect(PlugwhenEntity, SelectEntity, RestoreEntity):
+    """On which days the weekly full charge may take place; with a solar forecast the sunniest of them is chosen (default
+    Saturday or Sunday)."""
+
+    _attr_icon = "mdi:calendar-week"
+    _attr_options = list(vl.DAY_SETS)
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "weekly_days")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        self.vehicle.weekly_days = last.state if last is not None and last.state in vl.DAY_SETS else vl.DEFAULT_DAYS
+
+    @property
+    def current_option(self) -> str:
+        return self.vehicle.weekly_days
+
+    async def async_select_option(self, option: str) -> None:
+        self.vehicle.weekly_days = option if option in vl.DAY_SETS else vl.DEFAULT_DAYS
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)

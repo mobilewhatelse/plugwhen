@@ -154,5 +154,17 @@ class NoClockTests(unittest.TestCase):
         self.assertEqual(fb.ago(time.time() - 7200), "vor 2.0 h")
 
 
+class GenericNameTests(unittest.TestCase):
+    """Feedback 15.11.: devices called "Wallbox" and "Mercedes" erased the kind, the maker and an integration in the report."""
+
+    def test_generic_words_are_no_names(self):
+        keep = ["wallbox", "jackery", "Mercedes-Benz", "EQB 250"]
+        self.assertEqual(fb.real_names(["Wallbox", "Mercedes", "Jackery", "Familie Huber", "", None], keep), ["Familie Huber"])
+
+    def test_kind_and_maker_stay(self):
+        t = fb.anonym("wallbox: mbapi2020, Mercedes-Benz, EQB 250", fb.real_names(["Wallbox", "Mercedes"], ["wallbox", "Mercedes-Benz"]))
+        self.assertEqual(t, "wallbox: mbapi2020, Mercedes-Benz, EQB 250")
+
+
 if __name__ == "__main__":
     unittest.main()

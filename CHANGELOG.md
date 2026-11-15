@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.2 - unreleased - once a week full
+
+- **Once a week full (wish of a user):** per car a switch *Once a week full* (default off), the days (default Saturday or Sunday)
+  and the target (default 100 %). With a solar forecast the sunniest allowed day still ahead this week is chosen, without solar
+  the first one. Sun first, the rest from the grid, so the car really gets full; full shortly before the departure (without one
+  by 8 pm). Once per week, then the normal target again. Create the dashboard again to see the settings in the card *Settings*.
+  *Deutsch:* Einmal pro Woche voll laden (Wunsch eines Nutzers): je Auto Schalter *Einmal pro Woche voll laden* (Standard aus), Tage
+  (Standard Samstag oder Sonntag) und Ziel (Standard 100 %). Mit Solarprognose der sonnigste erlaubte Tag dieser Woche, ohne
+  Photovoltaik der erste. Zuerst Sonne, der Rest aus dem Netz, damit das Auto sicher voll wird; voll kurz vor der Abfahrt (ohne Abfahrt
+  bis 20 Uhr). Einmal je Woche, danach wieder das normale Ziel. Dashboard neu erstellen, damit die Einstellungen in der Karte
+  *Einstellungen* erscheinen.
+
 ## 0.9.1 - 15.11.2026 - fixes before the Marketplace, bug report on request
 
 - **Bug report on request:** new button *Send bug report* next to the feedback (text optional). One press sends it, and the

@@ -375,11 +375,17 @@
       },
       "share_usage": {
         "name": "Anonyme Daten teilen"
+      },
+      "weekly_full": {
+        "name": "Einmal pro Woche voll laden"
       }
     },
     "number": {
       "reserve_km": {
         "name": "Reserve"
+      },
+      "weekly_target": {
+        "name": "Ziel beim wöchentlichen Volladen"
       }
     },
     "select": {
@@ -390,6 +396,16 @@
           "learn": "Lernen",
           "evcc": "Über evcc (Plan schreiben)",
           "direct": "Direkt (Plugwhen steuert die Wallbox)"
+        }
+      },
+      "weekly_days": {
+        "name": "Tage für das wöchentliche Volladen",
+        "state": {
+          "weekend": "Samstag oder Sonntag",
+          "saturday": "Samstag",
+          "sunday": "Sonntag",
+          "friday_sunday": "Freitag bis Sonntag",
+          "any_day": "Jeder Tag der Woche"
         }
       }
     },

@@ -56,6 +56,15 @@ z. B. 11 oder 22 kW und 1,4 kW für einphasig 6 A). Eine bestimmte Marke wird ni
 Warum verteilen: Eine Wallbox mit „fertig bis“ und vollem Strom lädt spät und kräftig (z. B. 10 kW von 4 bis 6 Uhr) und bestimmt damit die
 Monatsspitze. Über die Nacht verteilt braucht dieselbe Energie 2–3 kW.
 
+**Einmal pro Woche voll laden (ab 0.9.2).** Viele Hersteller empfehlen, den Akku ab und zu ganz voll zu laden (z. B. damit die Anzeige des
+Ladestands stimmt). Je Auto gibt es dafür den Schalter *Einmal pro Woche voll laden* (Standard aus), die *Tage für das wöchentliche
+Volladen* (Standard Samstag oder Sonntag) und das *Ziel beim wöchentlichen Volladen* (Standard 100 %). Mit Solarprognose nimmt Plugwhen
+von den erlaubten Tagen, die in dieser Woche noch kommen, den mit der meisten Sonne, ohne Photovoltaik den ersten. Für einen Plan, der
+diesen Tag enthält, gilt das höhere Ziel: zuerst mit Sonne, der Rest aus dem Netz, damit das Auto sicher voll wird. Wie immer verteilt
+der Plan den Netzanteil in die ruhigen Stunden vor der Abfahrt, so steht der Akku nicht lange voll. Ohne Abfahrt an dem Tag ist das Auto
+bis 20 Uhr voll. Einmal je Woche (Montag bis Sonntag): ist das Ziel erreicht, gilt bis zur nächsten Woche wieder das normale Ziel.
+Die Karte *Einstellungen* zeigt, für welchen Tag das Volladen geplant ist.
+
 ## Steckzeiten
 
 Home Assistant hebt den Verlauf eines Stecker-Sensors nur wenige Tage auf, Binärsensoren haben keine Langzeitstatistik. Plugwhen schreibt An- und

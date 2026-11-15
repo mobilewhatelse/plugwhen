@@ -15,6 +15,7 @@ ENTITY_KEYS = {
     "readiness": "sensor", "potential": "sensor", "week_plan": "sensor", "reserve_km": "number", "learn_km": "switch",
     "mode": "select", "would_switch": "sensor", "learning_check": "sensor", "habit": "sensor",
     "notice_enabled": "switch", "switch_ready": "sensor",
+    "weekly_full": "switch", "weekly_days": "select", "weekly_target": "number",
 }
 
 TEXT = {
@@ -24,6 +25,10 @@ TEXT = {
         pot="Potenzial", plugs_h="Steckzeiten", settings="Einstellungen", week_h="Gelernter Wochenplan",
         reserve="Reserve (km), mit der das Auto mindestens losfährt", learn="Kilometer je Wochentag lernen",
         notice="Warnen, wenn das Auto nicht bereit sein wird",
+        wf="Einmal pro Woche voll laden", wf_days="An diesen Tagen (mit PV: der sonnigste)", wf_target="Ziel beim Volladen",
+        wf_days_names="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag",
+        wf_active="**Volladen läuft:** Ziel {t} %, zuerst mit Sonne, der Rest aus dem Netz.", wf_planned="Volladen geplant für {d}.",
+        wf_done="Volladen diese Woche erledigt.", wf_none="Diese Woche ist kein erlaubter Tag mehr übrig.",
         settings_note="**Reserve** ist die Untergrenze der Reichweite. Ist der Schalter an, hebt der gelernte hohe Wert eines Wochentags sie bei Bedarf an. Aus: nur die Reserve zählt.",
         lc_km="Kilometer", lc_depl="Abfahrt", lc_km_helps="Mit dem Gelernten wären", lc_km_helps_b="Prozentpunkte mehr Tage gedeckt gewesen",
         lc_km_same="Die feste Reserve allein deckt fast genauso viele Tage", lc_km_same_b="das Lernen der Kilometer bringt hier wenig",
@@ -121,6 +126,10 @@ TEXT = {
         pot="Potential", plugs_h="Plug-in times", settings="Settings", week_h="Learned week",
         reserve="Reserve (km) the car always leaves with", learn="Learn kilometres per weekday",
         notice="Warn when the car will not be ready",
+        wf="Once a week full", wf_days="On these days (with PV: the sunniest)", wf_target="Target of the full charge",
+        wf_days_names="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday",
+        wf_active="**Full charge running:** target {t} %, sun first, the rest from the grid.", wf_planned="Full charge planned for {d}.",
+        wf_done="Full charge done this week.", wf_none="No allowed day is left this week.",
         settings_note="**Reserve** is the lowest range. With the switch on, a weekday's learned high value raises it when needed. Off: only the reserve counts.",
         lc_km="Kilometres", lc_depl="Departure", lc_km_helps="With what was learned", lc_km_helps_b="percentage points more days would have been covered",
         lc_km_same="The fixed reserve alone covers almost as many days", lc_km_same_b="learning the kilometres brings little here",
@@ -455,6 +464,20 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             ]},
         ]},
     ]
+    if ids.get("weekly_full"):   # once a week full (0.9.2)
+        sw, tg = ids["weekly_full"], ids.get("weekly_target")
+        names = "['" + "','".join(t["wf_days_names"].split(",")) + "']"
+        status = ("{% if is_state('" + sw + "', 'on') %}{% set a = states['" + sw + "'].attributes %}"
+                  "{% if a.active %}" + t["wf_active"].replace("{t}", "{{ states('" + str(tg) + "') | int(100) }}")
+                  + "{% elif a.day %}" + t["wf_planned"].replace("{d}", "{{ " + names + "[as_datetime(a.day).weekday()] }}")
+                  + "{% elif a.done %}" + t["wf_done"] + "{% else %}" + t["wf_none"] + "{% endif %}{% endif %}")
+        ents = [{"entity": sw, "name": t["wf"]}]
+        if ids.get("weekly_days"):
+            ents.append({"entity": ids["weekly_days"], "name": t["wf_days"]})
+        if tg:
+            ents.append({"entity": tg, "name": t["wf_target"]})
+        details[-1]["cards"] += [{"type": "entities", "show_header_toggle": False, "entities": ents},
+                                 {"type": "markdown", "content": status}]
     return {"overview": overview, "learning": learning, "details": details}
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -50,6 +50,7 @@ from .need import MIN_SAMPLES, Need, compute_need
 from .startwerte import charge_efficiency
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, should_check
 from .plan import make_plan
+from . import vollladen as vl
 from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
 from .wallboxes import active_wallbox, car_hourly, cumulative, plan_order, shared, soc_rise_hours, taken_by_others, wallbox_ids
@@ -127,6 +128,12 @@ class Vehicle:
     others_kw: dict | None = None            # what the cars planned before this one (per quarter hour), for the attributes
     fleet_model: str | None = None           # car model for the fleet values (maker and model of the state of charge's device)
     fleet_cars: int | None = None            # how many cars the fleet value in use comes from
+    weekly_full: bool = False                # once a week full (switch, default off; vollladen.py)
+    weekly_days: str = vl.DEFAULT_DAYS       # allowed days (select)
+    weekly_target: float = vl.DEFAULT_TARGET  # target of the full charge in % (number)
+    weekly_done: str | None = None           # ISO week in which the car was full (restored with the switch)
+    weekly_day: date | None = None           # the day chosen this week (None = done or none left)
+    weekly_active: bool = False              # the full charge counts for the current plan
 
 
 def err_text(err: BaseException) -> str:
@@ -554,6 +561,10 @@ class Plugwhen:
                                  "abfahrt": fb.rel_h(v.departure, now), "abfahrt_quelle": v.departure_source,
                                  "kapazitaet_kwh": v.cfg.get(V_CAPACITY), "verbrauch_kwh_km": round(v.consumption, 3),
                                  "verbrauch_quelle": v.consumption_source, "reserve_km": v.reserve_km}
+            if v.weekly_full:   # weekday only, never a clock time
+                a["volladen"] = (f"an, {v.weekly_days}, Ziel {v.weekly_target:.0f} %, "
+                                 + ("läuft" if v.weekly_active else f"geplant {('Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So')[v.weekly_day.weekday()]}"
+                                    if v.weekly_day else "diese Woche erledigt" if v.weekly_done == vl.week_key(now.date()) else "kein Tag mehr"))
             if v.need:
                 a["bedarf"] = (f"Ziel {v.need.target_soc:.0f} %, {v.need.charge_kwh:.1f} kWh laden, Quelle {v.need.source}"
                                + ("" if v.need.reachable else ", nicht erreichbar"))
@@ -599,7 +610,11 @@ class Plugwhen:
             autos.append(a)
         ver, ha = self._version()
         fehler = {"evcc": (self.evcc_info or {}).get("error")}
-        return fb.bericht(ver, ha, self.setup_overview(), autos, list(self._diag_lines.lines), fehler, names)
+        overview = self.setup_overview()
+        keep = ["Plugwhen", "wallbox", "evcc"] + [str(x) for x in overview.get("herkunft") or []]
+        keep += [str(x.fleet_model) for x in self.vehicles.values() if x.fleet_model]
+        keep += [p for a in autos for p in str(a.get("wallbox_geraet") or "").split("|") if p]
+        return fb.bericht(ver, ha, overview, autos, list(self._diag_lines.lines), fehler, names, keep)
 
     def _evcc_data(self) -> dict[str, Any]:
         return {"written": self._written, "routes": self._routes, "direct": self._direct, "geo": self._geo, "usage": self._usage,
@@ -1027,8 +1042,11 @@ class Plugwhen:
 
         def target(weekday: int, dep: datetime | None = None) -> float:
             cal = self._trip_at(v, dep) is not None
-            return compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
-                                learn_km=v.learn_km or cal, min_soc=self._min_soc(v)).target_soc
+            t = compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
+                             learn_km=v.learn_km or cal, min_soc=self._min_soc(v)).target_soc
+            if dep is not None and v.weekly_full and vl.applies(now, dep, v.weekly_day):   # once a week full also into evcc
+                t = max(t, v.weekly_target)
+            return t
 
         week = []
         for wd in range(7):
@@ -1672,8 +1690,10 @@ class Plugwhen:
         load, target_kw = self._load_inputs(now)
         avail, v.availability_source = self._availability(now)
         v.load_used, v.availability_used = load is not None, avail is not None
+        self._weekly_full(v, now, avail)
+        plan_departure = v.departure or (vl.evening(v.weekly_day, now.tzinfo) if v.weekly_active and v.weekly_day else None)
         v.charge_plan = make_plan(
-            now, v.departure or now, v.need.charge_kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
+            now, plan_departure or now, v.need.charge_kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
             load=load, target_kw=target_kw if load is not None else None, available_kw=avail,
             # a wallbox shared with another car: charge compactly (at least three quarters of the wallbox power), so that the other
             # car still fits into the night
@@ -1689,6 +1709,23 @@ class Plugwhen:
             planned_kwh=planned,
         )
 
+    def _weekly_full(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None) -> None:
+        """Once a week full: choose the day (most sun among the allowed days, else the first), raise the target for a plan that
+        includes it, mark the week done when the car got there. The grid fills in what the sun does not deliver."""
+        v.weekly_day = vl.choose_day(now.date(), v.weekly_days, avail, v.weekly_done) if v.weekly_full else None
+        v.weekly_active = vl.applies(now, v.departure, v.weekly_day)
+        if not v.weekly_active or v.need is None:
+            return
+        if vl.reached(v.soc, v.weekly_target):
+            v.weekly_done = vl.week_key(now.date())
+            v.weekly_day, v.weekly_active = None, False
+            return
+        if v.weekly_target > v.need.target_soc:
+            capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
+            charge = max(0.0, (v.weekly_target - (v.soc or 0.0)) / 100.0 * capacity) / max(0.1, self.efficiency_of(v))
+            v.need = replace(v.need, target_soc=round(v.weekly_target, 1), charge_kwh=round(charge, 1), reachable=True,
+                             source="weekly_full")
+
     # ---------- the look-ahead ----------
 
     def _trips(self, v: Vehicle, now: datetime, capacity: float) -> list[Trip]:
@@ -1696,7 +1733,10 @@ class Plugwhen:
         def trip_for(departure: datetime, weekday: int) -> Trip:
             p = v.model.plan(weekday)
             need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km)
-            return Trip(departure, float(p.km_typical or 0.0), need.km)
+            km = need.km
+            if v.weekly_full and vl.applies(now, departure, v.weekly_day):   # once a week full: the range of the full target
+                km = max(km, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
+            return Trip(departure, float(p.km_typical or 0.0), km)
 
         out: list[Trip] = []
         for d in range(HORIZON_DAYS + 1):

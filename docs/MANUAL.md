@@ -52,6 +52,15 @@ and lowest, for example 11 or 22 kW and 1.4 kW for one phase at 6 A). Nothing as
 Why spreading: a wallbox "ready by" at full power charges late and hard (for example 10 kW from 4 to 6 in the morning) and
 sets the monthly peak. Spread over the night the same energy needs 2-3 kW.
 
+**Once a week full (from 0.9.2).** Many makers advise charging the battery full now and then (for example so that the shown state
+of charge stays right). Per car there is the switch *Once a week full* (default off), the *Days for the weekly full charge*
+(default Saturday or Sunday) and the *Target of the weekly full charge* (default 100 %). With a solar forecast Plugwhen takes the
+allowed day still ahead this week with the most sun, without solar the first one. A plan that includes that day gets the higher
+target: sun first, the rest from the grid, so that the car really gets full. As always the plan puts the grid part into the quiet
+hours before the departure, so the battery does not sit full for long. Without a departure that day the car is full by 8 pm.
+Once per week (Monday to Sunday): when the target is reached the normal target counts again until next week. The card
+*Settings* shows for which day the full charge is planned.
+
 ## Plug-in times
 
 Home Assistant keeps the history of a plug sensor only for a few days and binary sensors have no long-term statistics, so
@@ -271,7 +280,7 @@ link gets *Direct*. Never both. To test *Direct*, remove the evcc link of the ca
 | `select` Mode | `off`, `learn`, `evcc` (car linked to evcc) or `direct` (once offered) |
 | `sensor` Charging habit | share of the energy charged at night; attributes `by_weekday`, `day_share_pct`, `weekend_share_pct`, `chart` |
 | `sensor` Does learning help? | `learning_helps`, `reserve_enough`, `little`, `too_little_data`; attributes `coverage_reserve_pct`, `coverage_learned_pct`, `departure_right_pct`, `chart` |
-| `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready | settings |
+| `number` Reserve, `switch` Learn kilometres per weekday, `switch` Warn when the car will not be ready, `switch` Once a week full, `select` Days for the weekly full charge, `number` Target of the weekly full charge | settings |
 
 ## Limits
 

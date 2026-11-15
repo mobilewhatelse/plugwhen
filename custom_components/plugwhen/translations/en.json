@@ -375,11 +375,17 @@
       },
       "share_usage": {
         "name": "Share anonymous data"
+      },
+      "weekly_full": {
+        "name": "Once a week full"
       }
     },
     "number": {
       "reserve_km": {
         "name": "Reserve"
+      },
+      "weekly_target": {
+        "name": "Target of the weekly full charge"
       }
     },
     "select": {
@@ -390,6 +396,16 @@
           "learn": "Learn",
           "evcc": "Via evcc (write plan)",
           "direct": "Direct (Plugwhen controls the wallbox)"
+        }
+      },
+      "weekly_days": {
+        "name": "Days for the weekly full charge",
+        "state": {
+          "weekend": "Saturday or Sunday",
+          "saturday": "Saturday",
+          "sunday": "Sunday",
+          "friday_sunday": "Friday to Sunday",
+          "any_day": "Any day of the week"
         }
       }
     },

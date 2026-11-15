@@ -219,7 +219,19 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 16, "entities of the vehicle exist (16 with 'ready to switch')", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 19, "entities of the vehicle exist (19 with 'ready to switch' and the weekly full charge)", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    wf = find("switch", "once_a_week_full")
+    wd = find("select", "days_for_the_weekly")
+    wt = find("number", "target_of_the_weekly")
+    log(bool(wf and wf["state"] == "off" and wd and wd["state"] == "weekend" and wt and float(wt["state"]) == 100),
+        "weekly full charge: off by default, Saturday or Sunday, 100 %", str([(x or {}).get("entity_id") for x in (wf, wd, wt)]))
+    if wf:   # switched on: the plan counts it (the car is full, or a day is chosen, or none is left this week)
+        svc("switch", "turn_on", {"entity_id": wf["entity_id"]})
+        ok = wait_for(lambda: (state(wf["entity_id"]) or {}).get("state") == "on"
+                      and "done_week" in ((state(wf["entity_id"]) or {}).get("attributes") or {}), 30)
+        a = (state(wf["entity_id"]) or {}).get("attributes") or {}
+        log(bool(ok), "weekly full charge: switch on, its state tells day, active and done", str({k: a.get(k) for k in ("day", "active", "done_week")}))
+        svc("switch", "turn_off", {"entity_id": wf["entity_id"]})
     charge = find("sensor", "energy_to_charge")
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")

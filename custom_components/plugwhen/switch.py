@@ -1,4 +1,5 @@
-"""Switches per vehicle (the last state is restored after a restart): learn the kilometres per weekday, warn (both default on)."""
+"""Switches per vehicle (the last state is restored after a restart): learn the kilometres per weekday, warn (both default on),
+once a week full (default off)."""
 
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from .entity import PlugwhenEntity, PlugwhenMainEntity
 async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddConfigEntryEntitiesCallback) -> None:
     plug = entry.runtime_data
     for sub_id, v in plug.vehicles.items():
-        add([LearnKmSwitch(plug, v), NoticeSwitch(plug, v)], config_subentry_id=sub_id)
+        add([LearnKmSwitch(plug, v), NoticeSwitch(plug, v), WeeklyFullSwitch(plug, v)], config_subentry_id=sub_id)
     add([ShareSwitch(plug)])
 
 
@@ -100,3 +101,44 @@ class ShareSwitch(PlugwhenMainEntity, SwitchEntity, RestoreEntity):
     async def async_turn_off(self, **kwargs) -> None:
         self.plug.share_usage = False
         self.async_write_ha_state()
+
+
+class WeeklyFullSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
+    """On: once a week the car is charged to the full target (days and target are their own settings; vollladen.py). The week in
+    which it was full is kept with the state, so a restart does not charge again."""
+
+    _attr_icon = "mdi:battery-charging-100"
+
+    def __init__(self, plug, vehicle) -> None:
+        super().__init__(plug, vehicle, "weekly_full")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        self.vehicle.weekly_full = last is not None and last.state == "on"   # default off
+        if last is not None and isinstance(last.attributes.get("done_week"), str):
+            self.vehicle.weekly_done = last.attributes["done_week"]
+
+    @property
+    def is_on(self) -> bool:
+        return self.vehicle.weekly_full
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        v = self.vehicle
+        from homeassistant.util import dt as dt_util
+
+        from . import vollladen as vl
+
+        return {"done_week": v.weekly_done, "done": v.weekly_done == vl.week_key(dt_util.now().date()),
+                "day": v.weekly_day.isoformat() if v.weekly_day else None, "active": v.weekly_active}
+
+    async def async_turn_on(self, **kwargs) -> None:
+        self.vehicle.weekly_full = True
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        self.vehicle.weekly_full = False
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
