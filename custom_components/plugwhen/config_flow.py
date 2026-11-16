@@ -18,10 +18,11 @@ from homeassistant.helpers.selector import (
 from .const import (
     DEFAULT_CAPACITY_KWH, DEFAULT_CHARGE_MAX, DEFAULT_CHARGE_MIN, DEFAULT_CONSUMPTION_100, DEFAULT_NOTIFY_HOUR,
     DEFAULT_CHARGE_PREF, DEFAULT_RESERVE_KM, DEFAULT_SOC_MAX_AGE_H, DOMAIN, O_AVAIL, O_GRID_ENERGY, O_LOAD, O_PRICE_HIGH, O_PRICE_LOW,
-    O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
+    O_DIRECT_EARLY, O_EVCC_PASSWORD, O_EVCC_URL, O_ROUTE_WAZE, V_CALENDAR, V_EVCC_VEHICLE, V_STOCK, V_RESERVE_MODE, RESERVE_AFTER, RESERVE_AT, DEFAULT_RESERVE_MODE, V_DAYS_AHEAD, V_DAILY_CAP, O_PRICE_THRESHOLD, O_SOLAR, O_SOLAR_DEDUCT, O_WAECHTER, SUBENTRY_VEHICLE, V_CAPACITY, V_CHARGE_MAX, V_CHARGE_MIN, V_CHARGE_PREF, V_CHARGING,
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_WALLBOX_MORE,
     O_OUTDOOR_TEMP, O_WEATHER,
 )
+from .voraus import DEFAULT_CAP as DEFAULT_DAILY_CAP, DEFAULT_DAYS as DEFAULT_DAYS_AHEAD, MAX_DAYS as MAX_DAYS_AHEAD
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
 from .takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
@@ -75,6 +76,10 @@ def _vehicle_fields(d: dict[str, Any]) -> dict[Any, Any]:
         vol.Required(V_SOC_MAX_AGE, default=d.get(V_SOC_MAX_AGE, DEFAULT_SOC_MAX_AGE_H)): _num(0, 168, 0.01, "h"),
         vol.Required(V_CAPACITY, default=d.get(V_CAPACITY, DEFAULT_CAPACITY_KWH)): _num(5, 250, 0.5, "kWh"),
         vol.Required(V_RESERVE, default=d.get(V_RESERVE, DEFAULT_RESERVE_KM)): _num(0, 600, 5, "km"),
+        vol.Required(V_RESERVE_MODE, default=d.get(V_RESERVE_MODE, DEFAULT_RESERVE_MODE)): SelectSelector(SelectSelectorConfig(
+            options=[RESERVE_AFTER, RESERVE_AT], translation_key="reserve_mode", mode=SelectSelectorMode.DROPDOWN)),
+        vol.Required(V_DAYS_AHEAD, default=d.get(V_DAYS_AHEAD, DEFAULT_DAYS_AHEAD)): _num(1, MAX_DAYS_AHEAD, 1, "d"),
+        vol.Required(V_DAILY_CAP, default=d.get(V_DAILY_CAP, DEFAULT_DAILY_CAP)): _num(50, 100, 5, "%"),
         vol.Required(V_CONSUMPTION, default=d.get(V_CONSUMPTION, DEFAULT_CONSUMPTION_100)): _num(5, 60, 0.5, "kWh/100 km"),
         vol.Required(V_CHARGE_MAX, default=d.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX)): _num(1.4, 50, 0.1, "kW"),
         vol.Required(V_CHARGE_MIN, default=d.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)): _num(0.5, 22, 0.1, "kW"),

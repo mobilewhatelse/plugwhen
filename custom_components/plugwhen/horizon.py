@@ -39,7 +39,8 @@ TINY_KWH = 0.2
 class Trip:
     departure: datetime
     km_typical: float        # the energy the trip is expected to use
-    km_target: float         # the range to have at departure (reserve floor, lifted by the learned high value)
+    km_target: float         # the range to have at departure (the trip with the reserve, as the reserve is set)
+    km_high: float | None = None   # what the trip may use on a long day (learned high value), None = not known
 
 
 SAME_TRIP_WINDOW = timedelta(hours=2)   # a calendar trip this close to a learned departure counts as the same trip

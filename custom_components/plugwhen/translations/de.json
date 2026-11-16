@@ -77,7 +77,10 @@
           "notify_hour": "Warnen ab Uhrzeit",
           "evcc_vehicle": "Fahrzeug in evcc (optional)",
           "trip_calendar": "Kalender mit Fahrten (optional)",
-          "stock_soc": "Vorrat (Mindest-Ladestand)"
+          "stock_soc": "Vorrat (Mindest-Ladestand)",
+          "reserve_mode": "Was die Reserve bedeutet",
+          "days_ahead": "Für so viele Tage auf einmal laden",
+          "daily_cap_soc": "Obergrenze im Alltag für das Laden im Voraus"
         },
         "data_description": {
           "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -98,7 +101,10 @@
           "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
           "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
           "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-          "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
+          "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus.",
+          "reserve_mode": "Bleibt nach der Fahrt übrig: Geladen wird für die Fahrt plus die Reserve. Mindestreichweite bei der Abfahrt: wie vor 0.10, die Fahrt ist in der Reserve schon enthalten.",
+          "days_ahead": "Geladen wird erst, wenn der Akku unter dem Bedarf der nächsten Fahrt liegt, dann aber gleich für die Fahrten so vieler Tage: seltener und mehr auf einmal. Mit Solarprognose bleibt der Teil frei, den die Sonne zu Hause liefern kann. 1 = jeder Tag für sich.",
+          "daily_cap_soc": "Hier endet das Laden für mehrere Tage. Eine lange Fahrt oder das wöchentliche Volladen gehen trotzdem darüber."
         }
       },
       "finish": {
@@ -203,7 +209,10 @@
             "notify_hour": "Warnen ab Uhrzeit",
             "evcc_vehicle": "Fahrzeug in evcc (optional)",
             "trip_calendar": "Kalender mit Fahrten (optional)",
-            "stock_soc": "Vorrat (Mindest-Ladestand)"
+            "stock_soc": "Vorrat (Mindest-Ladestand)",
+            "reserve_mode": "Was die Reserve bedeutet",
+            "days_ahead": "Für so viele Tage auf einmal laden",
+            "daily_cap_soc": "Obergrenze im Alltag für das Laden im Voraus"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -224,7 +233,10 @@
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
             "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
             "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus.",
+            "reserve_mode": "Bleibt nach der Fahrt übrig: Geladen wird für die Fahrt plus die Reserve. Mindestreichweite bei der Abfahrt: wie vor 0.10, die Fahrt ist in der Reserve schon enthalten.",
+            "days_ahead": "Geladen wird erst, wenn der Akku unter dem Bedarf der nächsten Fahrt liegt, dann aber gleich für die Fahrten so vieler Tage: seltener und mehr auf einmal. Mit Solarprognose bleibt der Teil frei, den die Sonne zu Hause liefern kann. 1 = jeder Tag für sich.",
+            "daily_cap_soc": "Hier endet das Laden für mehrere Tage. Eine lange Fahrt oder das wöchentliche Volladen gehen trotzdem darüber."
           }
         },
         "reconfigure": {
@@ -250,7 +262,10 @@
             "notify_hour": "Warnen ab Uhrzeit",
             "evcc_vehicle": "Fahrzeug in evcc (optional)",
             "trip_calendar": "Kalender mit Fahrten (optional)",
-            "stock_soc": "Vorrat (Mindest-Ladestand)"
+            "stock_soc": "Vorrat (Mindest-Ladestand)",
+            "reserve_mode": "Was die Reserve bedeutet",
+            "days_ahead": "Für so viele Tage auf einmal laden",
+            "daily_cap_soc": "Obergrenze im Alltag für das Laden im Voraus"
           },
           "data_description": {
             "odometer_entity": "Sensor mit dem Kilometerstand (km oder Meilen). Er braucht Langzeitstatistik (eine Zustandsklasse), daraus lernt Plugwhen.",
@@ -271,7 +286,10 @@
             "notify_hour": "Ab dieser Abendstunde wird gewarnt, einmal je Abfahrt.",
             "evcc_vehicle": "Dann kommen „angesteckt“ und „lädt“ aus evcc, solange dafür kein Sensor eingetragen ist. Kilometerstand und Ladestand bleiben die Sensoren des Autos.",
             "trip_calendar": "Jeder Termin ist eine Fahrt: Beginn = Abfahrt, Kilometer im Titel („Linz 200 km“) oder aus dem Ort, hin und zurück, außer es steht „einfach“ dabei. Ganztägige Termine zählen nicht.",
-            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus."
+            "stock_soc": "Darunter plant Plugwhen nie, damit das Auto auch für eine ungeplante Fahrt bereit ist. 0 = aus.",
+            "reserve_mode": "Bleibt nach der Fahrt übrig: Geladen wird für die Fahrt plus die Reserve. Mindestreichweite bei der Abfahrt: wie vor 0.10, die Fahrt ist in der Reserve schon enthalten.",
+            "days_ahead": "Geladen wird erst, wenn der Akku unter dem Bedarf der nächsten Fahrt liegt, dann aber gleich für die Fahrten so vieler Tage: seltener und mehr auf einmal. Mit Solarprognose bleibt der Teil frei, den die Sonne zu Hause liefern kann. 1 = jeder Tag für sich.",
+            "daily_cap_soc": "Hier endet das Laden für mehrere Tage. Eine lange Fahrt oder das wöchentliche Volladen gehen trotzdem darüber."
           }
         }
       },
@@ -447,6 +465,14 @@
             }
           }
         }
+      }
+    }
+  },
+  "selector": {
+    "reserve_mode": {
+      "options": {
+        "after_trip": "Bleibt nach der Fahrt übrig",
+        "at_departure": "Mindestreichweite bei der Abfahrt"
       }
     }
   }

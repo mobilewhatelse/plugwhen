@@ -63,7 +63,7 @@ TEXT = {
         lm_journal="Letzte Entscheidungen", lm_none="Noch keine Entscheidungen.", lm_off="Probelauf aus. Fahrten und Verbrauch lernt Plugwhen trotzdem weiter.",
         lm_needless="Ohne Bedarf geladen (zum Beispiel mit Sonne)", lm_needless_in="kWh in den letzten 7 Tagen",
         lm_note="Im Lernmodus wird nichts geschaltet: Plugwhen schreibt nur auf, was es tun würde, und vergleicht das mit dem, was die Wallbox wirklich getan hat. Die Wallbox läuft weiter wie bisher.",
-        soc="Ladestand jetzt", plugged="angesteckt", yes="ja", no="nein", unknown="unbekannt", goal="Ziel bei Abfahrt",
+        soc="Ladestand jetzt", plugged="angesteckt", yes="ja", no="nein", unknown="unbekannt", goal="Ziel bei Abfahrt", ahead_fill="lädt im Voraus bis", ahead_days="Tage", ahead_sun="der Sonne überlassen",
         basis="Grundlage", b_learned="gelernter hoher Wert des Wochentags (länger als die Reserve)",
         b_away="nur die Reserve (an diesem Wochentag wird meist unterwegs geladen)", b_plus="Reserve plus gelernter Wert",
         b_reserve="die Reserve", unreachable="Achtung: das Ziel ist mit dem Akku nicht erreichbar.",
@@ -165,7 +165,7 @@ TEXT = {
         lm_journal="Latest decisions", lm_none="No decisions yet.", lm_off="Trial run off. Plugwhen still keeps learning trips and consumption.",
         lm_needless="Charged although nothing was needed (for example with the sun)", lm_needless_in="kWh in the last 7 days",
         lm_note="Nothing is switched in learn mode: Plugwhen only writes down what it would do and compares it with what the wallbox really did. The wallbox keeps working as before.",
-        soc="State of charge now", plugged="plugged in", yes="yes", no="no", unknown="unknown", goal="Target at departure",
+        soc="State of charge now", plugged="plugged in", yes="yes", no="no", unknown="unknown", goal="Target at departure", ahead_fill="charging ahead to", ahead_days="days", ahead_sun="left to the sun",
         basis="Based on", b_learned="the weekday's learned high value (longer than the reserve)",
         b_away="only the reserve (on this weekday the car mostly charges elsewhere)", b_plus="reserve plus learned value",
         b_reserve="the reserve", unreachable="Note: the target cannot be reached with this battery.",
@@ -246,7 +246,11 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% set at = " + need + " %}"
         f"**{t['soc']}:** {{{{ at.soc if at.soc is not none else '–' }}}} % · "
         f"**{t['plugged']}:** {{{{ '{t['yes']}' if at.plugged else ('{t['no']}' if at.plugged is false else '{t['unknown']}') }}}} · "
-        f"**{t['goal']}:** {{{{ at.target_soc }}}} % ({{{{ at.range_km }}}} km)"
+        f"**{t['goal']}:** {{{{ at.get('must_soc') or at.target_soc }}}} % ({{{{ at.range_km }}}} km)"
+        "{% set ah = at.get('ahead') %}{% if ah and ah.filling %}"
+        f" · **{t['ahead_fill']}:** {{{{ ah.target_soc }}}} % ({{{{ ah.days }}}} {t['ahead_days']})"
+        f"{{% if ah.sun_kwh > 0 %}} · {t['ahead_sun']} {{{{ ah.sun_kwh }}}} kWh{{% endif %}}"
+        "{% endif %}"
         f"{{% if at.reachable is false %}}\n\n**{t['unreachable']}**{{% endif %}}"
         "{% set tip = state_attr('" + ids["charge_plan"] + "', 'tip') %}{% if tip %}\n\n**{{ tip }}**{% endif %}"
     )

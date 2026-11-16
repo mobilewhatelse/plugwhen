@@ -105,6 +105,37 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual(len(chart), 1)
         self.assertEqual(chart[0]["conditions"][0], {"condition": "state", "entity": i["would_switch"], "state_not": "off"})
 
+    def test_status_line_shows_the_next_trip_and_a_charge_ahead(self):
+        """Strictly rendered: a car without the new attributes (an older state) must still render."""
+        import jinja2
+
+        i = ids("x")
+        views = build_views([{"name": "X", "ids": i}], "de")
+        cards = [c for v in views for s in v["sections"] for g in s["cards"] for c in g.get("cards", [g])]
+        md = [c for c in cards if c["type"] == "markdown" and "**Ziel bei Abfahrt:**" in c["content"] and "angesteckt" in c["content"]]
+        self.assertEqual(len(md), 1)
+
+        def render(attrs: dict) -> str:
+            ent = type("E", (), {"attributes": attrs})()
+
+            class States:
+                def __getattr__(self, domain):
+                    return type("D", (), {"__getattr__": lambda self, name: ent})()
+
+            env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+            return env.from_string(md[0]["content"]).render(states=States(), state_attr=lambda e, a: None)
+
+        base = {"soc": 30, "plugged": True, "target_soc": 75.7, "range_km": 146.0, "reachable": True}
+        old_state = render(base)
+        self.assertIn("**Ziel bei Abfahrt:** 75.7 % (146.0 km)", old_state)
+        self.assertNotIn("im Voraus", old_state)
+        ahead = {"filling": True, "target_soc": 75.7, "days": 3, "sun_kwh": 0.0}
+        filling = render({**base, "must_soc": 46.5, "ahead": ahead})
+        self.assertIn("**Ziel bei Abfahrt:** 46.5 % (146.0 km) · **lädt im Voraus bis:** 75.7 % (3 Tage)", filling)
+        self.assertNotIn("Sonne", filling)
+        self.assertIn("der Sonne überlassen 6.3 kWh", render({**base, "must_soc": 46.5, "ahead": {**ahead, "sun_kwh": 6.3}}))
+        self.assertNotIn("im Voraus", render({**base, "must_soc": 46.5, "ahead": {**ahead, "filling": False}}))
+
     def test_fleet_card_only_while_sharing_is_off(self):
         main = {"feedback_text": "text.fb", "feedback_send": "button.fb", "share_usage": "switch.share"}
         for lang, words in (("de", "Flottenwerte sind aus"), ("en", "Fleet values are off")):

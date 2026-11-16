@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.10.0 - unreleased - the reserve stays after the trip, charging for several days
+
+- **The reserve is left after the trip (new default, selectable per car).** Until now the reserve was the least range at the
+  departure and already contained the trip: with 100 km reserve and a 46 km day the car left with 100 km and came home with 54.
+  Now it is charged for the trip plus the reserve. *Least range at the departure* (as before) can be chosen in the car's settings.
+  **This changes the targets of existing cars: they get higher.**
+- **Charging for several days at once.** Charging starts when the battery is below what the next trip needs and then fills for
+  the trips of the next days (default 3, 1 = every day on its own) up to an everyday limit (default 80 %). Replayed with 255 real
+  days of one car: 3.2 charges a week of 26 kWh instead of 5.6 of 13 kWh, a third of them below 8 kWh. The warning, the promise
+  and the safety check only look at the next trip, so nobody is told to plug in every day.
+- **With a solar plant the sun comes first:** what the forecast promises while the car stands at home between the coming trips is
+  left to the sun, only the rest is taken from the grid. Without a forecast nothing is left out.
+- Create the dashboard again: the status line shows the target of the next trip and, while it runs, what a charge ahead fills to.
+  *Deutsch:* **Die Reserve bleibt nach der Fahrt übrig (neuer Standard, je Auto wählbar).** Bisher war die Reserve die
+  Mindestreichweite bei der Abfahrt, die Fahrt war darin schon enthalten: mit 100 km Reserve und einem Tag mit 46 km fuhr das Auto
+  mit 100 km los und kam mit 54 km heim. Jetzt wird für die Fahrt plus die Reserve geladen. *Mindestreichweite bei der Abfahrt*
+  (wie bisher) ist in den Einstellungen des Autos wählbar. **Das ändert die Ziele bestehender Autos: sie werden höher.**
+  **Für mehrere Tage auf einmal laden.** Geladen wird, wenn der Akku unter dem Bedarf der nächsten Fahrt liegt, dann gleich für
+  die Fahrten der nächsten Tage (Standard 3, 1 = jeder Tag für sich) bis zu einer Obergrenze im Alltag (Standard 80 %). Mit 255
+  echten Tagen eines Autos nachgerechnet: 3,2 Ladungen pro Woche mit 26 kWh statt 5,6 mit 13 kWh, davon ein Drittel unter 8 kWh.
+  Warnung, Zusage und Sicherheitsprüfung gelten nur der nächsten Fahrt, niemand wird täglich zum Anstecken ermahnt.
+  **Mit Solaranlage kommt zuerst die Sonne:** Was die Prognose für die Standzeit zwischen den nächsten Fahrten verspricht,
+  bleibt der Sonne überlassen, nur der Rest kommt aus dem Netz. Ohne Prognose wird nichts ausgelassen.
+  Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
+
 ## 0.9.2 - unreleased - once a week full
 
 - **Safety check before every departure (wish of a user after the field test):** from three hours before every departure, every

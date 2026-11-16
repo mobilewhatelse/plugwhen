@@ -46,7 +46,9 @@ from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
 from .horizon import Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
-from .need import MIN_SAMPLES, Need, compute_need
+from .need import MIN_SAMPLES, MODE_FLOOR, MODE_PLUS, Need, compute_need
+from .const import DEFAULT_RESERVE_MODE, RESERVE_AT, V_DAILY_CAP, V_DAYS_AHEAD, V_RESERVE_MODE
+from . import voraus
 from .startwerte import charge_efficiency
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, should_check
 from .plan import make_plan
@@ -139,6 +141,8 @@ class Vehicle:
     weekly_active: bool = False              # the full charge counts for the current plan
     weekly_hold: datetime | None = None      # the departure the full charge counted for; kept past midnight (restored with the switch)
     weekly_hold_day: date | None = None      # the chosen day of that kept full charge
+    need_must: Need | None = None            # the need of the next trip alone (warning, promise and safety check use this one)
+    ahead: dict | None = None                # charging for several days: must, comfort, sun left out, fill running (voraus.py)
     promise: Any = None                      # safety check: the highest planned target for the coming departure (sicherheit.py)
     promise_source: str | None = None        # where the promised departure came from (calendar, entity, learned)
     safety_alarm: Any = None                 # safety check: the alarm the user is still to be told about (after switching)
@@ -746,8 +750,15 @@ class Plugwhen:
         p = v.model.plan(weekday)
         t = self._trip_at(v, dep)
         if t and t.get("range_km"):
-            p = replace(p, km_typical=t["km"], km_high=t["range_km"], samples=max(p.samples, MIN_SAMPLES), home_charge_share=None)
+            # reserve left after the trip: the trip's kilometres (the reserve is added to them); else the range with its margin
+            high = t["km"] if self._need_mode(v) == MODE_PLUS and t.get("km") else t["range_km"]
+            p = replace(p, km_typical=t["km"], km_high=high, samples=max(p.samples, MIN_SAMPLES), home_charge_share=None)
         return p
+
+    @staticmethod
+    def _need_mode(v: Vehicle) -> str:
+        """How the reserve counts: left after the trip (the default: trip plus reserve) or the least range at the departure."""
+        return MODE_FLOOR if v.cfg.get(V_RESERVE_MODE, DEFAULT_RESERVE_MODE) == RESERVE_AT else MODE_PLUS
 
     # ---------- mode 'direct': Plugwhen controls the wallbox ----------
 
@@ -1191,7 +1202,9 @@ class Plugwhen:
         def target(weekday: int, dep: datetime | None = None) -> float:
             cal = self._trip_at(v, dep) is not None
             t = compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
-                             learn_km=v.learn_km or cal, min_soc=self._min_soc(v)).target_soc
+                             learn_km=v.learn_km or cal, min_soc=self._min_soc(v), mode=self._need_mode(v)).target_soc
+            if dep is not None and dep == v.departure and v.need is not None and v.need.source == "ahead":
+                t = max(t, v.need.target_soc)   # a fill for several days is running: evcc charges to it too
             if dep is not None and v.weekly_full and self._weekly_applies(v, now, dep):   # once a week full also into evcc
                 t = max(t, v.weekly_target)
             return t
@@ -1826,7 +1839,9 @@ class Plugwhen:
                 v.fleet_cars = entry.get("autos") if src == "fleet_model" else (self._fleet.get("modelle") or {}).get("autos")
         v.need = compute_need(
             v.plan, v.reserve_km, v.soc, float(v.cfg.get(V_CAPACITY) or 60.0), v.consumption,
-            learn_km=v.learn_km or v.departure_source == "calendar", efficiency=self.efficiency_of(v), min_soc=self._min_soc(v))
+            learn_km=v.learn_km or v.departure_source == "calendar", efficiency=self.efficiency_of(v), min_soc=self._min_soc(v),
+            mode=self._need_mode(v))
+        v.need_must, v.ahead = v.need, None
 
         max_kw = float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX))
         if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
@@ -1840,6 +1855,8 @@ class Plugwhen:
         avail, v.availability_source = self._availability(now)
         v.load_used, v.availability_used = load is not None, avail is not None
         self._weekly_full(v, now, avail)
+        v.need_must = v.need   # the next trip alone (with the weekly full charge): what is promised and warned about
+        self._look_ahead(v, now, avail, max_kw)
         plan_departure = v.departure or (vl.evening(v.weekly_day, now.tzinfo) if v.weekly_active and v.weekly_day else None)
         v.charge_plan = make_plan(
             now, plan_departure or now, v.need.charge_kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
@@ -1853,8 +1870,8 @@ class Plugwhen:
         v.horizon = self._horizon(v, now, avail, max_kw)
         hours = (v.departure - now).total_seconds() / 3600.0 if v.departure else None
         planned = v.charge_plan["planned_kwh"] if v.charge_plan["status"] == "planned" else None
-        v.notice = check_ready(
-            v.need, v.soc, plugged=v.plugged, charging=v.charging, hours_to_departure=hours, charge_kw_max=max_kw,
+        v.notice = check_ready(   # the next trip alone: nobody is told to plug in for the days after it
+            v.need_must, v.soc, plugged=v.plugged, charging=v.charging, hours_to_departure=hours, charge_kw_max=max_kw,
             planned_kwh=planned,
         )
         # safety check: keep the promise for the coming departure, and note when a planned window runs without charging
@@ -1863,7 +1880,7 @@ class Plugwhen:
             still = self._trip_at(v, v.promise.departure) is not None
         elif v.promise is not None and v.promise_source == "entity":
             still = False
-        promise = sicherheit.update_promise(v.promise, v.departure, v.need.target_soc, v.plugged, now, still)
+        promise = sicherheit.update_promise(v.promise, v.departure, v.need_must.target_soc, v.plugged, now, still)
         if promise is None or v.promise is None or promise.departure != v.promise.departure:
             v.promise_source = v.departure_source if promise is not None else None
         v.promise = promise
@@ -1871,6 +1888,36 @@ class Plugwhen:
         # only a wallbox that says it does not charge counts: one that is not reachable (Wi-Fi restart at night) says nothing
         known = (self._is_on(v.cfg.get(V_CHARGING)) is not None) if v.cfg.get(V_CHARGING) else v.evcc_live is not None
         v.stall_since = sicherheit.stall_start(v.stall_since, now, running, v.plugged, known, v.charging)
+
+    def _look_ahead(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None, max_kw: float) -> None:
+        """Charging for several days at once (voraus.py): below the need of the next trip a charge starts and fills to the
+        trips of the next days, at most the everyday limit; what the forecast sun brings at home in between is left to the sun.
+        The fill survives a restart (kept with what Plugwhen set on the wallbox)."""
+        if v.soc is None or v.need is None or v.departure is None:
+            return
+        capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
+        mine = self._direct.setdefault(v.sub_id, {})
+        filling = bool(mine.get("ahead_filling"))
+        eff = self.efficiency_of(v)
+        try:
+            a = voraus.look_ahead(
+                now, self._trips(v, now, capacity), v.departure, v.soc, v.need.target_soc,
+                days=int(v.cfg.get(V_DAYS_AHEAD, voraus.DEFAULT_DAYS) or 1), cap_soc=float(v.cfg.get(V_DAILY_CAP, voraus.DEFAULT_CAP)),
+                capacity_kwh=capacity, consumption=v.consumption, efficiency=eff, filling=filling, plugged=v.plugged,
+                sun_kw=avail, max_kw=max_kw)
+        except Exception as err:  # noqa: BLE001 - the look-ahead must never disturb the plan for the next trip
+            _LOGGER.debug("Plugwhen: charging ahead of %s failed: %s", v.name, err)
+            return
+        v.ahead = a.as_dict()
+        if a.filling != filling:
+            if a.filling:
+                mine["ahead_filling"] = True
+            else:
+                mine.pop("ahead_filling", None)
+            self._evcc_store.async_delay_save(self._evcc_data, 30)
+        if a.target_soc > v.need.target_soc + 0.05:
+            charge = max(0.0, (a.target_soc - v.soc) / 100.0 * capacity) / max(0.1, eff)
+            v.need = replace(v.need, target_soc=a.target_soc, charge_kwh=round(charge, 1), source="ahead")
 
     @staticmethod
     def _weekly_applies(v: Vehicle, now: datetime, departure: datetime | None) -> bool:
@@ -1913,11 +1960,12 @@ class Plugwhen:
         """The coming departures (learned, the early hour; an entity departure wins for its day) with the expected and the planned range."""
         def trip_for(departure: datetime, weekday: int) -> Trip:
             p = v.model.plan(weekday)
-            need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km)
+            need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km, mode=self._need_mode(v))
             km = need.km
+            high = p.km_high if v.learn_km and p.samples >= MIN_SAMPLES and p.km_high is not None else None
             if v.weekly_full and self._weekly_applies(v, now, departure):   # once a week full: the range of the full target
                 km = max(km, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
-            return Trip(departure, float(p.km_typical or 0.0), km)
+            return Trip(departure, float(p.km_typical or 0.0), km, high)
 
         out: list[Trip] = []
         for d in range(HORIZON_DAYS + 1):
@@ -1938,7 +1986,9 @@ class Plugwhen:
             d = dt_util.parse_datetime(t["departure"])
             if d is None or d <= now:
                 continue
-            cal.append(Trip(d, float(t["km"]), float(t["range_km"])) if t.get("km") else trip_for(d, d.weekday()))
+            after = self._need_mode(v) == MODE_PLUS   # reserve left after the trip: its kilometres plus the reserve
+            cal.append(Trip(d, float(t["km"]), float(t["km"]) + v.reserve_km if after else float(t["range_km"]), float(t["km"]))
+                       if t.get("km") else trip_for(d, d.weekday()))
         # a calendar trip replaces the learned departure only when it is the same trip (within two hours); calendar trips never replace each other
         return with_calendar(out, cal)[:HORIZON_TRIPS]
 

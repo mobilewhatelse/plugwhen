@@ -66,6 +66,8 @@ class NeedChargeSensor(PlugwhenEntity, SensorEntity):
             "range_km": n.km if n else None,
             "energy_kwh": n.kwh if n else None,
             "target_soc": n.target_soc if n else None,
+            "must_soc": v.need_must.target_soc if v.need_must else None,
+            "ahead": v.ahead,
             "soc": v.soc,
             "soc_stale": v.soc_stale,
             "soc_age_h": round(v.soc_age_s / 3600.0, 2) if v.soc_age_s is not None else None,

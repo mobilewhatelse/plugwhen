@@ -42,8 +42,15 @@ z. B. 11 oder 22 kW und 1,4 kW für einphasig 6 A). Eine bestimmte Marke wird ni
 
 ## Wie geplant wird
 
-1. **Bedarf:** Die Reserve ist die Untergrenze der Reichweite bei der Abfahrt. Ist *Kilometer je Wochentag lernen* an, hebt der gelernte hohe Wert
-   eines Wochentags sie bei Bedarf an. Daraus folgen Ziel-Ladestand und Energie (mit Ladeverlusten).
+1. **Bedarf:** die Fahrt des Tages (der gelernte hohe Wert des Wochentags, mit *Kilometer je Wochentag lernen*) **plus die Reserve**: Die
+   Reserve bleibt nach der Fahrt übrig (Standard ab 0.10). Wer es wie früher will, wählt beim Auto *Mindestreichweite bei der Abfahrt*: dann
+   ist die Reserve die Untergrenze, in der die Fahrt schon enthalten ist. Daraus folgen Ziel-Ladestand und Energie (mit Ladeverlusten).
+   **Für mehrere Tage auf einmal (ab 0.10):** Geladen wird erst, wenn der Akku unter dem Bedarf der nächsten Fahrt liegt, dann aber gleich
+   für die Fahrten der nächsten Tage (Einstellung *Für so viele Tage auf einmal laden*, Standard 3; 1 = jeder Tag für sich), höchstens bis
+   zur *Obergrenze im Alltag* (Standard 80 %; eine lange Fahrt oder das wöchentliche Volladen gehen darüber). Das gibt weniger und größere
+   Ladungen, und niemand muss täglich anstecken: Warnung, Zusage und Sicherheitsprüfung gelten nur der nächsten Fahrt. **Mit Solaranlage
+   kommt zuerst die Sonne:** Was die Prognose für die Zeit verspricht, in der das Auto zwischen den nächsten Fahrten zu Hause steht, bleibt
+   der Sonne überlassen; nur der Rest kommt aus dem Netz. Die nächste Fahrt wird immer rechtzeitig geladen.
 2. **Zuerst die Sonne:** Solange das Auto zu Hause steht, wird zuerst der erwartete Sonnenüberschuss genutzt. Er kommt aus der **Solarprognose des
    Energie-Dashboards** (jede dort eingerichtete: Forecast.Solar, Solcast, Open-Meteo …) minus einem Abzug für Haus und Hausakku (Standard 0,5 kW).
    Die Last-Prognose des Wächters wird dafür bewusst nicht abgezogen: Sie ist Netzbezug, tagsüber steckt die Sonne schon darin.

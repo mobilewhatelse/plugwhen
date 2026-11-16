@@ -37,9 +37,16 @@ and lowest, for example 11 or 22 kW and 1.4 kW for one phase at 6 A). Nothing as
 
 ## How it plans
 
-1. **Need:** the reserve is the floor of the range the car leaves with; with *Learn kilometres per weekday* on, a weekday's learned
-   high value raises it when needed. Target state of charge = state of charge needed for that range; energy = what is missing,
-   with charging losses.
+1. **Need:** the trip of the day (the weekday's learned high value, with *Learn kilometres per weekday*) **plus the reserve**: the
+   reserve is left after the trip (default from 0.10). If you want it as before, choose *Least range at the departure* for the car:
+   then the reserve is the floor that already contains the trip. Target state of charge = state of charge needed for that range;
+   energy = what is missing, with charging losses.
+   **For several days at once (from 0.10):** charging starts only when the battery is below what the next trip needs, and then fills
+   for the trips of the next days (setting *Charge for this many days at once*, default 3; 1 = every day on its own), at most up to
+   the *everyday limit* (default 80 %; a long trip or the weekly full charge go above). Fewer and larger charges, and nobody has to
+   plug in every day: the warning, the promise and the safety check only look at the next trip. **With a solar plant the sun comes
+   first:** what the forecast promises for the time the car stands at home between the coming trips is left to the sun; only the
+   rest comes from the grid. The next trip is always charged in time.
 2. **Sun first:** while the car is at home, the expected solar surplus is used first. It comes from the **solar forecast of the
    Energy dashboard** (any forecast set up there: Forecast.Solar, Solcast, Open-Meteo ...) minus a deduction for the house and a
    home battery (default 0.5 kW). An *availability* sensor (for example an energy community or a tariff signal, attributes

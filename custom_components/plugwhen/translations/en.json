@@ -77,7 +77,10 @@
           "notify_hour": "Warn from this hour",
           "evcc_vehicle": "Vehicle in evcc (optional)",
           "trip_calendar": "Calendar with trips (optional)",
-          "stock_soc": "Stock (minimum state of charge)"
+          "stock_soc": "Stock (minimum state of charge)",
+          "reserve_mode": "What the reserve means",
+          "days_ahead": "Charge for this many days at once",
+          "daily_cap_soc": "Everyday limit for charging ahead"
         },
         "data_description": {
           "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -98,7 +101,10 @@
           "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
           "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
           "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
-          "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
+          "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off.",
+          "reserve_mode": "Left after the trip: the car is charged for the trip plus the reserve. Least range at the departure: as before 0.10, the reserve already contains the trip.",
+          "days_ahead": "Charging starts when the battery is below what the next trip needs, and then fills for the trips of this many days: fewer and larger charges. With a solar forecast the part the sun can deliver at home is left to the sun. 1 = every day on its own.",
+          "daily_cap_soc": "Charging for several days ends here. A long trip or the weekly full charge still go above."
         }
       },
       "finish": {
@@ -203,7 +209,10 @@
             "notify_hour": "Warn from this hour",
             "evcc_vehicle": "Vehicle in evcc (optional)",
             "trip_calendar": "Calendar with trips (optional)",
-            "stock_soc": "Stock (minimum state of charge)"
+            "stock_soc": "Stock (minimum state of charge)",
+            "reserve_mode": "What the reserve means",
+            "days_ahead": "Charge for this many days at once",
+            "daily_cap_soc": "Everyday limit for charging ahead"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -224,7 +233,10 @@
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
             "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
             "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
-            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off.",
+            "reserve_mode": "Left after the trip: the car is charged for the trip plus the reserve. Least range at the departure: as before 0.10, the reserve already contains the trip.",
+            "days_ahead": "Charging starts when the battery is below what the next trip needs, and then fills for the trips of this many days: fewer and larger charges. With a solar forecast the part the sun can deliver at home is left to the sun. 1 = every day on its own.",
+            "daily_cap_soc": "Charging for several days ends here. A long trip or the weekly full charge still go above."
           }
         },
         "reconfigure": {
@@ -250,7 +262,10 @@
             "notify_hour": "Warn from this hour",
             "evcc_vehicle": "Vehicle in evcc (optional)",
             "trip_calendar": "Calendar with trips (optional)",
-            "stock_soc": "Stock (minimum state of charge)"
+            "stock_soc": "Stock (minimum state of charge)",
+            "reserve_mode": "What the reserve means",
+            "days_ahead": "Charge for this many days at once",
+            "daily_cap_soc": "Everyday limit for charging ahead"
           },
           "data_description": {
             "odometer_entity": "Sensor with the odometer (km or miles). It needs long-term statistics (a state class), that is where Plugwhen learns from.",
@@ -271,7 +286,10 @@
             "notify_hour": "The warning is sent from this hour of the evening on, once per departure.",
             "evcc_vehicle": "Then plugged in and charging come from evcc as long as no sensor is set for them. Odometer and state of charge stay the car's own sensors.",
             "trip_calendar": "Every event is a trip: start = departure, kilometres in the title (“Linz 200 km”) or from the location, there and back unless it says “one way”. All-day events are ignored.",
-            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off."
+            "stock_soc": "Plugwhen never plans below this, so the car is ready for an unplanned trip too. 0 = off.",
+            "reserve_mode": "Left after the trip: the car is charged for the trip plus the reserve. Least range at the departure: as before 0.10, the reserve already contains the trip.",
+            "days_ahead": "Charging starts when the battery is below what the next trip needs, and then fills for the trips of this many days: fewer and larger charges. With a solar forecast the part the sun can deliver at home is left to the sun. 1 = every day on its own.",
+            "daily_cap_soc": "Charging for several days ends here. A long trip or the weekly full charge still go above."
           }
         }
       },
@@ -447,6 +465,14 @@
             }
           }
         }
+      }
+    }
+  },
+  "selector": {
+    "reserve_mode": {
+      "options": {
+        "after_trip": "Left after the trip",
+        "at_departure": "Least range at the departure"
       }
     }
   }

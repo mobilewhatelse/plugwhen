@@ -50,6 +50,12 @@ DEFAULT_CHARGE_PREF = 4.0
 CALIBRATE_INTERVAL = timedelta(hours=24)  # learn the house-specific numbers again (quarter add, base load, solar accuracy)
 V_NOTIFY = "notify_service"               # optional: e.g. notify.mobile_app_phone
 V_CALENDAR = "trip_calendar"               # optional: calendar whose events are trips of this car (start = departure, km in the title or from the location)
+V_RESERVE_MODE = "reserve_mode"            # what the reserve means: left after the trip (default) or the least range at the departure
+RESERVE_AFTER = "after_trip"
+RESERVE_AT = "at_departure"
+DEFAULT_RESERVE_MODE = RESERVE_AFTER
+V_DAYS_AHEAD = "days_ahead"                # the trips of this many days are charged at once (1 = every day on its own; voraus.py)
+V_DAILY_CAP = "daily_cap_soc"              # everyday limit of that charge in % (a long trip or the weekly full charge go above)
 V_STOCK = "stock_soc"                      # optional: never plan below this state of charge (a stock for unplanned trips), 0 = off
 V_EVCC_VEHICLE = "evcc_vehicle"            # optional: the car's name in evcc (plugged in / charging when no sensor is set)
 V_NOTIFY_HOUR = "notify_hour"             # the warning is sent from this hour of the evening on

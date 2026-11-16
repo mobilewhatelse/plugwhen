@@ -244,6 +244,10 @@ def main():
         log(bool(ok), "weekly full charge: switch on, its state tells day, active and done", str({k: a.get(k) for k in ("day", "active", "done_week")}))
         svc("switch", "turn_off", {"entity_id": wf["entity_id"]})
     charge = find("sensor", "energy_to_charge")
+    if charge:   # 0.10: the reserve is left after the trip (default), and the sensor tells must and the charge ahead
+        a = (state(charge["entity_id"]) or {}).get("attributes", {})
+        log("must_soc" in a and "ahead" in a, "need sensor tells the target of the next trip and the charge ahead",
+            str({k: a.get(k) for k in ("target_soc", "must_soc", "ahead")}))
     rng = find("sensor", "range_needed")
     soc_t = find("sensor", "target_state_of_charge")
     reserve = find("number", "reserve")
