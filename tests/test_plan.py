@@ -93,6 +93,39 @@ class PlanTest(unittest.TestCase):
         night = [kw for t, kw in p["quarters"].items() if t not in avail]
         self.assertLess(max(night), 2.5)
 
+    def test_grid_energy_is_planned_behind_the_sun_when_it_fits(self):
+        """Review of 0.10: with sun at midday the grid part was also put into the morning before it. A battery filled from the
+        grid in the morning has no room for a sun that turns out stronger than forecast."""
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        dep = now + timedelta(hours=23)                                   # tomorrow 07:00
+        sun = {now + timedelta(hours=3, minutes=15 * k): 5.0 for k in range(12)}   # 11:00 to 14:00, 15 kWh
+        quiet_morning = [{"t": now + timedelta(minutes=15 * k), "typical": 0.1, "high": 0.2 if k < 12 else 1.5, "n": 4}
+                         for k in range(92)]                              # the house is quietest before the sun comes
+        p = make_plan(now, dep, 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0, load=quiet_morning)
+        self.assertEqual(p["status"], "planned")
+        self.assertAlmostEqual(p["available_kwh"], 15.0, places=1)
+        grid = [t for t in p["quarters"] if t not in sun]
+        self.assertGreater(min(grid), max(sun))                           # nothing from the grid before or during the sun
+        self.assertLessEqual(max(p["quarters"][t] for t in grid), 4.05)   # and no higher power than the preferred one
+
+    def test_when_it_does_not_fit_behind_the_sun_the_whole_time_is_used(self):
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        dep = now + timedelta(hours=7)                                    # 15:00, one hour after the sun
+        sun = {now + timedelta(hours=3, minutes=15 * k): 5.0 for k in range(12)}
+        p = make_plan(now, dep, 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0)
+        self.assertEqual(p["status"], "planned")
+        self.assertAlmostEqual(p["planned_kwh"], 30.0, places=1)
+        self.assertLess(min(t for t in p["quarters"] if t not in sun), min(sun))   # the morning is needed too
+
+    def test_behind_the_sun_never_means_a_higher_power(self):
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        dep = now + timedelta(hours=8)                                    # two hours after the sun: 15 kWh would need 7.5 kW there
+        sun = {now + timedelta(hours=3, minutes=15 * k): 5.0 for k in range(12)}
+        p = make_plan(now, dep, 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0)
+        grid = [t for t in p["quarters"] if t not in sun]
+        self.assertLess(max(p["quarters"][t] for t in grid), 6.0)         # spread over morning and afternoon instead
+        self.assertLess(min(grid), min(sun))
+
     def test_without_sun_only_spread(self):
         p = plan(available_kw=None, target_kw=None, load=None, need_kwh=20.0)
         self.assertEqual(p["available_kwh"], 0.0)

@@ -17,6 +17,8 @@ from typing import Any
 KEEP_DAYS = 400
 MAX_ENTRIES = 1500
 MIN_INTERVAL = timedelta(minutes=2)    # shorter on/off flickers are dropped
+SHARE_WEEKS = 8                        # the plugged-in share per weekday and hour looks back this far
+SHARE_MIN_DAYS = 14                    # with less recorded time nothing is said (None)
 
 
 def _parse(value: Any) -> datetime | None:
@@ -73,6 +75,37 @@ class PlugLog:
     def first(self) -> datetime | None:
         iv = self.intervals()
         return iv[0][0] if iv else None
+
+    def share_by_hour(self, now: datetime, weeks: int = SHARE_WEEKS, min_days: int = SHARE_MIN_DAYS) -> dict[tuple[int, int], float] | None:
+        """How often the car was plugged in, per (weekday 0=Monday, hour): the share of that hour over the last `weeks` weeks
+        (0..1). None while fewer than `min_days` days are recorded: then nothing is known about the habit.
+        The sun can only be planned for hours in which the car is usually plugged in."""
+        first = self.first()
+        if first is None:
+            return None
+        start = max(first, now - timedelta(weeks=weeks))
+        if (now - start).days < min_days:
+            return None
+        start = start.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        end = now.replace(minute=0, second=0, microsecond=0)
+        plugged: dict[tuple[int, int], float] = {}
+        total: dict[tuple[int, int], float] = {}
+        t = start
+        while t < end:
+            total[(t.weekday(), t.hour)] = total.get((t.weekday(), t.hour), 0.0) + 1.0
+            t += timedelta(hours=1)
+        hour = timedelta(hours=1)
+        for a, b_ in self.intervals():
+            lo, hi = max(a, start), min(b_ or now, end)
+            if hi <= lo:
+                continue
+            t = lo.replace(minute=0, second=0, microsecond=0)
+            while t < hi:
+                part = (min(hi, t + hour) - max(lo, t)).total_seconds() / 3600.0
+                if part > 0:
+                    plugged[(t.weekday(), t.hour)] = plugged.get((t.weekday(), t.hour), 0.0) + part
+                t += hour
+        return {k: min(1.0, plugged.get(k, 0.0) / n) for k, n in total.items() if n > 0}
 
     def summary(self, now: datetime, days: int = 28) -> dict[str, Any]:
         """How the car was plugged in over the last `days`: how many nights, the typical plug-in and unplug time."""

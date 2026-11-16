@@ -12,7 +12,8 @@ wallbox can deliver and two optional curves per quarter hour:
 Order of choice:
 
 1. Quarter hours with available power come first (the one with most available power first): the sun, when there is any.
-2. The rest is spread over the parking time with the lowest even grid import: house and car are topped up to one common
+2. The rest is spread over the parking time with the lowest even grid import (behind the last planned sun quarter hour,
+   if all of it fits there without a higher power: the battery keeps room for a sun stronger than forecast): house and car are topped up to one common
    level (quiet quarter hours get more, busy ones less or nothing), never above the peak target. Quarter hours where the
    car would get less than the wallbox minimum are dropped and the rest filled again (among equals the later ones stay:
    the battery waits less at a high state of charge). Households without solar get only this step.
@@ -105,11 +106,29 @@ def make_plan(
     #    than the preferred power, and only when that does not fit down to the wallbox minimum
     rest = [q for q in quarters if q["t"] not in plan]
     floor = max(min_kw, min(max_kw, pref_kw)) if pref_kw else min_kw
-    spread = _spread(rest, remaining, max_kw, floor, target_kw)
-    delivered = sum(p * QUARTER_H * next(q for q in rest if q["t"] == t)["frac"] for t, p in spread.items())
-    if floor > min_kw and remaining - delivered > 0.1:
-        spread = _spread(rest, remaining, max_kw, min_kw, target_kw)
-    result["spread_floor_kw"] = floor if floor > min_kw and remaining - delivered <= 0.1 else min_kw
+
+    def spread_over(cands: list[dict[str, Any]]) -> tuple[dict[datetime, float], float, float]:
+        """(power per quarter hour, energy delivered, the lowest power used): at the preferred power, else down to the minimum."""
+        def run(lowest: float) -> tuple[dict[datetime, float], float]:
+            s = _spread(cands, remaining, max_kw, lowest, target_kw)
+            return s, sum(pw * QUARTER_H * next(q for q in cands if q["t"] == ts)["frac"] for ts, pw in s.items())
+
+        s, d = run(floor)
+        if floor > min_kw and remaining - d > 0.1:
+            s, d = run(min_kw)
+            return s, d, min_kw
+        return s, d, floor
+
+    spread, delivered, used_floor = spread_over(rest)
+    # the sun first also in time: if sun is planned, the grid part goes behind the last sun quarter hour - when all of it fits
+    # there and needs no higher power than it would otherwise (or than the preferred one). A battery filled from the grid in the
+    # morning has no room left for a sun that turns out stronger than forecast.
+    after_sun = [q for q in rest if q["t"] > max(plan)] if plan else []
+    if after_sun and len(after_sun) < len(rest) and remaining >= 0.05:
+        s, d, f = spread_over(after_sun)
+        if remaining - d <= 0.1 and max(s.values(), default=0.0) <= max(max(spread.values(), default=0.0), floor) + 0.05:
+            spread, delivered, used_floor = s, d, f
+    result["spread_floor_kw"] = used_floor
     for t, p in spread.items():
         put(next(q for q in rest if q["t"] == t), p)
 

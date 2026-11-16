@@ -45,8 +45,11 @@ and lowest, for example 11 or 22 kW and 1.4 kW for one phase at 6 A). Nothing as
    for the trips of the next days (setting *Charge for this many days at once*, default 3; 1 = every day on its own), at most up to
    the *everyday limit* (default 80 %; a long trip or the weekly full charge go above). Fewer and larger charges, and nobody has to
    plug in every day: the warning, the promise and the safety check only look at the next trip. **With a solar plant the sun comes
-   first:** what the forecast promises for the time the car stands at home between the coming trips is left to the sun; only the
-   rest comes from the grid. The next trip is always charged in time.
+   first:** what the forecast promises for the time the car stands at home between the coming trips **and is usually plugged in**
+   (learned from the recorded plug-in times, after about two weeks) is left to the sun; only the rest comes from the grid. Only
+   what can be planned is counted. The next trip is always charged in time. Solar power that comes while the car is plugged in is
+   always used, with or without a plan: the wallbox's sun mode stays in charge, Plugwhen never limits it. If the charge for
+   several days no longer fits before the departure it is cut to what fits; the next trip always comes first.
 2. **Sun first:** while the car is at home, the expected solar surplus is used first. It comes from the **solar forecast of the
    Energy dashboard** (any forecast set up there: Forecast.Solar, Solcast, Open-Meteo ...) minus a deduction for the house and a
    home battery (default 0.5 kW). An *availability* sensor (for example an energy community or a tariff signal, attributes

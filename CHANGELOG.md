@@ -10,8 +10,11 @@
   the trips of the next days (default 3, 1 = every day on its own) up to an everyday limit (default 80 %). Replayed with 255 real
   days of one car: 3.2 charges a week of 26 kWh instead of 5.6 of 13 kWh, a third of them below 8 kWh. The warning, the promise
   and the safety check only look at the next trip, so nobody is told to plug in every day.
-- **With a solar plant the sun comes first:** what the forecast promises while the car stands at home between the coming trips is
-  left to the sun, only the rest is taken from the grid. Without a forecast nothing is left out.
+- **With a solar plant the sun comes first:** what the forecast promises while the car stands at home between the coming trips
+  and is usually plugged in (learned from the recorded plug-in times) is left to the sun, only the rest is taken from the grid.
+  Without a forecast nothing is left out. Solar power that comes while the car is plugged in is always used, plan or not.
+  In a plan with sun the grid part now lies behind the sun hours whenever it fits there without a higher power: the battery
+  keeps room for a sun that turns out stronger than forecast (before, a quiet morning could be charged from the grid first).
 - Create the dashboard again: the status line shows the target of the next trip and, while it runs, what a charge ahead fills to.
   *Deutsch:* **Die Reserve bleibt nach der Fahrt übrig (neuer Standard, je Auto wählbar).** Bisher war die Reserve die
   Mindestreichweite bei der Abfahrt, die Fahrt war darin schon enthalten: mit 100 km Reserve und einem Tag mit 46 km fuhr das Auto
@@ -21,8 +24,12 @@
   die Fahrten der nächsten Tage (Standard 3, 1 = jeder Tag für sich) bis zu einer Obergrenze im Alltag (Standard 80 %). Mit 255
   echten Tagen eines Autos nachgerechnet: 3,2 Ladungen pro Woche mit 26 kWh statt 5,6 mit 13 kWh, davon ein Drittel unter 8 kWh.
   Warnung, Zusage und Sicherheitsprüfung gelten nur der nächsten Fahrt, niemand wird täglich zum Anstecken ermahnt.
-  **Mit Solaranlage kommt zuerst die Sonne:** Was die Prognose für die Standzeit zwischen den nächsten Fahrten verspricht,
-  bleibt der Sonne überlassen, nur der Rest kommt aus dem Netz. Ohne Prognose wird nichts ausgelassen.
+  **Mit Solaranlage kommt zuerst die Sonne:** Was die Prognose für die Zeit verspricht, in der das Auto zwischen den nächsten
+  Fahrten zu Hause steht und üblicherweise angesteckt ist (gelernt aus den Steckzeiten), bleibt der Sonne überlassen, nur der
+  Rest kommt aus dem Netz. Ohne Prognose wird nichts ausgelassen. Sonnenstrom, der kommt, während das Auto angesteckt ist,
+  wird immer genutzt, mit oder ohne Plan. In einem Plan mit Sonne liegt der Netzanteil jetzt hinter den Sonnenstunden, wenn er
+  dort ohne höhere Leistung Platz hat: Der Akku behält Platz für eine Sonne, die stärker ausfällt als die Prognose (bisher
+  konnte zuerst ein ruhiger Vormittag aus dem Netz geladen werden).
   Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
 
 ## 0.9.2 - unreleased - once a week full

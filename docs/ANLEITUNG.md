@@ -49,8 +49,12 @@ z. B. 11 oder 22 kW und 1,4 kW für einphasig 6 A). Eine bestimmte Marke wird ni
    für die Fahrten der nächsten Tage (Einstellung *Für so viele Tage auf einmal laden*, Standard 3; 1 = jeder Tag für sich), höchstens bis
    zur *Obergrenze im Alltag* (Standard 80 %; eine lange Fahrt oder das wöchentliche Volladen gehen darüber). Das gibt weniger und größere
    Ladungen, und niemand muss täglich anstecken: Warnung, Zusage und Sicherheitsprüfung gelten nur der nächsten Fahrt. **Mit Solaranlage
-   kommt zuerst die Sonne:** Was die Prognose für die Zeit verspricht, in der das Auto zwischen den nächsten Fahrten zu Hause steht, bleibt
-   der Sonne überlassen; nur der Rest kommt aus dem Netz. Die nächste Fahrt wird immer rechtzeitig geladen.
+   kommt zuerst die Sonne:** Was die Prognose für die Zeit verspricht, in der das Auto zwischen den nächsten Fahrten zu Hause steht **und
+   üblicherweise angesteckt ist** (gelernt aus den mitgeschriebenen Steckzeiten, nach etwa zwei Wochen), bleibt der Sonne überlassen; nur
+   der Rest kommt aus dem Netz. Gerechnet wird nur mit dem, was planbar ist. Die nächste Fahrt wird immer rechtzeitig geladen. Sonnenstrom,
+   der kommt, während das Auto angesteckt ist, wird immer genutzt, mit oder ohne Plan: Der Sonnenmodus der Wallbox bleibt zuständig,
+   Plugwhen begrenzt ihn nie. Passt die Ladung für mehrere Tage nicht mehr vor die Abfahrt, wird sie auf das gekürzt, was passt; die
+   nächste Fahrt geht immer vor.
 2. **Zuerst die Sonne:** Solange das Auto zu Hause steht, wird zuerst der erwartete Sonnenüberschuss genutzt. Er kommt aus der **Solarprognose des
    Energie-Dashboards** (jede dort eingerichtete: Forecast.Solar, Solcast, Open-Meteo …) minus einem Abzug für Haus und Hausakku (Standard 0,5 kW).
    Die Last-Prognose des Wächters wird dafür bewusst nicht abgezogen: Sie ist Netzbezug, tagsüber steckt die Sonne schon darin.

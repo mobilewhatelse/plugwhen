@@ -18,6 +18,7 @@ from custom_components.plugwhen.const import RESERVE_AT, V_DAILY_CAP, V_DAYS_AHE
 from custom_components.plugwhen.horizon import Trip  # noqa: E402
 from custom_components.plugwhen.learning import WeekdayPlan  # noqa: E402
 from custom_components.plugwhen.need import MODE_FLOOR, MODE_PLUS, Need, compute_need  # noqa: E402
+from custom_components.plugwhen.plan import make_plan  # noqa: E402
 
 TZ = timezone(timedelta(hours=1))
 MON_EVENING = datetime(2026, 11, 16, 19, 0, tzinfo=TZ)
@@ -144,6 +145,108 @@ class LookAheadTests(unittest.TestCase):
         p._trips = lambda *a: (_ for _ in ()).throw(RuntimeError("boom"))
         self.step(p, v)
         self.assertEqual(v.need.target_soc, v.need_must.target_soc)
+
+
+    def test_a_running_fill_keeps_its_target(self):
+        p, v = bare(three_days()), car(30.0)
+        self.step(p, v)
+        self.assertEqual(p._direct["sub"]["ahead_target"], v.need.target_soc)
+        held = v.need.target_soc
+        v.soc, v.consumption = 50.0, CONS * 1.03            # colder tomorrow: three percent more consumption
+        self.step(p, v)
+        self.assertEqual(v.need.target_soc, held)
+        v.soc = held                                         # done: nothing is kept
+        self.step(p, v)
+        self.assertNotIn("ahead_target", p._direct["sub"])
+
+    def test_a_calendar_trip_keeps_its_margin_when_the_reserve_is_small(self):
+        p, v = bare(), car(30.0)
+        v.reserve_km = 0.0
+        v.trips = [{"departure": TUE_7.isoformat(), "km": 200.0, "range_km": 230.0}]
+        n = compute_need(p._plan_for(v, TUE_7, 1), v.reserve_km, v.soc, CAP, CONS, mode=MODE_PLUS)
+        self.assertEqual(n.km, 230.0)
+
+
+class SunHabitTests(unittest.TestCase):
+    def sunny(self):
+        day = TUE_7.replace(hour=0)
+        return {day + timedelta(hours=h, minutes=m): 5.0 for h in range(11, 17) for m in (0, 15, 30, 45)}
+
+    def early_home(self):
+        return [Trip(TUE_7, 10.0, 146.0, 12.0)] + [Trip(TUE_7 + timedelta(days=i), 37.0, 146.0, 46.0) for i in (1, 2)]
+
+    def target(self, v) -> float:
+        p = bare(self.early_home())
+        v.need = v.need_must = must_need(v, MODE_PLUS)
+        p._look_ahead(v, MON_EVENING, self.sunny(), 11.0)
+        return v.need.target_soc
+
+    def test_the_learned_plug_in_hours_decide_which_sun_counts(self):
+        nothing_learned = car(30.0)
+        self.assertEqual(nothing_learned.plug_log.share_by_hour(MON_EVENING), None)
+        with_sun = self.target(nothing_learned)                  # no habit yet: the time at home counts
+        evenings_only = car(30.0)
+        for d in range(29, 0, -1):                               # four weeks: plugged in 18:00 to 07:00, never by day
+            evenings_only.plug_log.change(True, MON_EVENING - timedelta(days=d, hours=1))
+            evenings_only.plug_log.change(False, MON_EVENING - timedelta(days=d) + timedelta(hours=12))
+        self.assertGreater(self.target(evenings_only), with_sun)   # the midday sun would not reach this car: charged from the grid
+        self.assertEqual(evenings_only.ahead["sun_kwh"], 0.0)
+        self.assertEqual(evenings_only.ahead["sun_basis"], "plug_times")
+
+    def test_the_habit_is_computed_once_an_hour(self):
+        v = car(30.0)
+        a = co.Plugwhen._plug_share(v, MON_EVENING)
+        v.plug_share_cache = (v.plug_share_cache[0], {"marker": 1.0})
+        self.assertEqual(co.Plugwhen._plug_share(v, MON_EVENING + timedelta(minutes=20)), {"marker": 1.0})
+        self.assertEqual(co.Plugwhen._plug_share(v, MON_EVENING + timedelta(hours=1)), a)
+
+
+class FitTests(unittest.TestCase):
+    """Review of 0.10: a charge for several days that does not fit before the departure made the plan say "the target cannot
+    be reached", although the next trip was fine."""
+
+    def plan_for(self, hours: float):
+        return lambda kwh: make_plan(MON_EVENING, MON_EVENING + timedelta(hours=hours), kwh, 11.0, 1.4)
+
+    def ahead_car(self, soc: float = 30.0):
+        p, v = bare(three_days()), car(soc)
+        v.need = v.need_must = must_need(v, MODE_PLUS)
+        p._look_ahead(v, MON_EVENING, None, 11.0)
+        self.assertEqual(v.need.source, "ahead")
+        return p, v
+
+    def test_enough_time_the_whole_charge_is_planned(self):
+        p, v = self.ahead_car()
+        plan = p._fit_ahead(v, self.plan_for(12))
+        self.assertEqual(plan["status"], "planned")
+        self.assertEqual(v.need.target_soc, 75.7)
+        self.assertNotIn("cut_to_fit", v.ahead)
+
+    def test_little_time_it_is_cut_to_what_fits_and_the_plan_stays_fine(self):
+        p, v = self.ahead_car()                              # 33.5 kWh wanted, two hours at 11 kW
+        plan = p._fit_ahead(v, self.plan_for(2))
+        self.assertEqual(plan["status"], "planned")
+        self.assertAlmostEqual(v.need.charge_kwh, 22.0, delta=0.2)
+        self.assertGreater(v.need.target_soc, v.need_must.target_soc)   # the next trip and more
+        self.assertLess(v.need.target_soc, 75.7)
+        self.assertTrue(v.ahead["cut_to_fit"])
+        self.assertEqual(v.ahead["target_soc"], v.need.target_soc)
+        self.assertAlmostEqual(v.ahead["wanted_kwh"], 33.5, delta=0.1)   # the wallbox still gets the whole wish
+        self.assertEqual(v.ahead["wanted_soc"], 75.7)
+
+    def test_when_not_even_the_next_trip_fits_the_plan_says_so_for_the_next_trip(self):
+        p, v = self.ahead_car()                              # the next trip alone needs 12.1 kWh, half an hour gives 5.5
+        plan = p._fit_ahead(v, self.plan_for(0.5))
+        self.assertEqual(plan["status"], "infeasible")
+        self.assertEqual(v.need, v.need_must)
+        self.assertAlmostEqual(plan["needed_kwh"], v.need_must.charge_kwh, delta=0.05)
+
+    def test_without_a_charge_ahead_nothing_changes(self):
+        p, v = bare(three_days()), car(30.0, **{V_DAYS_AHEAD: 1})
+        v.need = v.need_must = must_need(v, MODE_PLUS)
+        p._look_ahead(v, MON_EVENING, None, 11.0)
+        plan = p._fit_ahead(v, self.plan_for(0.5))
+        self.assertEqual(plan["status"], "infeasible")       # as before: the next trip does not fit, and it says so
 
 
 if __name__ == "__main__":

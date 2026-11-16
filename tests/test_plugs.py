@@ -90,5 +90,46 @@ class SolarTest(unittest.TestCase):
         self.assertIsNone(merge_available(None, None))
 
 
+
+class ShareByHourTests(unittest.TestCase):
+    """In which hours of the week the car is usually plugged in: the sun can only be planned for those."""
+
+    def log(self, weeks: int = 4) -> PlugLog:
+        log = PlugLog()
+        for w in range(weeks):
+            for d in range(5):                                   # Monday to Friday 18:00 until 07:00 the next morning
+                log.change(True, at(7 * w + d, 18))
+                log.change(False, at(7 * w + d + 1, 7))
+            log.change(True, at(7 * w + 5, 10))                  # Saturday 10:00 until 16:30, every second week
+            log.change(False, at(7 * w + 5, 16, 30) if w % 2 == 0 else at(7 * w + 5, 10, 30))
+        return log
+
+    def test_nights_are_plugged_weekday_afternoons_are_not(self):
+        s = self.log().share_by_hour(at(28, 0))
+        self.assertEqual(s[(0, 20)], 1.0)                        # Monday evening
+        self.assertEqual(s[(2, 3)], 1.0)                         # Wednesday night
+        self.assertEqual(s[(1, 15)], 0.0)                        # Tuesday afternoon: home, but not plugged in
+        self.assertEqual(s[(0, 7)], 0.0)
+
+    def test_a_habit_of_every_second_week_is_half(self):
+        s = self.log().share_by_hour(at(28, 0))
+        self.assertAlmostEqual(s[(5, 12)], 0.5)
+        self.assertAlmostEqual(s[(5, 16)], 0.25)                 # half of the hour, every second week
+        self.assertAlmostEqual(s[(5, 10)], 0.75)                 # the whole hour every second week, half of it in the others
+
+    def test_too_little_recorded_says_nothing(self):
+        self.assertIsNone(PlugLog().share_by_hour(at(28, 0)))
+        self.assertIsNone(self.log(1).share_by_hour(at(8, 0)))
+
+    def test_only_the_last_weeks_count_and_still_plugged_in_counts(self):
+        log = PlugLog()
+        log.change(True, at(0, 0))                               # plugged in for ten weeks without a break ...
+        log.change(False, at(70, 0))
+        s = log.share_by_hour(at(140, 0), weeks=8)                # ... but that was more than eight weeks ago
+        self.assertEqual(max(s.values()), 0.0)
+        log.change(True, at(139, 12))
+        self.assertGreater(log.share_by_hour(at(140, 0), weeks=8)[(at(139, 13).weekday(), 13)], 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

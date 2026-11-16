@@ -115,6 +115,49 @@ class NotReachableTests(unittest.TestCase):
         self.assertNotIn("number.wb_energy", [e for e, _ in p.written])
 
 
+class CutToFitTests(unittest.TestCase):
+    def test_the_wallbox_gets_the_whole_wish_steadily_while_the_plan_shrinks(self):
+        # little time: the plan shows what fits (it shrinks every minute), the wallbox must not be told a new value every
+        # few minutes - it would stop and plan again, just when time is short
+        states = {MODE: "Eco", "time.wb_trip": "06:00:00", "number.wb_energy": "0.0"}
+        p, v = plugwhen(states), car(charge_kwh=22.0)
+        v.ahead = {"cut_to_fit": True, "wanted_kwh": 33.5, "wanted_soc": 75.7}
+        run(p._direct_step(v, T0))
+        self.assertIn(("number.wb_energy", 33.5), p.written)
+        for k, fits in enumerate((19.0, 16.0, 13.0), 1):            # the car charges slowly, the time runs faster
+            v.need = Need(km=100, kwh=20, target_soc=60.0, charge_kwh=fits, reachable=True, source="ahead")
+            v.soc = 50.0 + k                                         # 0.7 kWh charged each time
+            v.ahead = {"cut_to_fit": True, "wanted_kwh": 33.5 - 0.73 * k, "wanted_soc": 75.7}
+            run(p._direct_step(v, T0 + timedelta(minutes=5 * k)))
+        self.assertEqual([x for x in p.written if x[0] == "number.wb_energy"], [("number.wb_energy", 33.5)])
+
+
+class SunAlwaysTests(unittest.TestCase):
+    """Wish of the user: if the car is plugged in and there is solar power, it is always used - plan or no plan."""
+
+    def test_nothing_to_charge_the_wallbox_is_put_into_its_sun_mode(self):
+        for start in ("Default", "NextTrip"):
+            states = {MODE: start, "time.wb_trip": "07:00:00", "number.wb_energy": "0.0"}
+            p, v = plugwhen(states), car(charge_kwh=0.0)
+            run(p._direct_step(v, T0))
+            self.assertEqual(states[MODE], "Eco", start)
+
+    def test_no_departure_known_still_the_sun_mode(self):
+        states = {MODE: "Default", "time.wb_trip": "07:00:00", "number.wb_energy": "0.0"}
+        p, v = plugwhen(states), car(charge_kwh=12.0)
+        v.departure = None
+        run(p._direct_step(v, T0))
+        self.assertEqual(states[MODE], "Eco")
+
+    def test_a_wallbox_with_a_sun_and_a_grid_mode_is_in_the_sun_mode_outside_grid_windows(self):
+        caps = {"variant": "mode", "mode": MODE, "mode_grid": "Default", "mode_sun": "Eco"}
+        states = {MODE: "Default"}
+        p, v = plugwhen(states, caps), car(charge_kwh=0.0)
+        v.charge_plan = {"status": "not_needed", "windows": []}
+        run(p._direct_step(v, T0))
+        self.assertEqual(states[MODE], "Eco")
+
+
 class ByHandTests(unittest.TestCase):
     def test_respected_until_the_departure(self):
         # before: the change by hand held for one run only, the next one set Plugwhen's mode again

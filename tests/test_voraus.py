@@ -27,9 +27,10 @@ def soc_for(km: float) -> float:
     return km * CONS / CAP * 100.0
 
 
-def ahead(trips, soc, must, days=3, cap=80.0, filling=False, plugged=True, sun=None):
+def ahead(trips, soc, must, days=3, cap=80.0, filling=False, plugged=True, sun=None, held=None, share=None):
     return vo.look_ahead(MON_EVENING, trips, TUE_7, soc, must, days=days, cap_soc=cap, capacity_kwh=CAP, consumption=CONS,
-                         efficiency=EFF, filling=filling, plugged=plugged, sun_kw=sun, max_kw=11.0)
+                         efficiency=EFF, filling=filling, plugged=plugged, sun_kw=sun, max_kw=11.0, held_soc=held,
+                         plug_share=share)
 
 
 class ComfortTests(unittest.TestCase):
@@ -37,6 +38,14 @@ class ComfortTests(unittest.TestCase):
         trips = week(60, 136, 46, 80)
         self.assertEqual(len(vo.trips_ahead(trips, TUE_7, 3)), 3)
         self.assertAlmostEqual(vo.comfort_km(vo.trips_ahead(trips, TUE_7, 3)), 60 + 136 + 46 + RESERVE)
+
+    def test_a_long_trip_in_the_middle_decides_itself(self):
+        # Wednesday needs a full battery (target 400 km) but is expected to use little; Thursday is a normal day
+        trips = [Trip(TUE_7, 48.0, 160.0, 60.0), Trip(TUE_7 + timedelta(days=1), 40.0, 400.0, 46.0),
+                 Trip(TUE_7 + timedelta(days=2), 37.0, 146.0, 46.0)]
+        self.assertAlmostEqual(vo.comfort_km(trips), 60 + 400)       # not 60 + 46 + 146: Wednesday would start too low
+        self.assertAlmostEqual(vo.comfort_km(trips[:1]), 160.0)
+        self.assertEqual(vo.comfort_km([]), 0.0)
 
     def test_one_day_is_the_next_trip_alone(self):
         a = ahead(week(60, 136, 46), 30.0, soc_for(160), days=1)
@@ -87,6 +96,51 @@ class StartAndFillTests(unittest.TestCase):
         self.assertEqual((a.target_soc, a.filling), (round(self.must, 1), False))
 
 
+class HeldTargetTests(unittest.TestCase):
+    """Review of 0.10: the forecast, the weather and the learning move the target a little all the time; every new value makes
+    a wallbox with a "next trip" mode stop and plan again."""
+
+    def setUp(self):
+        self.trips = week(60, 46, 40)                    # comfort 60 + 46 + 140 = 246 km = 78.3 %
+        self.must = soc_for(160)
+
+    def test_a_running_fill_keeps_its_target_against_small_changes(self):
+        a = ahead(self.trips, 60.0, self.must, filling=True, held=76.0)
+        self.assertEqual((a.target_soc, a.filling), (76.0, True))
+
+    def test_a_real_change_is_taken(self):
+        a = ahead(self.trips, 60.0, self.must, filling=True, held=60.0)   # e.g. a trip was added to the calendar
+        self.assertEqual(a.target_soc, 78.3)
+
+    def test_never_below_must_and_only_while_filling(self):
+        a = ahead(self.trips, 40.0, 77.0, filling=True, held=74.0)
+        self.assertGreaterEqual(a.target_soc, 77.0)
+        a = ahead(self.trips, 40.0, self.must, filling=False, held=76.0)   # a new fill computes its own target
+        self.assertEqual(a.target_soc, 78.3)
+
+
+class NeverBelowMustTests(unittest.TestCase):
+    def test_whatever_the_inputs_the_target_is_at_least_must(self):
+        """The next trip is what must never be lost: comfort, the limit and the sun only ever add to it."""
+        import random
+
+        rnd = random.Random(1611)
+        for _ in range(3000):
+            n = rnd.randint(0, 6)
+            trips = [Trip(TUE_7 + timedelta(days=i, hours=rnd.choice((0, 0, 5, 13))), rnd.uniform(0, 250),
+                          rnd.uniform(50, 450), rnd.choice((None, rnd.uniform(0, 300)))) for i in range(n)]
+            must = rnd.uniform(20, 100)
+            soc = rnd.choice((None, rnd.uniform(0, 100)))
+            sun = {TUE_7.replace(hour=0) + timedelta(days=d, hours=h, minutes=m): rnd.uniform(0, 12)
+                   for d in range(3) for h in range(8, 17) for m in (0, 15, 30, 45)} if rnd.random() < 0.5 else None
+            a = vo.look_ahead(MON_EVENING, trips, TUE_7, soc, must, days=rnd.randint(1, 7), cap_soc=rnd.uniform(50, 100),
+                              capacity_kwh=CAP, consumption=rnd.uniform(0.12, 0.3), efficiency=rnd.uniform(0.7, 0.95),
+                              filling=rnd.random() < 0.5, plugged=rnd.choice((True, False, None)), sun_kw=sun,
+                              held_soc=rnd.choice((None, rnd.uniform(20, 100))))
+            self.assertGreaterEqual(a.target_soc, round(must, 1) - 0.05, (trips, must, soc))
+            self.assertLessEqual(a.target_soc, 100.0)
+
+
 class SunTests(unittest.TestCase):
     def sun(self, day: int, kw: float, hours=range(10, 16)) -> dict:
         d = TUE_7.replace(hour=0) + timedelta(days=day)
@@ -102,6 +156,32 @@ class SunTests(unittest.TestCase):
         self.assertGreater(with_sun.sun_kwh, 15.0)
         self.assertLess(with_sun.target_soc, no_sun.target_soc)
         self.assertGreaterEqual(with_sun.target_soc, round(soc_for(160), 1))   # must is always charged
+
+    def home_early(self):
+        return [Trip(TUE_7, 10.0, 160.0, 12.0), Trip(TUE_7 + timedelta(days=1), 40.0, 150.0, 50.0),
+                Trip(TUE_7 + timedelta(days=2), 40.0, 150.0, 50.0)]
+
+    def test_only_the_hours_the_car_is_usually_plugged_in_count(self):
+        # home from eleven, sun from eleven to five - but the car is plugged in from three on (learned)
+        sun = self.sun(0, 5.0, range(11, 17))
+        wd = TUE_7.weekday()
+        home = ahead(self.home_early(), 30.0, soc_for(160), sun=sun)
+        from_three = ahead(self.home_early(), 30.0, soc_for(160), sun=sun, share={(wd, h): 1.0 for h in (15, 16)})
+        never = ahead(self.home_early(), 30.0, soc_for(160), sun=sun, share={})
+        self.assertEqual((home.sun_basis, from_three.sun_basis), ("home", "plug_times"))
+        self.assertAlmostEqual(from_three.sun_kwh, round(home.sun_kwh / 3, 1), delta=0.2)   # two of the six hours
+        self.assertEqual(never.sun_kwh, 0.0)
+        self.assertGreater(never.target_soc, home.target_soc)    # nothing is left to a sun that would not reach the car
+
+    def test_plugged_in_on_half_of_the_days_counts_half(self):
+        sun = self.sun(0, 5.0, range(11, 17))
+        wd = TUE_7.weekday()
+        full = ahead(self.home_early(), 30.0, soc_for(160), sun=sun, share={(wd, h): 1.0 for h in range(24)})
+        half = ahead(self.home_early(), 30.0, soc_for(160), sun=sun, share={(wd, h): 0.5 for h in range(24)})
+        self.assertAlmostEqual(half.sun_kwh, full.sun_kwh / 2, delta=0.1)
+
+    def test_without_a_forecast_nothing_is_said_about_the_sun(self):
+        self.assertIsNone(ahead(self.home_early(), 30.0, soc_for(160)).sun_basis)
 
     def test_sun_while_the_car_is_away_does_not_count(self):
         trips = week(60, 46, 59)                         # away from 07:00 for 3 h + 48/12 h = 7 h: home at 14:00
