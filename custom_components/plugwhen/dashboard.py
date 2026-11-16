@@ -484,8 +484,10 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             cards += [
                 {"type": "markdown", "content": "**" + t["wf_days"] + "**  \n" + t["wf_days_hint"]},
                 {"type": "grid", "columns": 7, "square": False, "cards": [
-                    {"type": "button", "entity": eid, "name": short[d], "show_icon": False, "show_state": False,
-                     "tap_action": {"action": "toggle"}, "hold_action": {"action": "more-info"}}
+                    # a ticked day: green check; not ticked: grey empty circle (the icon comes from the switch)
+                    {"type": "tile", "entity": eid, "name": short[d], "color": "green", "hide_state": True,
+                     "vertical": True, "tap_action": {"action": "toggle"}, "icon_tap_action": {"action": "toggle"},
+                     "hold_action": {"action": "more-info"}}
                     for d, eid in enumerate(day_ids)]},
             ]
         details[-1]["cards"] += cards + [{"type": "markdown", "content": status}]

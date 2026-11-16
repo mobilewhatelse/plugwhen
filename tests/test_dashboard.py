@@ -30,6 +30,27 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual([v["path"] for v in views], ["plugwhen", "lernen", "details"])
         self.assertEqual(views[0]["type"], "sections")
 
+    def test_day_bar_shows_which_days_are_ticked(self):
+        """Field test 16.11.2026: the buttons without an icon looked the same on and off. Now tiles with a green check."""
+        text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], "de"), ensure_ascii=False)
+        views = json.loads(text)
+        tiles = []
+
+        def walk(x):
+            if isinstance(x, dict):
+                if str(x.get("entity", "")).startswith("switch.car_weekly_day_"):
+                    tiles.append(x)
+                for val in x.values():
+                    walk(val)
+            elif isinstance(x, list):
+                for val in x:
+                    walk(val)
+        walk(views)
+        self.assertEqual([t["name"] for t in tiles], ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"])
+        for t in tiles:
+            self.assertEqual((t["type"], t["color"], t["hide_state"]), ("tile", "green", True))
+            self.assertEqual(t["tap_action"], {"action": "toggle"})
+
     def test_two_vehicles_have_their_names_in_the_headings(self):
         views = build_views([{"name": "A", "ids": ids("a")}, {"name": "B", "ids": ids("b")}], "de")
         heads = [c["heading"] for s in views[0]["sections"] for c in s["cards"] if c["type"] == "heading"]

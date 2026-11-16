@@ -80,8 +80,6 @@ class WeeklyDaySwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
     """One weekday of the weekly full charge (Monday to Sunday, shown as a bar on the dashboard). Several ticked: the sunniest of
     them, without a forecast the first. Default Saturday and Sunday; a choice from the former selection is carried over."""
 
-    _attr_icon = "mdi:calendar-check"
-
     def __init__(self, plug, vehicle, weekday: int) -> None:
         super().__init__(plug, vehicle, f"weekly_day_{weekday}")
         self.weekday = weekday
@@ -105,6 +103,11 @@ class WeeklyDaySwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
     @property
     def is_on(self) -> bool:
         return self.weekday in self.vehicle.weekly_days
+
+    @property
+    def icon(self) -> str:
+        """A ticked day shows a filled check, an unticked one an empty circle (the day bar shows which days are chosen)."""
+        return "mdi:check-circle" if self.is_on else "mdi:circle-outline"
 
     async def async_turn_on(self, **kwargs) -> None:
         self._set(True)
