@@ -133,7 +133,9 @@ heraus, was sie kann (die Karte „Bereit zum Schalten?“ zeigt es):
 - **Moduswechsel** (Lademodus mit Sonnen- und Netzmodus): in den geplanten Netz-Fenstern Netzmodus, sonst zurück.
 - **Nur Start/Stopp:** Start am Anfang, Stopp am Ende eines geplanten Fensters.
 
-Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie in Ruhe.
+Plugwhen ändert nur zurück, was es selbst gesetzt hat. Stellen Sie die Wallbox zwischendurch selbst um, lässt Plugwhen sie bis zur
+nächsten Abfahrt in Ruhe; nur die Sicherheitsprüfung („Jetzt laden“) greift trotzdem ein. Ist die Wallbox kurz nicht erreichbar,
+wartet Plugwhen und vergisst nichts.
 
 **Die Betriebsart entscheidet, wer steuert, und stellt mit um:** „Direkt“ stellt die Wallbox auf ihren Sonnenmodus (z. B. Eco) als
 Grundstellung; evcc darf diese Wallbox dann **nur lesen** (oder gar nicht da sein), denn „Off“ heißt in evcc „Laden gesperrt“ und nicht

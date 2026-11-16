@@ -41,8 +41,42 @@ class PromiseTests(unittest.TestCase):
         p = s.update_promise(s.Promise(MON_7, 100.0), tue, 45.0, True, MON_7 + timedelta(hours=4))
         self.assertEqual(p, s.Promise(tue, 45.0))
 
+    def test_a_later_departure_does_not_raise_or_move_the_promise(self):
+        # review 16.11.: the later departure's target (e.g. the weekly 100 %) was taken into the promise of the earlier one
+        tue = MON_7 + timedelta(days=1)
+        p = s.update_promise(s.Promise(MON_7, 45.0), tue, 100.0, True, SUN_EVENING)
+        self.assertEqual(p, s.Promise(MON_7, 45.0))
+
+    def test_a_departure_the_user_took_away_takes_the_promise_with_it(self):
+        # review 16.11.: a deleted calendar trip left "charge now" for a trip that no longer existed
+        tue = MON_7 + timedelta(days=1)
+        p = s.update_promise(s.Promise(MON_7, 100.0), tue, 55.0, True, SUN_EVENING, still_expected=False)
+        self.assertEqual(p, s.Promise(tue, 55.0))
+
+
+class StallTests(unittest.TestCase):
+    def test_counts_only_a_wallbox_that_says_it_does_not_charge(self):
+        t0 = MON_7 - timedelta(hours=2)
+        self.assertEqual(s.stall_start(None, t0, True, True, True, False), t0)
+        self.assertEqual(s.stall_start(t0, t0 + timedelta(minutes=5), True, True, True, False), t0)
+        self.assertIsNone(s.stall_start(t0, t0, True, True, True, True))      # charging
+        self.assertIsNone(s.stall_start(t0, t0, False, True, True, False))    # no window
+        self.assertIsNone(s.stall_start(t0, t0, True, False, True, False))    # unplugged
+
+    def test_an_unreachable_wallbox_is_no_stall(self):
+        # review 16.11.: the nightly Wi-Fi restart made "unavailable" count as "does not charge"
+        t0 = MON_7 - timedelta(hours=2)
+        self.assertIsNone(s.stall_start(None, t0, True, None, False, False))
+        self.assertIsNone(s.stall_start(t0 - timedelta(minutes=9), t0, True, None, False, False))
+
 
 class CheckTests(unittest.TestCase):
+    def test_weekly_full_booked_done_at_99_is_no_alarm(self):
+        # review 16.11.: at 99 % the weekly full charge is done and its target falls back on purpose; 0.7 kWh "missing" to the
+        # promised 100 % raised "target fell" in the last hours before every such departure
+        self.assertIsNone(chk(MON_7 - timedelta(hours=1, minutes=30), s.Promise(MON_7, 100.0), 55.0, 99.0, charging=True))
+        self.assertEqual(chk(MON_7 - timedelta(hours=1, minutes=30), s.Promise(MON_7, 100.0), 55.0, 98.0).reason, "target_fell")
+
     def test_nothing_before_three_hours(self):
         self.assertIsNone(chk(MON_7 - timedelta(hours=4), s.Promise(MON_7, 100.0), 40.0, 28.0))
 
@@ -93,6 +127,20 @@ class TextTests(unittest.TestCase):
         self.assertIn("Sicherheitsprüfung: das geplante", msg)
         title, msg = s.alarm_text("en", a, "Car")
         self.assertIn("charging now", title)
+
+    def test_the_sentence_keeps_its_full_stop(self):
+        _title, msg = s.alarm_text("de", s.Alarm("target_fell", 52.8, 100.0, 28.0, 2.5), "Auto")
+        self.assertIn("zugesagt. Es fehlen noch 52,8 kWh", msg)
+
+    def test_says_so_when_the_wallbox_was_not_switched(self):
+        a = s.Alarm("tight", 20.0, 80.0, 50.0, 1.5)
+        title, msg = s.alarm_text("de", a, "Auto", switched=False)
+        self.assertIn("bitte Laden starten", title)
+        self.assertIn("konnte die Wallbox nicht", msg)
+        self.assertNotIn("hat auf", msg)
+        title, msg = s.alarm_text("en", a, "Car", switched=False)
+        self.assertIn("please start charging", title)
+        self.assertIn("could not switch", msg)
 
 
 if __name__ == "__main__":

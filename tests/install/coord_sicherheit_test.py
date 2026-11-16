@@ -67,6 +67,13 @@ def run(coro):
     return asyncio.run(coro)
 
 
+def act(p, v, now) -> None:
+    """One run as in _act_once: check, switch, tell."""
+    run(p._safety_step(v, now))
+    run(p._direct_step(v, now))
+    run(p._safety_tell(v, now))
+
+
 def phone(p) -> list[dict]:
     return [d for dom, _n, d in p.hass.services.calls if dom == "notify"]
 
@@ -80,6 +87,10 @@ class SafetyCoordinatorTests(unittest.TestCase):
         p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
         run(p._safety_step(v, AT_4))
         self.assertEqual(v.safety["reason"], "target_fell")
+        self.assertEqual(p.hass.services.calls, [])   # nothing is told before the wallbox was switched
+        run(p._direct_step(v, AT_4))
+        run(p._safety_tell(v, AT_4))
+        self.assertTrue(v.safety["switched"])
         data, = phone(p)
         self.assertEqual(p.hass.services.calls[-1][:2], ("notify", "handy"))
         self.assertIn("lädt jetzt", data["title"])
@@ -93,18 +104,18 @@ class SafetyCoordinatorTests(unittest.TestCase):
 
     def test_one_message_per_departure_and_reason(self):
         p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
-        run(p._safety_step(v, AT_4))
+        act(p, v, AT_4)
         v.safety = None
-        run(p._safety_step(v, AT_4 + timedelta(minutes=5)))
+        act(p, v, AT_4 + timedelta(minutes=5))
         self.assertEqual(len(phone(p)), 1)
         self.assertEqual(len(in_ha(p)), 1)
 
     def test_without_a_phone_service_only_in_home_assistant_and_once(self):
         p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
         v.cfg[co.V_NOTIFY] = ""
-        run(p._safety_step(v, AT_4))
+        act(p, v, AT_4)
         v.safety = None
-        run(p._safety_step(v, AT_4 + timedelta(minutes=5)))
+        act(p, v, AT_4 + timedelta(minutes=5))
         self.assertEqual(phone(p), [])
         self.assertEqual(len(in_ha(p)), 1)
         self.assertIsNotNone(v.safety)   # charging now does not need a message service
@@ -123,6 +134,24 @@ class SafetyCoordinatorTests(unittest.TestCase):
         v.promise = sicherheit.update_promise(v.promise, v.departure, 40.0, False, AT_4)
         run(p._safety_step(v, AT_4 + timedelta(minutes=10)))
         self.assertIsNone(v.safety)
+
+    def test_a_wallbox_that_is_not_reachable_the_message_says_so(self):
+        # review 16.11.: the message said "switched to charge now" before anything was switched
+        p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "unavailable"}), car("direct")
+        act(p, v, AT_4)
+        self.assertEqual(p.written, [])
+        self.assertFalse(v.safety["switched"])
+        data, = phone(p)
+        self.assertIn("bitte Laden starten", data["title"])
+        self.assertIn("konnte die Wallbox nicht", data["message"])
+
+    def test_charge_now_also_over_a_change_by_hand(self):
+        # the car must be charged: the safety check overrides a mode the user set by hand
+        p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
+        p._direct["sub"] = {"select.wb_mode": {"user": True, "until": MON_7.isoformat()}}
+        act(p, v, AT_4)
+        self.assertIn(("select.wb_mode", "Default"), p.written)
+        self.assertTrue(v.safety["switched"])
 
     def test_buttons_press_start(self):
         caps = {"variant": "buttons", "start": "button.wb_start", "stop": "button.wb_stop"}

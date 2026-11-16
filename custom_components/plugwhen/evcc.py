@@ -129,6 +129,14 @@ def match_vehicle(state: dict[str, Any] | None, name: str | None, taken: set[str
     return vehicles[0]["key"] if vehicles else None
 
 
+def note_loadpoint_mode(state: dict[str, Any] | None, number: int, mode: str) -> None:
+    """Write the mode Plugwhen just set into the state read last. evcc is read every few minutes, Plugwhen acts more often:
+    without this the next run sees the old mode, takes it for a change by the user and forgets what it has to give back."""
+    lps = _loadpoints(state)
+    if 1 <= number <= len(lps):
+        lps[number - 1]["mode"] = mode
+
+
 def loadpoint_index(state: dict[str, Any] | None, key: str) -> tuple[int, str | None] | None:
     """(number 1.., current mode) of the loadpoint evcc has assigned vehicle `key` to, or None."""
     for i, lp in enumerate(_loadpoints(state), 1):

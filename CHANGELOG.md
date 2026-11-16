@@ -19,6 +19,20 @@
   danach wird alles zurückgegeben. In den Betriebsarten *aus* und *lernen* fasst Plugwhen die Wallbox nicht an; dort meldet wie bisher
   die Warnung „Auto wird nicht bereit sein“.
 
+- **Fixes from a code review of the safety check and the wallbox control (before the release):**
+  no false alarm "target fell" when the weekly full charge is done at 99 %; a wallbox that is not reachable for a while (Wi-Fi
+  restart at night) is left alone, nothing is forgotten and nothing counts as written, and it no longer looks like "does not
+  charge"; evcc's mode is reliably given back after "charge now"; a calendar trip that was deleted or moved takes its promise
+  with it; a mode you set on the wallbox by hand stays until the next departure (before: only a few minutes); the message is
+  sent after switching and says so if the wallbox could not be switched; unticking the day ends a full charge already planned.
+  *Deutsch:* Korrekturen aus einer Code-Durchsicht der Sicherheitsprüfung und der Wallbox-Steuerung (vor der Veröffentlichung):
+  kein Fehlalarm „Ziel gefallen“, wenn das Volladen bei 99 % erledigt ist; eine kurz nicht erreichbare Wallbox (WLAN-Neustart in
+  der Nacht) wird in Ruhe gelassen, nichts wird vergessen oder als geschrieben gemerkt, und sie gilt nicht mehr als „lädt nicht“;
+  der Modus von evcc wird nach „Jetzt laden“ sicher zurückgegeben; ein gelöschter oder verschobener Kalendertermin nimmt seine
+  Zusage mit; ein von Hand gesetzter Modus der Wallbox bleibt bis zur nächsten Abfahrt (vorher nur wenige Minuten); die Nachricht
+  kommt nach dem Umschalten und sagt es, wenn die Wallbox nicht umgeschaltet werden konnte; einen Tag abwählen beendet ein schon
+  geplantes Volladen.
+
 - **Once a week full (wish of a user):** per car a switch *Once a week full* (default off), the days as a bar Mo to Su to
   tap (one switch per weekday, default Saturday and Sunday) and the target (default 100 %). With a solar forecast the sunniest allowed day still ahead this week is chosen, without solar
   the first one. Sun first, the rest from the grid, so the car really gets full; full shortly before the departure (without one

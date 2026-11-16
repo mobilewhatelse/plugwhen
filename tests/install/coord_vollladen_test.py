@@ -182,6 +182,16 @@ class KeptOverMidnightTests(unittest.TestCase):
         self.assertIsNone(v.weekly_hold)
         self.assertFalse(v.weekly_active)
 
+    def test_unticking_the_day_drops_the_kept_target(self):
+        # review 16.11.: only the main switch ended a kept full charge, unticking its day in the day bar did not
+        v = self.sunday_plan()
+        fresh_need(v)
+        v.weekly_days = frozenset({5})   # Sunday unticked, Saturday (past) stays
+        bare()._weekly_full(v, AFTER_MIDNIGHT - timedelta(hours=2), None)
+        self.assertIsNone(v.weekly_hold)
+        self.assertFalse(v.weekly_active)
+        self.assertEqual(v.need.target_soc, 45.0)
+
     def test_evcc_and_look_ahead_keep_it_after_midnight(self):
         v = self.sunday_plan()
         v.departure_source, v.trips, v.consumption = "entity", [], 0.2

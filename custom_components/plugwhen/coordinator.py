@@ -29,7 +29,7 @@ from dataclasses import replace
 from . import direct_stats, fehlerbericht as fb, flotte
 from . import rueckmeldung as rm
 
-from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
+from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index, note_loadpoint_mode
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_energy_due, trip_settings
@@ -58,6 +58,7 @@ from .wallboxes import active_wallbox, car_hourly, cumulative, plan_order, share
 
 _LOGGER = logging.getLogger(__name__)
 _BAD = (None, "", STATE_UNKNOWN, STATE_UNAVAILABLE)
+OWN_GRACE_S = 120   # a value Plugwhen set on the wallbox may take this long to show up before it is sent again
 
 
 def _to_celsius(value: Any, unit: str | None) -> float | None:
@@ -139,6 +140,8 @@ class Vehicle:
     weekly_hold: datetime | None = None      # the departure the full charge counted for; kept past midnight (restored with the switch)
     weekly_hold_day: date | None = None      # the chosen day of that kept full charge
     promise: Any = None                      # safety check: the highest planned target for the coming departure (sicherheit.py)
+    promise_source: str | None = None        # where the promised departure came from (calendar, entity, learned)
+    safety_alarm: Any = None                 # safety check: the alarm the user is still to be told about (after switching)
     safety: dict[str, Any] | None = None     # safety check: "charge now" is on (reason, since, departure)
     stall_since: datetime | None = None      # safety check: a planned window runs, but the car does not charge
 
@@ -287,6 +290,7 @@ class Plugwhen:
             before = (v.evcc_write, v.direct_last)
             await self._write_evcc(v, now)
             await self._direct_step(v, now)
+            await self._safety_tell(v, now)
             acted = acted or before != (v.evcc_write, v.direct_last)
         if acted:   # show at once what was written into evcc or set on the wallbox, not only at the next run
             async_dispatcher_send(self.hass, self.signal)
@@ -304,8 +308,8 @@ class Plugwhen:
         (evcc plan, wallbox), not only at the next run in up to five minutes. In the background: a slow wallbox over the cloud
         must not hold the setting in the user interface."""
         now = dt_util.now()
-        vehicle.promise = None   # the user changed a setting: the safety check takes the new plan as its promise
-        vehicle.safety = None
+        vehicle.promise = vehicle.promise_source = None   # the user changed a setting: the safety check takes the new plan as its promise
+        vehicle.safety = vehicle.safety_alarm = None
         self._compute(vehicle, now)
         async_dispatcher_send(self.hass, self.signal)
         self.entry.async_create_background_task(self.hass, self._send_and_act(now), f"{DOMAIN} act after a setting")
@@ -897,20 +901,56 @@ class Plugwhen:
         elif domain == "button":
             await self.hass.services.async_call("button", "press", {"entity_id": entity_id}, blocking=True)
 
-    async def _own(self, v: Vehicle, entity_id: str, wanted: Any) -> str | None:
-        """Set `entity_id` to `wanted` (None = give back) - only what Plugwhen set itself is changed back."""
+    async def _own(self, v: Vehicle, entity_id: str, wanted: Any, now: datetime | None = None, force: bool = False) -> str | None:
+        """Set `entity_id` to `wanted` (None = give back) - only what Plugwhen set itself is changed back.
+
+        * A wallbox that is not reachable (unavailable, e.g. the Wi-Fi restarts at night) is left alone and nothing is
+          forgotten: its state says nothing, and a command would go nowhere.
+        * A value Plugwhen set that never showed up (a slow wallbox over the cloud) is waited for (OWN_GRACE_S), then sent again.
+        * A value that did show up and is different now was changed by the user: Plugwhen keeps its hands off until the
+          coming departure (`force` = the safety check's "charge now" overrides that: the car must be charged)."""
+        now = now or dt_util.now()
         mine = self._direct.setdefault(v.sub_id, {})
         st = self.hass.states.get(entity_id)
-        current = st.state if st is not None else None
-        rec = mine.get(entity_id, {})
-        action, value = next_action(current, wanted, rec.get("set"), rec.get("orig"))
-        if action is None:
-            if value == "user_changed" or (wanted is None and rec):
-                mine.pop(entity_id, None)   # the user took over, or nothing left to give back
+        if st is None or st.state in _BAD:
             return None
+        current = st.state
+        rec = mine.get(entity_id, {})
+        if rec.get("user"):   # changed by hand: left alone until the departure it was changed before
+            until = dt_util.parse_datetime(str(rec.get("until") or ""))
+            if not (wanted is None or force or until is None or now >= until):
+                return None
+            mine.pop(entity_id, None)
+            rec = {}
+            if wanted is None:
+                return None   # nothing of Plugwhen's left to give back
+        orig = rec.get("orig") if rec.get("orig") not in _BAD else None
+        set_by_us = rec.get("set")
+        seen = rec.get("seen", "at" not in rec)   # records of earlier versions count as seen
+        if set_by_us is not None and current == set_by_us and not seen:
+            rec["seen"] = seen = True
+        if wanted is not None and set_by_us is not None and current != set_by_us and not seen:
+            at = dt_util.parse_datetime(str(rec.get("at") or ""))
+            if at is not None and (now - at).total_seconds() < OWN_GRACE_S:
+                return None   # our command is not visible yet
+            set_by_us = None   # it never arrived: send again
+        action, value = next_action(current, wanted, set_by_us, orig)
+        if action is None:
+            if value == "user_changed" and not force:
+                until = v.departure if v.departure is not None and v.departure > now else now + timedelta(hours=24)
+                mine[entity_id] = {"user": True, "until": until.isoformat()}
+                self._diag_action(v, now, f"{entity_id} von Hand auf {current} gestellt: bleibt so bis zur Abfahrt")
+                self._evcc_store.async_delay_save(self._evcc_data, 5)
+                return None
+            if value == "user_changed":   # the safety check takes over what the user set
+                action, value, orig = "set", wanted, None
+            else:
+                if wanted is None and rec:
+                    mine.pop(entity_id, None)   # nothing left to give back
+                return None
         await self._set_entity(entity_id, value)
         if action == "set":
-            mine[entity_id] = {"set": value, "orig": rec.get("orig", current)}
+            mine[entity_id] = {"set": value, "orig": orig if orig is not None else current, "at": now.isoformat(), "seen": False}
         else:
             mine.pop(entity_id, None)
         return f"{entity_id}={value}"
@@ -932,6 +972,7 @@ class Plugwhen:
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
         await EvccClient(async_get_clientsession(self.hass), conn[0], conn[1]).set_loadpoint_mode(lp[0], value)
+        note_loadpoint_mode(self.evcc_state, lp[0], value)   # evcc is read again only at the next run
         if action == "set":
             mine["evcc_loadpoint"] = {"set": value, "orig": rec.get("orig", lp[1])}
         else:
@@ -948,13 +989,19 @@ class Plugwhen:
         done: list[str] = []
         try:
             if v.safety is not None and v.mode in ("direct", "evcc"):   # safety check: charge now until the target or the departure
+                switched = False
                 if v.mode == "evcc":
                     if caps.get("mode") and caps.get("mode_grid"):
-                        r = await self._own(v, caps["mode"], caps["mode_grid"])
+                        r = await self._own(v, caps["mode"], caps["mode_grid"], now, force=True)
                         done += [r] if r else []
                     r = await self._evcc_loadpoint_mode(v, "now")
+                    key = v.cfg.get(V_EVCC_VEHICLE)
+                    lp = loadpoint_index(self.evcc_state, key) if key and self.evcc_state is not None else None
+                    switched = bool(r) or bool(lp and lp[1] == "now")
                 elif variant in ("trip", "mode") and caps.get("mode_grid"):
-                    r = await self._own(v, caps["mode"], caps["mode_grid"])
+                    r = await self._own(v, caps["mode"], caps["mode_grid"], now, force=True)
+                    st = self.hass.states.get(caps["mode"])
+                    switched = bool(r) or bool(st is not None and st.state == caps["mode_grid"])
                 elif variant == "buttons" and caps.get("start"):
                     mine = self._direct.setdefault(v.sub_id, {})
                     r = None
@@ -962,33 +1009,40 @@ class Plugwhen:
                         await self._set_entity(caps["start"], None)
                         mine["started"] = now.isoformat()
                         r = caps["start"]
+                    switched = True
                 else:
                     r = None
                 done += [r] if r else []
+                v.safety["switched"] = switched
             elif v.mode == "direct" and variant:
                 if variant == "trip":
                     ts = trip_settings(v.need.charge_kwh if v.need else None, v.departure, now, caps.get("trip_energy_unit"))
                     if ts:
                         mine = self._direct.setdefault(v.sub_id, {})
+                        kwh, soc = v.need.charge_kwh, v.soc   # as planned now: a computation during a slow command must not mix in
                         for eid, val in ((caps["trip_time"], ts["time"]), (caps["trip_energy"], ts["energy"])):
                             st = self.hass.states.get(eid)
-                            if st is not None and str(st.state) in (str(val), f"{val}.0"):
+                            if st is None or st.state in _BAD:
+                                continue   # not reachable: a command would go nowhere, and must not count as written
+                            if str(st.state) in (str(val), f"{val}.0"):
+                                if eid == caps["trip_energy"] and not mine.get("trip_written"):
+                                    mine["trip_written"] = {"kwh": kwh, "soc": soc}   # already there (e.g. after a restart)
                                 continue
-                            if eid == caps["trip_energy"] and st is not None and not trip_energy_due(
-                                    v.need.charge_kwh, mine.get("trip_written"), v.soc,
+                            if eid == caps["trip_energy"] and not trip_energy_due(
+                                    kwh, mine.get("trip_written"), soc,
                                     float(v.cfg.get(V_CAPACITY) or 60.0), self.efficiency_of(v)):
                                 continue   # only charging progress: writing it would stop the wallbox to plan again
                             await self._set_entity(eid, val)
                             done.append(f"{eid}={val}")
                             if eid == caps["trip_energy"]:
-                                mine["trip_written"] = {"kwh": v.need.charge_kwh, "soc": v.soc}
+                                mine["trip_written"] = {"kwh": kwh, "soc": soc}
                     else:   # no trip ahead: the next one is written fresh
                         self._direct.get(v.sub_id, {}).pop("trip_written", None)
-                    r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else caps.get("mode_sun"))
+                    r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else caps.get("mode_sun"), now)
                     done += [r] if r else []
                 elif variant == "mode":
                     windows = (v.charge_plan or {}).get("windows")
-                    r = await self._own(v, caps["mode"], caps["mode_grid"] if in_grid_window(windows, now) else caps.get("mode_sun"))
+                    r = await self._own(v, caps["mode"], caps["mode_grid"] if in_grid_window(windows, now) else caps.get("mode_sun"), now)
                     done += [r] if r else []
                 elif variant == "buttons":
                     mine = self._direct.setdefault(v.sub_id, {})
@@ -1007,13 +1061,13 @@ class Plugwhen:
                 done += [r] if r else []
             elif v.mode == "evcc":
                 if caps.get("mode") and caps.get("mode_grid"):   # evcc regulates: the wallbox charges when evcc lets it
-                    r = await self._own(v, caps["mode"], caps["mode_grid"])
+                    r = await self._own(v, caps["mode"], caps["mode_grid"], now)
                     done += [r] if r else []
                 r = await self._evcc_loadpoint_mode(v, None)
                 done += [r] if r else []
             else:   # off / learn: give back everything Plugwhen set
                 for eid in [e for e in self._direct.get(v.sub_id, {}) if "." in e]:
-                    r = await self._own(v, eid, None)
+                    r = await self._own(v, eid, None, now)
                     done += [r] if r else []
                 mine = self._direct.get(v.sub_id, {})
                 if mine.get("started"):   # Plugwhen pressed start: press stop, or the wallbox keeps charging from the grid
@@ -1025,6 +1079,8 @@ class Plugwhen:
                 done += [r] if r else []
         except Exception as err:  # noqa: BLE001 - a wallbox or evcc that does not answer must not stop the planner
             v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "error": err_text(err)}
+            if v.safety is not None:
+                v.safety["switched"] = False
             self._diag_action(v, now, f"{v.mode}: Fehler {err_text(err)} nach {', '.join(done) or 'nichts gesetzt'}")
             _LOGGER.warning("Plugwhen: wallbox of %s not controlled: %s", v.name, err)
             return
@@ -1060,13 +1116,23 @@ class Plugwhen:
             return
         departure = v.promise.departure
         v.safety = {"reason": alarm.reason, "since": now.isoformat(), "departure": departure.isoformat()}
+        v.safety_alarm = alarm   # told after the wallbox was switched (_safety_tell): the message says what really happened
         self._diag_action(v, now, f"Sicherheitspruefung: {alarm.reason}, {alarm.missing_kwh} kWh fehlen - Jetzt laden")
         _LOGGER.warning("Plugwhen: safety check for %s (%s): charging now", v.name, alarm.reason)
-        key = f"safety-{departure.date().isoformat()}-{alarm.reason}"
+
+    async def _safety_tell(self, v: Vehicle, now: datetime) -> None:
+        """Tell the user about "charge now" - after the wallbox was switched, so the message says whether that worked."""
+        alarm, v.safety_alarm = v.safety_alarm, None
+        if alarm is None or v.safety is None:
+            return
+        switched = bool(v.safety.get("switched"))
+        if not switched:
+            self._diag_action(v, now, "Sicherheitspruefung: Wallbox nicht umgeschaltet")
+        key = f"safety-{v.safety['departure'][:10]}-{alarm.reason}" + ("" if switched else "-failed")
         sent = self._sent.setdefault(v.sub_id, [])
         if key in sent:
             return
-        title, message = sicherheit.alarm_text(self.hass.config.language, alarm, v.name)
+        title, message = sicherheit.alarm_text(self.hass.config.language, alarm, v.name, switched)
         try:   # always also in Home Assistant's notifications, so it is there without a phone service and stays until read
             await self.hass.services.async_call("persistent_notification", "create", {
                 "title": title, "message": message, "notification_id": f"{DOMAIN}_safety_{v.sub_id}"}, blocking=False)
@@ -1766,6 +1832,7 @@ class Plugwhen:
         if v.soc is None:  # without the state of charge nothing can be said: no plan, no warning (the sensors say so)
             v.charge_plan = {"status": "unknown_soc", "windows": [], "needed_kwh": None, "planned_kwh": None}
             v.notice = None
+            v.stall_since = None
             v.horizon = None
             v.load_used = v.availability_used = False
             return
@@ -1791,12 +1858,19 @@ class Plugwhen:
             planned_kwh=planned,
         )
         # safety check: keep the promise for the coming departure, and note when a planned window runs without charging
-        v.promise = sicherheit.update_promise(v.promise, v.departure, v.need.target_soc, v.plugged, now)
+        still = True   # is the promised departure still expected? A calendar trip the user deleted or a changed entity is not
+        if v.promise is not None and v.promise_source == "calendar":
+            still = self._trip_at(v, v.promise.departure) is not None
+        elif v.promise is not None and v.promise_source == "entity":
+            still = False
+        promise = sicherheit.update_promise(v.promise, v.departure, v.need.target_soc, v.plugged, now, still)
+        if promise is None or v.promise is None or promise.departure != v.promise.departure:
+            v.promise_source = v.departure_source if promise is not None else None
+        v.promise = promise
         running = any(w["start"] <= now < w["end"] for w in v.charge_plan.get("windows") or [])
-        if running and v.plugged is not False and not v.charging:
-            v.stall_since = v.stall_since or now
-        else:
-            v.stall_since = None
+        # only a wallbox that says it does not charge counts: one that is not reachable (Wi-Fi restart at night) says nothing
+        known = (self._is_on(v.cfg.get(V_CHARGING)) is not None) if v.cfg.get(V_CHARGING) else v.evcc_live is not None
+        v.stall_since = sicherheit.stall_start(v.stall_since, now, running, v.plugged, known, v.charging)
 
     @staticmethod
     def _weekly_applies(v: Vehicle, now: datetime, departure: datetime | None) -> bool:
@@ -1808,7 +1882,9 @@ class Plugwhen:
     def _weekly_full(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None) -> None:
         """Once a week full: choose the day (most sun among the allowed days, else the first), raise the target for a plan that
         includes it, mark the week done when the car got there. The grid fills in what the sun does not deliver."""
-        if not v.weekly_full or not vl.held(now, v.weekly_hold):
+        if (not v.weekly_full or not vl.held(now, v.weekly_hold)
+                or (v.weekly_hold_day is not None and isinstance(v.weekly_days, (set, frozenset))
+                    and v.weekly_hold_day.weekday() not in v.weekly_days)):   # the day was unticked
             v.weekly_hold = v.weekly_hold_day = None
         if v.weekly_hold is not None:   # promised for a departure: kept past midnight and into the next week
             v.weekly_day = v.weekly_hold_day

@@ -263,7 +263,9 @@ what it can do (the card *Ready to switch?* shows it):
 - **Mode change** (charging mode with a solar and a grid mode): grid mode in the planned grid windows, otherwise back.
 - **Start/stop only:** start at the beginning, stop at the end of a planned window.
 
-Plugwhen only changes back what it set itself. If you change the wallbox yourself in between, Plugwhen leaves it alone.
+Plugwhen only changes back what it set itself. If you change the wallbox yourself in between, Plugwhen leaves it alone until the
+next departure; only the safety check ("charge now") still steps in. While the wallbox is not reachable, Plugwhen waits and
+forgets nothing.
 
 **The mode decides who controls, and sets the wallbox accordingly:** *Direct* sets the wallbox to its solar mode (for example Eco) as the
 basic setting; evcc may then only **read** this wallbox (or not be there at all), because "Off" in evcc means "charging blocked", not
