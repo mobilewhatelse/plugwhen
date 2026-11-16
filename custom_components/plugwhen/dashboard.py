@@ -15,7 +15,8 @@ ENTITY_KEYS = {
     "readiness": "sensor", "potential": "sensor", "week_plan": "sensor", "reserve_km": "number", "learn_km": "switch",
     "mode": "select", "would_switch": "sensor", "learning_check": "sensor", "habit": "sensor",
     "notice_enabled": "switch", "switch_ready": "sensor",
-    "weekly_full": "switch", "weekly_days": "select", "weekly_target": "number",
+    "weekly_full": "switch", "weekly_target": "number",
+    **{f"weekly_day_{d}": "switch" for d in range(7)},
 }
 
 TEXT = {
@@ -26,7 +27,8 @@ TEXT = {
         reserve="Reserve (km), mit der das Auto mindestens losfährt", learn="Kilometer je Wochentag lernen",
         notice="Warnen, wenn das Auto nicht bereit sein wird",
         wf="Einmal pro Woche voll laden", wf_days="An diesen Tagen (mit PV: der sonnigste)", wf_target="Ziel beim Volladen",
-        wf_days_names="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag",
+        wf_days_names="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag", wf_days_short="Mo,Di,Mi,Do,Fr,Sa,So",
+        wf_days_hint="Tage antippen. Mehrere Tage: mit Solarprognose der sonnigste, sonst der erste.",
         wf_active="**Volladen läuft:** Ziel {t} %, zuerst mit Sonne, der Rest aus dem Netz.", wf_planned="Volladen geplant für {d}.",
         wf_done="Volladen diese Woche erledigt.", wf_none="Diese Woche ist kein erlaubter Tag mehr übrig.",
         settings_note="**Reserve** ist die Untergrenze der Reichweite. Ist der Schalter an, hebt der gelernte hohe Wert eines Wochentags sie bei Bedarf an. Aus: nur die Reserve zählt.",
@@ -127,7 +129,8 @@ TEXT = {
         reserve="Reserve (km) the car always leaves with", learn="Learn kilometres per weekday",
         notice="Warn when the car will not be ready",
         wf="Once a week full", wf_days="On these days (with PV: the sunniest)", wf_target="Target of the full charge",
-        wf_days_names="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday",
+        wf_days_names="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday", wf_days_short="Mo,Tu,We,Th,Fr,Sa,Su",
+        wf_days_hint="Tap the days. Several days: the sunniest with a solar forecast, otherwise the first.",
         wf_active="**Full charge running:** target {t} %, sun first, the rest from the grid.", wf_planned="Full charge planned for {d}.",
         wf_done="Full charge done this week.", wf_none="No allowed day is left this week.",
         settings_note="**Reserve** is the lowest range. With the switch on, a weekday's learned high value raises it when needed. Off: only the reserve counts.",
@@ -472,12 +475,20 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
                   + "{% elif a.day %}" + t["wf_planned"].replace("{d}", "{{ " + names + "[as_datetime(a.day).weekday()] }}")
                   + "{% elif a.done %}" + t["wf_done"] + "{% else %}" + t["wf_none"] + "{% endif %}{% endif %}")
         ents = [{"entity": sw, "name": t["wf"]}]
-        if ids.get("weekly_days"):
-            ents.append({"entity": ids["weekly_days"], "name": t["wf_days"]})
         if tg:
             ents.append({"entity": tg, "name": t["wf_target"]})
-        details[-1]["cards"] += [{"type": "entities", "show_header_toggle": False, "entities": ents},
-                                 {"type": "markdown", "content": status}]
+        cards: list[dict[str, Any]] = [{"type": "entities", "show_header_toggle": False, "entities": ents}]
+        day_ids = [ids.get(f"weekly_day_{d}") for d in range(7)]
+        if all(day_ids):   # the day bar: seven buttons Mo..So, tap to tick
+            short = t["wf_days_short"].split(",")
+            cards += [
+                {"type": "markdown", "content": "**" + t["wf_days"] + "**  \n" + t["wf_days_hint"]},
+                {"type": "grid", "columns": 7, "square": False, "cards": [
+                    {"type": "button", "entity": eid, "name": short[d], "show_icon": False, "show_state": False,
+                     "tap_action": {"action": "toggle"}, "hold_action": {"action": "more-info"}}
+                    for d, eid in enumerate(day_ids)]},
+            ]
+        details[-1]["cards"] += cards + [{"type": "markdown", "content": status}]
     return {"overview": overview, "learning": learning, "details": details}
 
 

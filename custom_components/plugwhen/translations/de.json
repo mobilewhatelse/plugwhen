@@ -378,6 +378,27 @@
       },
       "weekly_full": {
         "name": "Einmal pro Woche voll laden"
+      },
+      "weekly_day_0": {
+        "name": "Wöchentlich voll laden am Montag"
+      },
+      "weekly_day_1": {
+        "name": "Wöchentlich voll laden am Dienstag"
+      },
+      "weekly_day_2": {
+        "name": "Wöchentlich voll laden am Mittwoch"
+      },
+      "weekly_day_3": {
+        "name": "Wöchentlich voll laden am Donnerstag"
+      },
+      "weekly_day_4": {
+        "name": "Wöchentlich voll laden am Freitag"
+      },
+      "weekly_day_5": {
+        "name": "Wöchentlich voll laden am Samstag"
+      },
+      "weekly_day_6": {
+        "name": "Wöchentlich voll laden am Sonntag"
       }
     },
     "number": {
@@ -396,16 +417,6 @@
           "learn": "Lernen",
           "evcc": "Über evcc (Plan schreiben)",
           "direct": "Direkt (Plugwhen steuert die Wallbox)"
-        }
-      },
-      "weekly_days": {
-        "name": "Tage für das wöchentliche Volladen",
-        "state": {
-          "weekend": "Samstag oder Sonntag",
-          "saturday": "Samstag",
-          "sunday": "Sonntag",
-          "friday_sunday": "Freitag bis Sonntag",
-          "any_day": "Jeder Tag der Woche"
         }
       }
     },

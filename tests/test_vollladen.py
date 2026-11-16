@@ -20,6 +20,36 @@ def sun(day: date, kw: float, hours=range(10, 15)) -> dict[datetime, float]:
     return {datetime(day.year, day.month, day.day, h, m, tzinfo=TZ): kw for h in hours for m in (0, 15, 30, 45)}
 
 
+class DayBarTests(unittest.TestCase):
+    """Since the day bar the allowed days are the ticked weekdays (0=Monday)."""
+
+    MON0 = FRI - timedelta(days=4)   # Monday of that week
+
+    def test_a_single_weekday(self):
+        self.assertEqual(vl.choose_day(self.MON0, frozenset({2}), None, None), self.MON0 + timedelta(days=2))   # Wednesday
+
+    def test_several_days_the_sunniest(self):
+        wed, thu = self.MON0 + timedelta(days=2), self.MON0 + timedelta(days=3)
+        self.assertEqual(vl.choose_day(self.MON0, frozenset({2, 3}), {**sun(wed, 1.0), **sun(thu, 3.0)}, None), thu)
+
+    def test_no_day_ticked_means_no_full_charge(self):
+        self.assertIsNone(vl.choose_day(self.MON0, frozenset(), None, None))
+
+    def test_a_day_already_past_this_week_waits_for_next_week(self):
+        self.assertIsNone(vl.choose_day(FRI, frozenset({0}), None, None))   # Monday ticked, it is Friday
+
+    def test_the_former_selection_is_carried_over(self):
+        self.assertEqual(vl.days_of("weekend"), frozenset({5, 6}))
+        self.assertEqual(vl.days_of("friday_sunday"), frozenset({4, 5, 6}))
+        self.assertEqual(vl.days_of("any_day"), frozenset(range(7)))
+        self.assertIsNone(vl.days_of(None))
+        self.assertIsNone(vl.days_of("unavailable"))
+
+    def test_default_is_the_weekend(self):
+        self.assertEqual(vl.DEFAULT_DAY_SET, frozenset({5, 6}))
+        self.assertEqual(vl.days_text(frozenset({6, 5})), "Sa,So")
+
+
 class ChooseDayTests(unittest.TestCase):
     def test_no_pv_first_allowed_day(self):
         self.assertEqual(vl.choose_day(FRI, "weekend", None, None), SAT)

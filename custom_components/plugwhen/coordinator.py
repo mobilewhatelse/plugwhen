@@ -32,7 +32,7 @@ from . import rueckmeldung as rm
 from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
-from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_settings
+from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_energy_due, trip_settings
 from .trips import (GEO_MISS, address_variants, coordinates, event_days, parse_geocode, range_for_trip, trip_km, trips_from_events,
                     waze_region)
 from .freshness import soc_is_stale
@@ -51,6 +51,7 @@ from .startwerte import charge_efficiency
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, should_check
 from .plan import make_plan
 from . import vollladen as vl
+from . import sicherheit
 from .shadow import Decision, ShadowLog, decide
 from .potential import Prices, calculate as calculate_potential, clean_grid
 from .wallboxes import active_wallbox, car_hourly, cumulative, plan_order, shared, soc_rise_hours, taken_by_others, wallbox_ids
@@ -129,11 +130,17 @@ class Vehicle:
     fleet_model: str | None = None           # car model for the fleet values (maker and model of the state of charge's device)
     fleet_cars: int | None = None            # how many cars the fleet value in use comes from
     weekly_full: bool = False                # once a week full (switch, default off; vollladen.py)
-    weekly_days: str = vl.DEFAULT_DAYS       # allowed days (select)
+    weekly_days: frozenset[int] = vl.DEFAULT_DAY_SET   # allowed weekdays 0=Mon..6=Sun (one switch per day)
+    weekly_days_old: frozenset[int] | None = None       # the days of the former selection (0.9.2 builds before the day bar)
     weekly_target: float = vl.DEFAULT_TARGET  # target of the full charge in % (number)
     weekly_done: str | None = None           # ISO week in which the car was full (restored with the switch)
     weekly_day: date | None = None           # the day chosen this week (None = done or none left)
     weekly_active: bool = False              # the full charge counts for the current plan
+    weekly_hold: datetime | None = None      # the departure the full charge counted for; kept past midnight (restored with the switch)
+    weekly_hold_day: date | None = None      # the chosen day of that kept full charge
+    promise: Any = None                      # safety check: the highest planned target for the coming departure (sicherheit.py)
+    safety: dict[str, Any] | None = None     # safety check: "charge now" is on (reason, since, departure)
+    stall_since: datetime | None = None      # safety check: a planned window runs, but the car does not charge
 
 
 def err_text(err: BaseException) -> str:
@@ -276,6 +283,7 @@ class Plugwhen:
         acted = False
         for v in self.vehicles.values():
             await self._maybe_send(v, now)
+            await self._safety_step(v, now)
             before = (v.evcc_write, v.direct_last)
             await self._write_evcc(v, now)
             await self._direct_step(v, now)
@@ -296,6 +304,8 @@ class Plugwhen:
         (evcc plan, wallbox), not only at the next run in up to five minutes. In the background: a slow wallbox over the cloud
         must not hold the setting in the user interface."""
         now = dt_util.now()
+        vehicle.promise = None   # the user changed a setting: the safety check takes the new plan as its promise
+        vehicle.safety = None
         self._compute(vehicle, now)
         async_dispatcher_send(self.hass, self.signal)
         self.entry.async_create_background_task(self.hass, self._send_and_act(now), f"{DOMAIN} act after a setting")
@@ -562,7 +572,7 @@ class Plugwhen:
                                  "kapazitaet_kwh": v.cfg.get(V_CAPACITY), "verbrauch_kwh_km": round(v.consumption, 3),
                                  "verbrauch_quelle": v.consumption_source, "reserve_km": v.reserve_km}
             if v.weekly_full:   # weekday only, never a clock time
-                a["volladen"] = (f"an, {v.weekly_days}, Ziel {v.weekly_target:.0f} %, "
+                a["volladen"] = (f"an, {vl.days_text(v.weekly_days)}, Ziel {v.weekly_target:.0f} %, "
                                  + ("läuft" if v.weekly_active else f"geplant {('Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So')[v.weekly_day.weekday()]}"
                                     if v.weekly_day else "diese Woche erledigt" if v.weekly_done == vl.week_key(now.date()) else "kein Tag mehr"))
             if v.need:
@@ -937,15 +947,43 @@ class Plugwhen:
         variant = caps.get("variant")
         done: list[str] = []
         try:
-            if v.mode == "direct" and variant:
+            if v.safety is not None and v.mode in ("direct", "evcc"):   # safety check: charge now until the target or the departure
+                if v.mode == "evcc":
+                    if caps.get("mode") and caps.get("mode_grid"):
+                        r = await self._own(v, caps["mode"], caps["mode_grid"])
+                        done += [r] if r else []
+                    r = await self._evcc_loadpoint_mode(v, "now")
+                elif variant in ("trip", "mode") and caps.get("mode_grid"):
+                    r = await self._own(v, caps["mode"], caps["mode_grid"])
+                elif variant == "buttons" and caps.get("start"):
+                    mine = self._direct.setdefault(v.sub_id, {})
+                    r = None
+                    if not mine.get("started"):
+                        await self._set_entity(caps["start"], None)
+                        mine["started"] = now.isoformat()
+                        r = caps["start"]
+                else:
+                    r = None
+                done += [r] if r else []
+            elif v.mode == "direct" and variant:
                 if variant == "trip":
                     ts = trip_settings(v.need.charge_kwh if v.need else None, v.departure, now, caps.get("trip_energy_unit"))
                     if ts:
+                        mine = self._direct.setdefault(v.sub_id, {})
                         for eid, val in ((caps["trip_time"], ts["time"]), (caps["trip_energy"], ts["energy"])):
                             st = self.hass.states.get(eid)
-                            if st is None or str(st.state) not in (str(val), f"{val}.0"):
-                                await self._set_entity(eid, val)
-                                done.append(f"{eid}={val}")
+                            if st is not None and str(st.state) in (str(val), f"{val}.0"):
+                                continue
+                            if eid == caps["trip_energy"] and st is not None and not trip_energy_due(
+                                    v.need.charge_kwh, mine.get("trip_written"), v.soc,
+                                    float(v.cfg.get(V_CAPACITY) or 60.0), self.efficiency_of(v)):
+                                continue   # only charging progress: writing it would stop the wallbox to plan again
+                            await self._set_entity(eid, val)
+                            done.append(f"{eid}={val}")
+                            if eid == caps["trip_energy"]:
+                                mine["trip_written"] = {"kwh": v.need.charge_kwh, "soc": v.soc}
+                    else:   # no trip ahead: the next one is written fresh
+                        self._direct.get(v.sub_id, {}).pop("trip_written", None)
                     r = await self._own(v, caps["mode"], caps["mode_trip"] if ts else caps.get("mode_sun"))
                     done += [r] if r else []
                 elif variant == "mode":
@@ -994,6 +1032,50 @@ class Plugwhen:
             v.direct_last = {"at": now.isoformat(), "mode": v.mode, "variant": variant, "done": done, "error": None}
             self._diag_action(v, now, f"{v.mode}: {', '.join(done)}")
             self._evcc_store.async_delay_save(self._evcc_data, 5)
+
+    def can_charge_now(self, v: Vehicle) -> bool:
+        """Can Plugwhen itself switch the wallbox to "charge now" (mode direct with a controllable wallbox, or evcc)?"""
+        if v.mode == "evcc":
+            return bool(v.cfg.get(V_EVCC_VEHICLE)) and self.evcc_connection() is not None
+        if v.mode != "direct":
+            return False
+        caps = self.wallbox_control(v)
+        variant = caps.get("variant")
+        return bool((variant in ("trip", "mode") and caps.get("mode_grid")) or (variant == "buttons" and caps.get("start")))
+
+    async def _safety_step(self, v: Vehicle, now: datetime) -> None:
+        """Safety check before every departure: from three hours before, compare the promise with reality; if the car would not
+        be charged, switch to "charge now" (when Plugwhen controls the wallbox) and tell the user why."""
+        if v.safety is not None and sicherheit.charge_now_done(now, v.promise, v.soc, v.plugged):
+            self._diag_action(v, now, "Sicherheitspruefung: Jetzt laden beendet")
+            v.safety = None
+        if v.safety is not None or not self.can_charge_now(v):
+            return   # without control of the wallbox (off, learn) the readiness warning tells the user, as set by the user
+        stalled = (now - v.stall_since).total_seconds() / 60.0 if v.stall_since else 0.0
+        alarm = sicherheit.check(
+            now, v.promise, v.need.target_soc if v.need else None, v.soc, plugged=v.plugged, charging=v.charging,
+            stalled_min=stalled, capacity_kwh=float(v.cfg.get(V_CAPACITY) or 60.0),
+            efficiency=self.efficiency_of(v), max_kw=float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX)))
+        if alarm is None:
+            return
+        departure = v.promise.departure
+        v.safety = {"reason": alarm.reason, "since": now.isoformat(), "departure": departure.isoformat()}
+        self._diag_action(v, now, f"Sicherheitspruefung: {alarm.reason}, {alarm.missing_kwh} kWh fehlen - Jetzt laden")
+        _LOGGER.warning("Plugwhen: safety check for %s (%s): charging now", v.name, alarm.reason)
+        key = f"safety-{departure.date().isoformat()}-{alarm.reason}"
+        sent = self._sent.setdefault(v.sub_id, [])
+        if key in sent:
+            return
+        title, message = sicherheit.alarm_text(self.hass.config.language, alarm, v.name)
+        try:   # always also in Home Assistant's notifications, so it is there without a phone service and stays until read
+            await self.hass.services.async_call("persistent_notification", "create", {
+                "title": title, "message": message, "notification_id": f"{DOMAIN}_safety_{v.sub_id}"}, blocking=False)
+        except Exception as err:  # noqa: BLE001 - a missing notification must not stop charging
+            _LOGGER.warning("Plugwhen: notification for %s not created: %s", v.name, err)
+        services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
+        if not (services and await self._deliver(v, services, title, message, key)):
+            remember_sent(sent, key, SENT_KEEP)
+            self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
 
     def _min_soc(self, v: Vehicle) -> float:
         """Never plan below this: the stock for unplanned trips (setting), at least 20 %."""
@@ -1044,7 +1126,7 @@ class Plugwhen:
             cal = self._trip_at(v, dep) is not None
             t = compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
                              learn_km=v.learn_km or cal, min_soc=self._min_soc(v)).target_soc
-            if dep is not None and v.weekly_full and vl.applies(now, dep, v.weekly_day):   # once a week full also into evcc
+            if dep is not None and v.weekly_full and self._weekly_applies(v, now, dep):   # once a week full also into evcc
                 t = max(t, v.weekly_target)
             return t
 
@@ -1708,17 +1790,40 @@ class Plugwhen:
             v.need, v.soc, plugged=v.plugged, charging=v.charging, hours_to_departure=hours, charge_kw_max=max_kw,
             planned_kwh=planned,
         )
+        # safety check: keep the promise for the coming departure, and note when a planned window runs without charging
+        v.promise = sicherheit.update_promise(v.promise, v.departure, v.need.target_soc, v.plugged, now)
+        running = any(w["start"] <= now < w["end"] for w in v.charge_plan.get("windows") or [])
+        if running and v.plugged is not False and not v.charging:
+            v.stall_since = v.stall_since or now
+        else:
+            v.stall_since = None
+
+    @staticmethod
+    def _weekly_applies(v: Vehicle, now: datetime, departure: datetime | None) -> bool:
+        """Does the full charge count for a plan to this departure (a kept one, or one for the chosen day)?"""
+        if vl.held(now, v.weekly_hold):
+            return vl.applies_held(now, departure, v.weekly_hold)
+        return vl.applies(now, departure, v.weekly_day)
 
     def _weekly_full(self, v: Vehicle, now: datetime, avail: dict[datetime, float] | None) -> None:
         """Once a week full: choose the day (most sun among the allowed days, else the first), raise the target for a plan that
         includes it, mark the week done when the car got there. The grid fills in what the sun does not deliver."""
-        v.weekly_day = vl.choose_day(now.date(), v.weekly_days, avail, v.weekly_done) if v.weekly_full else None
-        v.weekly_active = vl.applies(now, v.departure, v.weekly_day)
+        if not v.weekly_full or not vl.held(now, v.weekly_hold):
+            v.weekly_hold = v.weekly_hold_day = None
+        if v.weekly_hold is not None:   # promised for a departure: kept past midnight and into the next week
+            v.weekly_day = v.weekly_hold_day
+            v.weekly_active = vl.applies_held(now, v.departure, v.weekly_hold)
+        else:
+            v.weekly_day = vl.choose_day(now.date(), v.weekly_days, avail, v.weekly_done) if v.weekly_full else None
+            v.weekly_active = vl.applies(now, v.departure, v.weekly_day)
+            if v.weekly_active and v.departure is not None:
+                v.weekly_hold, v.weekly_hold_day = v.departure, v.weekly_day
         if not v.weekly_active or v.need is None:
             return
         if vl.reached(v.soc, v.weekly_target):
-            v.weekly_done = vl.week_key(now.date())
+            v.weekly_done = vl.week_key(v.weekly_day or now.date())   # the week of the chosen day, also when reached on Monday
             v.weekly_day, v.weekly_active = None, False
+            v.weekly_hold = v.weekly_hold_day = None
             return
         if v.weekly_target > v.need.target_soc:
             capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
@@ -1734,7 +1839,7 @@ class Plugwhen:
             p = v.model.plan(weekday)
             need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km)
             km = need.km
-            if v.weekly_full and vl.applies(now, departure, v.weekly_day):   # once a week full: the range of the full target
+            if v.weekly_full and self._weekly_applies(v, now, departure):   # once a week full: the range of the full target
                 km = max(km, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
             return Trip(departure, float(p.km_typical or 0.0), km)
 

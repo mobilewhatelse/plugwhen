@@ -53,13 +53,20 @@ Why spreading: a wallbox "ready by" at full power charges late and hard (for exa
 sets the monthly peak. Spread over the night the same energy needs 2-3 kW.
 
 **Once a week full (from 0.9.2).** Many makers advise charging the battery full now and then (for example so that the shown state
-of charge stays right). Per car there is the switch *Once a week full* (default off), the *Days for the weekly full charge*
-(default Saturday or Sunday) and the *Target of the weekly full charge* (default 100 %). With a solar forecast Plugwhen takes the
+of charge stays right). Per car there is the switch *Once a week full* (default off), the days as a bar
+*Mo Tu We Th Fr Sa Su* to tap (one switch per weekday, default Saturday and Sunday; no day ticked means no full charge) and the *Target of the weekly full charge* (default 100 %). With a solar forecast Plugwhen takes the
 allowed day still ahead this week with the most sun, without solar the first one. A plan that includes that day gets the higher
 target: sun first, the rest from the grid, so that the car really gets full. As always the plan puts the grid part into the quiet
 hours before the departure, so the battery does not sit full for long. Without a departure that day the car is full by 8 pm.
 Once per week (Monday to Sunday): when the target is reached the normal target counts again until next week. The card
 *Settings* shows for which day the full charge is planned.
+
+**Safety check before every departure (from 0.9.2).** From three hours before every departure Plugwhen checks every day whether
+the car still reaches the promised target. If the planned target fell, the wallbox does not charge although the plan says so, or
+time is getting short, Plugwhen switches to "charge now" in the modes *direct* and *evcc* and sends a message with the reason to
+the car's notify services; the same message is in Home Assistant's notifications. There is a message only when Plugwhen really
+acts, once per departure and reason. "Charge now" ends at the target, at the departure or when the car is unplugged. In the modes *off* and
+*learn* Plugwhen does not touch the wallbox; there the warning tells as before when the car will not be ready.
 
 ## Plug-in times
 

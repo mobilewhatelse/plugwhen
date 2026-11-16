@@ -15,7 +15,8 @@ from .entity import PlugwhenEntity, PlugwhenMainEntity
 async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry, add: AddConfigEntryEntitiesCallback) -> None:
     plug = entry.runtime_data
     for sub_id, v in plug.vehicles.items():
-        add([LearnKmSwitch(plug, v), NoticeSwitch(plug, v), WeeklyFullSwitch(plug, v)], config_subentry_id=sub_id)
+        add([LearnKmSwitch(plug, v), NoticeSwitch(plug, v), WeeklyFullSwitch(plug, v)]
+            + [WeeklyDaySwitch(plug, v, wd) for wd in range(7)], config_subentry_id=sub_id)
     add([ShareSwitch(plug)])
 
 
@@ -75,6 +76,46 @@ class NoticeSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
         await self.plug.async_recompute(self.vehicle)
 
 
+class WeeklyDaySwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
+    """One weekday of the weekly full charge (Monday to Sunday, shown as a bar on the dashboard). Several ticked: the sunniest of
+    them, without a forecast the first. Default Saturday and Sunday; a choice from the former selection is carried over."""
+
+    _attr_icon = "mdi:calendar-check"
+
+    def __init__(self, plug, vehicle, weekday: int) -> None:
+        super().__init__(plug, vehicle, f"weekly_day_{weekday}")
+        self.weekday = weekday
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        from . import vollladen as vl
+
+        last = await self.async_get_last_state()
+        if last is not None and last.state in ("on", "off"):
+            on = last.state == "on"
+        else:
+            on = self.weekday in (self.vehicle.weekly_days_old or vl.DEFAULT_DAY_SET)
+        self._set(on)
+
+    def _set(self, on: bool) -> None:
+        days = set(self.vehicle.weekly_days)
+        (days.add if on else days.discard)(self.weekday)
+        self.vehicle.weekly_days = frozenset(days)
+
+    @property
+    def is_on(self) -> bool:
+        return self.weekday in self.vehicle.weekly_days
+
+    async def async_turn_on(self, **kwargs) -> None:
+        self._set(True)
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        self._set(False)
+        self.async_write_ha_state()
+        await self.plug.async_recompute(self.vehicle)
+
 
 class ShareSwitch(PlugwhenMainEntity, SwitchEntity, RestoreEntity):
     """The voluntary usage statistics: as chosen in the last step of the set-up (default off), afterwards the last state."""
@@ -118,6 +159,17 @@ class WeeklyFullSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
         self.vehicle.weekly_full = last is not None and last.state == "on"   # default off
         if last is not None and isinstance(last.attributes.get("done_week"), str):
             self.vehicle.weekly_done = last.attributes["done_week"]
+        if last is not None:   # a full charge kept for a departure survives a restart in the night
+            from datetime import date as _date
+
+            from homeassistant.util import dt as dt_util
+
+            hold, day = dt_util.parse_datetime(str(last.attributes.get("hold_until") or "")), last.attributes.get("hold_day")
+            if hold is not None and isinstance(day, str):
+                try:
+                    self.vehicle.weekly_hold, self.vehicle.weekly_hold_day = hold, _date.fromisoformat(day)
+                except ValueError:
+                    pass
 
     @property
     def is_on(self) -> bool:
@@ -131,7 +183,9 @@ class WeeklyFullSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
         from . import vollladen as vl
 
         return {"done_week": v.weekly_done, "done": v.weekly_done == vl.week_key(dt_util.now().date()),
-                "day": v.weekly_day.isoformat() if v.weekly_day else None, "active": v.weekly_active}
+                "day": v.weekly_day.isoformat() if v.weekly_day else None, "active": v.weekly_active,
+                "hold_until": v.weekly_hold.isoformat() if v.weekly_hold else None,
+                "hold_day": v.weekly_hold_day.isoformat() if v.weekly_hold_day else None}
 
     async def async_turn_on(self, **kwargs) -> None:
         self.vehicle.weekly_full = True

@@ -30,7 +30,7 @@ def bare() -> co.Plugwhen:
 
 def car(soc: float, departure=MON_MORNING) -> co.Vehicle:
     v = co.Vehicle("sub", "Auto", {"capacity_kwh": 60})
-    v.weekly_full, v.weekly_days, v.weekly_target = True, "weekend", 100.0
+    v.weekly_full, v.weekly_days, v.weekly_target = True, vl.DEFAULT_DAY_SET, 100.0
     v.soc, v.departure = soc, departure
     v.need = Need(km=100, kwh=20, target_soc=45.0, charge_kwh=0.0, reachable=True, source="reserve")
     return v
@@ -108,6 +108,90 @@ class WeeklyFullTests(unittest.TestCase):
         v.horizon = {"status": "ok", "first_need": {"departure": MON_MORNING.isoformat()}}
         ahead, _week, _reason, _ = bare().evcc_plan_inputs(v, FRI_EVENING)
         self.assertLess(ahead["target_soc"], 100.0)
+
+
+SUN_EVENING = datetime(2026, 11, 22, 18, 50, tzinfo=TZ)
+AFTER_MIDNIGHT = datetime(2026, 11, 23, 0, 2, tzinfo=TZ)
+
+
+def fresh_need(v: co.Vehicle) -> None:
+    """The coordinator computes the normal need again every run before the full charge raises it."""
+    v.need = Need(km=100, kwh=20, target_soc=45.0, charge_kwh=0.0, reachable=True, source="reserve")
+
+
+class KeptOverMidnightTests(unittest.TestCase):
+    """Bug 16.11.2026: chosen Sunday, plugged in Sunday evening, departure Monday 07:00. The planner charges in the night; at
+    midnight the full target was gone and the wallbox got only the normal amount."""
+
+    def sunday_plan(self, soc: float = 28.0) -> co.Vehicle:
+        v = car(soc)
+        bare()._weekly_full(v, SUN_EVENING, None)
+        self.assertTrue(v.weekly_active)
+        self.assertEqual(v.weekly_hold, MON_MORNING)
+        return v
+
+    def test_full_target_kept_after_midnight(self):
+        v = self.sunday_plan()
+        fresh_need(v)
+        bare()._weekly_full(v, AFTER_MIDNIGHT, None)
+        self.assertTrue(v.weekly_active)
+        self.assertEqual(v.need.target_soc, 100.0)
+        self.assertEqual(v.weekly_day, SUN_EVENING.date())
+
+    def test_kept_when_the_departure_moves_an_hour_later(self):
+        v = self.sunday_plan()
+        fresh_need(v)
+        v.departure = MON_MORNING + timedelta(hours=1)
+        bare()._weekly_full(v, AFTER_MIDNIGHT + timedelta(hours=1), None)
+        self.assertEqual(v.need.target_soc, 100.0)
+
+    def test_reached_on_monday_books_the_week_of_sunday(self):
+        v = self.sunday_plan()
+        v.soc = 99.5
+        fresh_need(v)
+        bare()._weekly_full(v, AFTER_MIDNIGHT + timedelta(hours=5), None)
+        self.assertEqual(v.weekly_done, vl.week_key(SUN_EVENING.date()))
+        self.assertIsNone(v.weekly_hold)
+        self.assertEqual(v.need.target_soc, 45.0)
+        # the new week chooses its own day again
+        bare()._weekly_full(v, AFTER_MIDNIGHT + timedelta(hours=6), None)
+        self.assertIsNotNone(v.weekly_day)
+        self.assertGreater(v.weekly_day, SUN_EVENING.date())
+
+    def test_released_after_the_departure(self):
+        v = self.sunday_plan()
+        fresh_need(v)
+        v.departure = MON_MORNING + timedelta(days=1)   # the next departure: Tuesday
+        bare()._weekly_full(v, MON_MORNING + timedelta(hours=vl.HOLD_SLACK_H, minutes=1), None)
+        self.assertIsNone(v.weekly_hold)
+        self.assertFalse(v.weekly_active)
+        self.assertEqual(v.need.target_soc, 45.0)
+
+    def test_a_later_departure_does_not_get_the_kept_target(self):
+        v = self.sunday_plan()
+        fresh_need(v)
+        v.departure = MON_MORNING + timedelta(days=1)   # the car was not used Monday, the plan now goes to Tuesday
+        bare()._weekly_full(v, AFTER_MIDNIGHT, None)
+        self.assertFalse(v.weekly_active)
+
+    def test_switched_off_drops_the_kept_target(self):
+        v = self.sunday_plan()
+        fresh_need(v)
+        v.weekly_full = False
+        bare()._weekly_full(v, AFTER_MIDNIGHT, None)
+        self.assertIsNone(v.weekly_hold)
+        self.assertFalse(v.weekly_active)
+
+    def test_evcc_and_look_ahead_keep_it_after_midnight(self):
+        v = self.sunday_plan()
+        v.departure_source, v.trips, v.consumption = "entity", [], 0.2
+        fresh_need(v)
+        bare()._weekly_full(v, AFTER_MIDNIGHT, None)
+        mon = [t for t in bare()._trips(v, AFTER_MIDNIGHT, 60.0) if t.departure == MON_MORNING]
+        self.assertAlmostEqual(mon[0].km_target, 300.0)
+        v.horizon = {"status": "ok", "first_need": {"departure": MON_MORNING.isoformat()}}
+        ahead, _week, _reason, _ = bare().evcc_plan_inputs(v, AFTER_MIDNIGHT)
+        self.assertEqual(ahead["target_soc"], 100.0)
 
 
 if __name__ == "__main__":

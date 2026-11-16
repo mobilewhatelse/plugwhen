@@ -26,12 +26,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:
             hass.config_entries.async_update_subentry(entry, sub, title=title)
     plug = Plugwhen(hass, entry)
     entry.runtime_data = plug
+    _carry_over_weekly_days(hass, plug)
     # entities first: the reserve and the switch restore their last values before the first computation
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await plug.async_start()
     entry.async_on_unload(entry.add_update_listener(_reload))
     _register_services(hass)
     return True
+
+
+def _carry_over_weekly_days(hass: HomeAssistant, plug: Plugwhen) -> None:
+    """Builds of 0.9.2 before the day bar had a selection of days ("Saturday or Sunday" …). Its last choice is handed to the new
+    day switches (they take it when they have no state of their own yet), then the selection is removed from the registry so no
+    'unavailable' entity is left behind."""
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers.restore_state import async_get as restore_data
+
+    from . import vollladen as vl
+
+    registry = er.async_get(hass)
+    for sub_id, v in plug.vehicles.items():
+        eid = registry.async_get_entity_id("select", DOMAIN, f"{sub_id}_weekly_days")
+        if eid is None:
+            continue
+        try:
+            stored = restore_data(hass).last_states.get(eid)
+            v.weekly_days_old = vl.days_of(stored.state.state if stored is not None else None)
+        except Exception:  # noqa: BLE001 - a missing restore cache only means the default days
+            v.weekly_days_old = None
+        registry.async_remove(eid)
 
 
 def _register_services(hass: HomeAssistant) -> None:

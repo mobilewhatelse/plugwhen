@@ -57,13 +57,20 @@ Warum verteilen: Eine Wallbox mit „fertig bis“ und vollem Strom lädt spät 
 Monatsspitze. Über die Nacht verteilt braucht dieselbe Energie 2–3 kW.
 
 **Einmal pro Woche voll laden (ab 0.9.2).** Viele Hersteller empfehlen, den Akku ab und zu ganz voll zu laden (z. B. damit die Anzeige des
-Ladestands stimmt). Je Auto gibt es dafür den Schalter *Einmal pro Woche voll laden* (Standard aus), die *Tage für das wöchentliche
-Volladen* (Standard Samstag oder Sonntag) und das *Ziel beim wöchentlichen Volladen* (Standard 100 %). Mit Solarprognose nimmt Plugwhen
+Ladestands stimmt). Je Auto gibt es dafür den Schalter *Einmal pro Woche voll laden* (Standard aus), die Tage als Leiste
+*Mo Di Mi Do Fr Sa So* zum Antippen (ein Schalter je Wochentag, Standard Samstag und Sonntag; kein Tag angetippt heißt kein Volladen) und das *Ziel beim wöchentlichen Volladen* (Standard 100 %). Mit Solarprognose nimmt Plugwhen
 von den erlaubten Tagen, die in dieser Woche noch kommen, den mit der meisten Sonne, ohne Photovoltaik den ersten. Für einen Plan, der
 diesen Tag enthält, gilt das höhere Ziel: zuerst mit Sonne, der Rest aus dem Netz, damit das Auto sicher voll wird. Wie immer verteilt
 der Plan den Netzanteil in die ruhigen Stunden vor der Abfahrt, so steht der Akku nicht lange voll. Ohne Abfahrt an dem Tag ist das Auto
 bis 20 Uhr voll. Einmal je Woche (Montag bis Sonntag): ist das Ziel erreicht, gilt bis zur nächsten Woche wieder das normale Ziel.
 Die Karte *Einstellungen* zeigt, für welchen Tag das Volladen geplant ist.
+
+**Sicherheitsprüfung vor jeder Abfahrt (ab 0.9.2).** Ab drei Stunden vor jeder Abfahrt prüft Plugwhen jeden Tag, ob das Auto das
+zugesagte Ziel noch erreicht. Ist das geplante Ziel gesunken, lädt die Wallbox nicht, obwohl sie laut Plan laden sollte, oder wird die
+Zeit knapp, schaltet Plugwhen in den Betriebsarten *direkt* und *evcc* auf „Jetzt laden“ und schickt eine Nachricht mit dem Grund an
+die Benachrichtigungsdienste des Autos; dieselbe Meldung steht unter *Benachrichtigungen* in Home Assistant. Gemeldet wird nur, wenn
+Plugwhen wirklich eingreift, je Abfahrt und Grund einmal. „Jetzt laden“ endet beim Ziel, bei der Abfahrt oder beim Abstecken. In den Betriebsarten *aus*
+und *lernen* fasst Plugwhen die Wallbox nicht an; dort meldet wie bisher die Warnung, wenn das Auto nicht bereit sein wird.
 
 ## Steckzeiten
 

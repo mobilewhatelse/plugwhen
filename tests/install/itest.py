@@ -219,12 +219,23 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 19, "entities of the vehicle exist (19 with 'ready to switch' and the weekly full charge)", f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
+    log(len(ents) == 25, "entities of the vehicle exist (25 with 'ready to switch', the weekly full charge and its seven day switches)",
+        f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     wf = find("switch", "once_a_week_full")
-    wd = find("select", "days_for_the_weekly")
     wt = find("number", "target_of_the_weekly")
-    log(bool(wf and wf["state"] == "off" and wd and wd["state"] == "weekend" and wt and float(wt["state"]) == 100),
-        "weekly full charge: off by default, Saturday or Sunday, 100 %", str([(x or {}).get("entity_id") for x in (wf, wd, wt)]))
+    day_names = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+    days = [find("switch", f"weekly_full_charge_on_{d}") for d in day_names]
+    log(bool(wf and wf["state"] == "off" and wt and float(wt["state"]) == 100 and all(days)
+             and [x["state"] for x in days] == ["off"] * 5 + ["on"] * 2),
+        "weekly full charge: off by default, day bar Saturday and Sunday, 100 %",
+        str([(x or {}).get("state") for x in days]) + " " + str([(x or {}).get("entity_id") for x in (wf, wt)]))
+    log(find("select", "days_for_the_weekly") is None, "the former day selection is gone")
+    if days[2]:   # tap Wednesday on and off again
+        svc("switch", "turn_on", {"entity_id": days[2]["entity_id"]})
+        on = wait_for(lambda: (state(days[2]["entity_id"]) or {}).get("state") == "on", 20)
+        svc("switch", "turn_off", {"entity_id": days[2]["entity_id"]})
+        off = wait_for(lambda: (state(days[2]["entity_id"]) or {}).get("state") == "off", 20)
+        log(bool(on and off), "a day of the bar can be tapped on and off")
     if wf:   # switched on: the plan counts it (the car is full, or a day is chosen, or none is left this week)
         svc("switch", "turn_on", {"entity_id": wf["entity_id"]})
         ok = wait_for(lambda: (state(wf["entity_id"]) or {}).get("state") == "on"

@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from direct import detect, in_grid_window, next_action, trip_settings  # noqa: E402
+from direct import detect, in_grid_window, next_action, trip_energy_due, trip_settings  # noqa: E402
 
 CET = timezone(timedelta(hours=1))
 NOW = datetime(2026, 11, 12, 18, 0, tzinfo=CET)
@@ -86,6 +86,37 @@ class OwnershipTest(unittest.TestCase):
         self.assertEqual(next_action("Next Trip", None, "Next Trip", "Eco"), ("restore", "Eco"))
         self.assertEqual(next_action("Default", None, "Next Trip", "Eco"), (None, "nothing"))   # the user changed it: leave it
         self.assertEqual(next_action("Eco", None, None, None), (None, "nothing"))
+
+
+class TripEnergyResendTest(unittest.TestCase):
+    """Field test 16.11.2026: every new next-trip energy made the Wattpilot stop and plan again (ten stops in 80 minutes)."""
+
+    CAP, EFF = 60.0, 0.9
+
+    def due(self, new, written, soc):
+        return trip_energy_due(new, written, soc, self.CAP, self.EFF)
+
+    def test_first_write(self):
+        self.assertTrue(self.due(12.6, None, 28.0))
+
+    def test_falling_need_while_charging_is_not_written(self):
+        w = {"kwh": 12.6, "soc": 28.0}
+        # every percent of the 60 kWh battery is 0.67 kWh with the losses; values like the night from the field test
+        for soc, need in ((29, 11.9), (30, 11.3), (31, 10.6), (32, 9.9), (33, 9.3), (36, 7.3), (38, 5.9)):
+            self.assertFalse(self.due(need, w, float(soc)), (soc, need))
+
+    def test_a_real_change_of_the_need_is_written(self):
+        w = {"kwh": 12.6, "soc": 28.0}
+        self.assertTrue(self.due(52.9, w, 28.0))   # the weekly full charge starts
+        self.assertTrue(self.due(4.0, w, 28.0))    # the departure moved, much less needed
+        self.assertTrue(self.due(14.5, w, 25.0))   # the car was driven: the need rose
+
+    def test_small_drift_is_not_written(self):
+        self.assertFalse(self.due(13.3, {"kwh": 12.6, "soc": 28.0}, 27.0))
+
+    def test_without_soc_only_the_written_value_counts(self):
+        self.assertFalse(self.due(12.0, {"kwh": 12.6, "soc": None}, None))
+        self.assertTrue(self.due(8.0, {"kwh": 12.6, "soc": None}, None))
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ from typing import Any
 
 TRIP_HORIZON = timedelta(hours=24)   # a wallbox's "next trip" is a time of day: only for a departure within 24 hours
 MIN_KWH = 0.5
+TRIP_RESEND_KWH = 1.5   # the energy is written again only if the need differs this much from what charging explains
 
 _TRIP = re.compile(r"next.?trip|n(ä|ae)chste.?fahrt|abfahrt", re.IGNORECASE)
 _SUN = re.compile(r"\beco\b|pv|sonne|solar|surplus|überschuss", re.IGNORECASE)
@@ -64,6 +65,23 @@ def trip_settings(charge_kwh: float | None, departure: datetime | None, now: dat
         return None
     energy = round(charge_kwh * 1000) if (unit or "").lower() == "wh" else round(charge_kwh, 1)
     return {"time": departure.strftime("%H:%M:00"), "energy": energy}
+
+
+def trip_energy_due(new_kwh: float, written: dict[str, Any] | None, soc_now: float | None, capacity_kwh: float,
+                    efficiency: float) -> bool:
+    """Must the next-trip energy be written again?
+
+    The need falls while the car charges. Every new value makes a wallbox like the Wattpilot stop and plan again (field test
+    16.11.2026: ten stops in 80 minutes, a third of the time lost). So a lower value that the charging since the last write explains
+    is not written; a real change of the need (a new departure, the weekly full charge starts or ends, the car was driven) is.
+    `written` = {"kwh", "soc"} of the last write, or None."""
+    if not written or written.get("kwh") is None:
+        return True
+    charged = 0.0
+    if soc_now is not None and written.get("soc") is not None:
+        charged = max(0.0, float(soc_now) - float(written["soc"])) / 100.0 * capacity_kwh / max(0.1, efficiency)
+    expected = max(0.0, float(written["kwh"]) - charged)
+    return abs(float(new_kwh) - expected) >= TRIP_RESEND_KWH
 
 
 def in_grid_window(windows: list[dict[str, Any]] | None, now: datetime) -> bool:

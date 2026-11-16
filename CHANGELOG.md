@@ -2,15 +2,45 @@
 
 ## 0.9.2 - unreleased - once a week full
 
-- **Once a week full (wish of a user):** per car a switch *Once a week full* (default off), the days (default Saturday or Sunday)
-  and the target (default 100 %). With a solar forecast the sunniest allowed day still ahead this week is chosen, without solar
+- **Safety check before every departure (wish of a user after the field test):** from three hours before every departure, every
+  day, Plugwhen compares what it promised for this departure with reality. If the target it planned fell below the promise, the
+  wallbox does not charge although the plan says so, or the time left is getting short, it switches the wallbox to "charge now"
+  (the wallbox's grid mode, its start button, or evcc "now") and sends a message with the reason (to the car's notify services and
+  into Home Assistant's notifications; only when it acts, once per departure and reason). A message alone in the night would
+  not be read. "Charge now" ends at the target, at the departure or when the car is unplugged, then everything is given back. In
+  the modes *off* and *learn* Plugwhen does not touch the wallbox; there the warning "car will not be ready" tells as before.
+  *Deutsch:* Sicherheitsprüfung vor jeder Abfahrt (Wunsch eines Nutzers nach dem Praxistest): ab drei Stunden vor jeder Abfahrt,
+  jeden Tag, vergleicht Plugwhen, was es für diese Abfahrt zugesagt hat, mit der Wirklichkeit. Ist das geplante Ziel unter die Zusage
+  gefallen, lädt die Wallbox nicht, obwohl sie laut Plan laden sollte, oder wird die Zeit knapp, schaltet es die Wallbox auf
+  „Jetzt laden“ (Netzmodus der Wallbox, Start-Taste oder evcc „Sofort“) und schickt eine Nachricht mit dem Grund (an die
+  Benachrichtigungsdienste des Autos und unter *Benachrichtigungen* in Home Assistant; nur wenn es eingreift, je Abfahrt und Grund
+  einmal). Eine Nachricht
+  allein würde in der Nacht niemand lesen. „Jetzt laden“ endet beim Ziel, bei der Abfahrt oder wenn das Auto abgesteckt wird,
+  danach wird alles zurückgegeben. In den Betriebsarten *aus* und *lernen* fasst Plugwhen die Wallbox nicht an; dort meldet wie bisher
+  die Warnung „Auto wird nicht bereit sein“.
+
+- **Once a week full (wish of a user):** per car a switch *Once a week full* (default off), the days as a bar Mo to Su to
+  tap (one switch per weekday, default Saturday and Sunday) and the target (default 100 %). With a solar forecast the sunniest allowed day still ahead this week is chosen, without solar
   the first one. Sun first, the rest from the grid, so the car really gets full; full shortly before the departure (without one
-  by 8 pm). Once per week, then the normal target again. Create the dashboard again to see the settings in the card *Settings*.
-  *Deutsch:* Einmal pro Woche voll laden (Wunsch eines Nutzers): je Auto Schalter *Einmal pro Woche voll laden* (Standard aus), Tage
-  (Standard Samstag oder Sonntag) und Ziel (Standard 100 %). Mit Solarprognose der sonnigste erlaubte Tag dieser Woche, ohne
+  by 8 pm). A full charge planned for a departure stays until that departure, also when the car charges after midnight of the
+  chosen day (found in the field test: Sunday evening plugged in, Monday morning only the normal target). Once per week, then
+  the normal target again. Create the dashboard again to see the settings in the card *Settings*.
+  *Deutsch:* Einmal pro Woche voll laden (Wunsch eines Nutzers): je Auto Schalter *Einmal pro Woche voll laden* (Standard aus), die Tage
+  als Leiste Mo bis So zum Antippen (ein Schalter je Wochentag, Standard Samstag und Sonntag) und Ziel (Standard 100 %). Mit Solarprognose der sonnigste erlaubte Tag dieser Woche, ohne
   Photovoltaik der erste. Zuerst Sonne, der Rest aus dem Netz, damit das Auto sicher voll wird; voll kurz vor der Abfahrt (ohne Abfahrt
-  bis 20 Uhr). Einmal je Woche, danach wieder das normale Ziel. Dashboard neu erstellen, damit die Einstellungen in der Karte
+  bis 20 Uhr). Ein für eine Abfahrt geplantes Volladen bleibt bis zu dieser Abfahrt, auch wenn das Auto nach Mitternacht des
+  gewählten Tages lädt (gefunden im Praxistest: Sonntagabend angesteckt, Montag früh nur das normale Ziel). Einmal je Woche,
+  danach wieder das normale Ziel. Dashboard neu erstellen, damit die Einstellungen in der Karte
   *Einstellungen* erscheinen.
+
+- **Mode *direct* with a next-trip wallbox (e.g. Wattpilot): no more stops while charging (found in the field test):** Plugwhen wrote
+  the remaining energy again whenever it fell during charging, and the wallbox stopped every time to plan again (ten stops in
+  80 minutes). Now the energy is written again only if the need really changes (new departure, weekly full charge, the car was
+  driven), not because the car is charging.
+  *Deutsch:* Betriebsart *direkt* mit einer Wallbox mit „Nächste Fahrt“ (z. B. Wattpilot): keine Ladepausen mehr (gefunden im
+  Praxistest): Plugwhen schrieb die Restenergie jedes Mal neu, wenn sie beim Laden sank, und die Wallbox stoppte jedes Mal, um neu
+  zu planen (zehn Pausen in 80 Minuten). Jetzt wird die Energie nur neu geschrieben, wenn sich der Bedarf wirklich ändert (neue
+  Abfahrt, Volladen, das Auto ist gefahren), nicht weil das Auto lädt.
 
 ## 0.9.1 - 15.11.2026 - fixes before the Marketplace, bug report on request
 

@@ -378,6 +378,27 @@
       },
       "weekly_full": {
         "name": "Once a week full"
+      },
+      "weekly_day_0": {
+        "name": "Weekly full charge on Monday"
+      },
+      "weekly_day_1": {
+        "name": "Weekly full charge on Tuesday"
+      },
+      "weekly_day_2": {
+        "name": "Weekly full charge on Wednesday"
+      },
+      "weekly_day_3": {
+        "name": "Weekly full charge on Thursday"
+      },
+      "weekly_day_4": {
+        "name": "Weekly full charge on Friday"
+      },
+      "weekly_day_5": {
+        "name": "Weekly full charge on Saturday"
+      },
+      "weekly_day_6": {
+        "name": "Weekly full charge on Sunday"
       }
     },
     "number": {
@@ -396,16 +417,6 @@
           "learn": "Learn",
           "evcc": "Via evcc (write plan)",
           "direct": "Direct (Plugwhen controls the wallbox)"
-        }
-      },
-      "weekly_days": {
-        "name": "Days for the weekly full charge",
-        "state": {
-          "weekend": "Saturday or Sunday",
-          "saturday": "Saturday",
-          "sunday": "Sunday",
-          "friday_sunday": "Friday to Sunday",
-          "any_day": "Any day of the week"
         }
       }
     },
