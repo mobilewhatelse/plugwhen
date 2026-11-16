@@ -65,21 +65,26 @@ def trips_ahead(trips: list[Trip], first: datetime, days: int) -> list[Trip]:
     return sorted((t for t in trips if first - timedelta(minutes=1) <= t.departure <= end), key=lambda t: t.departure)
 
 
-def comfort_km(ahead: list[Trip]) -> float:
-    """The range to have at the first departure so that every one of these trips still starts with its own target without
-    charging in between: what the trips before it use (the high value where known, else the typical one) plus its target
-    range - the largest of these. (Usually the last trip decides; a long trip in the middle decides itself.)"""
-    best, used = 0.0, 0.0
+def comfort_points(ahead: list[Trip]) -> list[float]:
+    """For every one of these trips: the range to have at the first departure so that this trip still starts with its own
+    target without charging in between - what the trips before it use (the high value where known, else the typical one)
+    plus its target range."""
+    out, used = [], 0.0
     for t in ahead:
-        best = max(best, used + float(t.km_target))
+        out.append(used + float(t.km_target))
         used += max(float(t.km_typical or 0.0), float(getattr(t, "km_high", None) or 0.0))
-    return best
+    return out
 
 
-def sun_later_kwh(now: datetime, ahead: list[Trip], sun_kw: dict[datetime, float] | None, max_kw: float,
-                  plug_share: dict[tuple[int, int], float] | None = None) -> float:
-    """Wallbox energy the forecast sun can be planned to deliver between these trips (after the first one). Only what can be
-    planned counts:
+def comfort_km(ahead: list[Trip]) -> float:
+    """The largest of them: usually the last trip decides, a long trip in the middle decides itself."""
+    return max(comfort_points(ahead), default=0.0)
+
+
+def sun_windows_kwh(now: datetime, ahead: list[Trip], sun_kw: dict[datetime, float] | None, max_kw: float,
+                    plug_share: dict[tuple[int, int], float] | None = None) -> list[float]:
+    """Wallbox energy the forecast sun can be planned to deliver in each home window between these trips (window k lies between
+    trip k and trip k+1). Only what can be planned counts:
 
     * the car stands at home (between a trip's return and the next departure), and
     * it is usually plugged in at that weekday and hour (`plug_share`, learned from the recorded plug-in times: a car that
@@ -88,21 +93,28 @@ def sun_later_kwh(now: datetime, ahead: list[Trip], sun_kw: dict[datetime, float
 
     The sun before the first departure is not counted here: the plan to that departure uses it itself. Sun that comes while
     the car happens to be plugged in is used anyway (the wallbox's sun mode), it is just not counted on in advance."""
-    if not sun_kw:
-        return 0.0
-    total = 0.0
+    out: list[float] = []
     for prev, nxt in zip(ahead, ahead[1:]):
-        home_from = max(now, prev.departure + timedelta(hours=away_hours(float(prev.km_typical or 0.0))))
-        t = home_from.replace(minute=(home_from.minute // 15) * 15, second=0, microsecond=0)
-        while t < nxt.departure:
-            end = t + QUARTER
-            frac = (min(end, nxt.departure) - max(t, home_from)).total_seconds() / 900.0
-            kw = min(max_kw, max(0.0, sun_kw.get(t, 0.0)))
-            if frac > 0 and kw >= MIN_SUN_KW:
-                share = 1.0 if plug_share is None else plug_share.get((t.weekday(), t.hour), 0.0)
-                total += kw * QUARTER_H * frac * share
-            t = end
-    return total
+        total = 0.0
+        if sun_kw:
+            home_from = max(now, prev.departure + timedelta(hours=away_hours(float(prev.km_typical or 0.0))))
+            t = home_from.replace(minute=(home_from.minute // 15) * 15, second=0, microsecond=0)
+            while t < nxt.departure:
+                end = t + QUARTER
+                frac = (min(end, nxt.departure) - max(t, home_from)).total_seconds() / 900.0
+                kw = min(max_kw, max(0.0, sun_kw.get(t, 0.0)))
+                if frac > 0 and kw >= MIN_SUN_KW:
+                    share = 1.0 if plug_share is None else plug_share.get((t.weekday(), t.hour), 0.0)
+                    total += kw * QUARTER_H * frac * share
+                t = end
+        out.append(total)
+    return out
+
+
+def sun_later_kwh(now: datetime, ahead: list[Trip], sun_kw: dict[datetime, float] | None, max_kw: float,
+                  plug_share: dict[tuple[int, int], float] | None = None) -> float:
+    """All of it together."""
+    return sum(sun_windows_kwh(now, ahead, sun_kw, max_kw, plug_share))
 
 
 def decide(soc: float | None, must_soc: float, comfort_soc: float, filling: bool, plugged: bool | None) -> tuple[float, bool]:
@@ -126,10 +138,15 @@ def look_ahead(now: datetime, trips: list[Trip], first: datetime | None, soc: fl
     ahead = trips_ahead(trips, first, days) if first is not None else []
     if days <= 1 or len(ahead) < 2 or capacity_kwh <= 0 or consumption <= 0:
         return Ahead(round(must_soc, 1), False, round(must_soc, 1), round(must_soc, 1), 0.0, None, len(ahead), days)
-    comfort = min(max(cap_soc, must_soc), comfort_km(ahead) * consumption / capacity_kwh * 100.0)
-    comfort = max(must_soc, comfort)
-    sun = sun_later_kwh(now, ahead, sun_kw, max_kw, plug_share) * SUN_TRUST
-    with_sun = max(must_soc, comfort - sun * max(0.1, efficiency) / capacity_kwh * 100.0)
+    limit = max(cap_soc, must_soc)
+    points = [km * consumption / capacity_kwh * 100.0 for km in comfort_points(ahead)]
+    comfort = max(must_soc, min(limit, max(points)))
+    # the sun helps a trip only if it comes before that trip: for every trip its own need minus the sun of the home windows
+    # before it, and the largest of these counts (sun after the long trip in the middle does not make that trip shorter)
+    windows = [w * SUN_TRUST for w in sun_windows_kwh(now, ahead, sun_kw, max_kw, plug_share)]
+    per_kwh = max(0.1, efficiency) / capacity_kwh * 100.0
+    with_sun = max(must_soc, min(limit, max(pt - sum(windows[:k]) * per_kwh for k, pt in enumerate(points))))
+    sun = sum(windows)
     if filling and held_soc is not None and abs(with_sun - held_soc) < HOLD_BAND:
         with_sun = max(must_soc, held_soc)   # the running fill keeps its target
     target, filling = decide(soc, must_soc, with_sun, filling, plugged)

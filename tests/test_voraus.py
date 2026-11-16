@@ -183,6 +183,22 @@ class SunTests(unittest.TestCase):
     def test_without_a_forecast_nothing_is_said_about_the_sun(self):
         self.assertIsNone(ahead(self.home_early(), 30.0, soc_for(160)).sun_basis)
 
+    def test_sun_after_the_trip_that_decides_does_not_help_that_trip(self):
+        """Independent review of 0.10: the comfort target is set by the long trip in the middle, but the sun of ALL home windows
+        was taken off - also the sun that only comes after that trip."""
+        wed = TUE_7 + timedelta(days=1)
+        trips = [Trip(TUE_7, 48.0, 160.0, 60.0), Trip(wed, 30.0, 250.0, 36.0),      # Wednesday: a long trip is planned
+                 Trip(wed + timedelta(days=1), 37.0, 146.0, 46.0)]
+        day = wed.replace(hour=0)
+        sun_after = {day + timedelta(hours=h, minutes=m): 6.0 for h in range(11, 17) for m in (0, 15, 30, 45)}   # Wed, after it
+        no_sun = ahead(trips, 30.0, soc_for(160), cap=100.0)
+        with_sun = ahead(trips, 30.0, soc_for(160), cap=100.0, sun=sun_after)
+        self.assertGreater(with_sun.sun_kwh, 15.0)
+        self.assertEqual(with_sun.target_soc, no_sun.target_soc)          # Wednesday's trip still needs all of it
+        tue = TUE_7.replace(hour=0)
+        sun_before = {tue + timedelta(hours=h, minutes=m): 6.0 for h in range(15, 19) for m in (0, 15, 30, 45)}   # Tue afternoon
+        self.assertLess(ahead(trips, 30.0, soc_for(160), cap=100.0, sun=sun_before).target_soc, no_sun.target_soc)
+
     def test_sun_while_the_car_is_away_does_not_count(self):
         trips = week(60, 46, 59)                         # away from 07:00 for 3 h + 48/12 h = 7 h: home at 14:00
         a = ahead(trips, 30.0, soc_for(160), sun=self.sun(0, 5.0, range(8, 13)))

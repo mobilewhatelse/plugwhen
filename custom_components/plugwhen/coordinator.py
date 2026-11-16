@@ -217,6 +217,9 @@ class Plugwhen:
         self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
         self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
         self._direct = ev.get("direct", {}) if isinstance(ev.get("direct"), dict) else {}
+        for rec in self._direct.values():   # a restart (also after changed settings): a running fill computes its target anew
+            if isinstance(rec, dict):
+                rec.pop("ahead_target", None)
         self._geo = ev.get("geo", {}) if isinstance(ev.get("geo"), dict) else {}
         self._usage = ev.get("usage", {}) if isinstance(ev.get("usage"), dict) else {}
         self._fleet = ev.get("flotte", {}) if isinstance(ev.get("flotte"), dict) else {}
@@ -1225,6 +1228,13 @@ class Plugwhen:
         h = v.horizon or {}
         if v.soc is None:
             return None, week, "unknown_soc", None
+        a = v.ahead or {}
+        if a.get("filling") and v.departure is not None and v.need_must is not None:
+            # a fill for several days runs: evcc charges to it by the next departure - also once the next trip alone is
+            # covered (the look-ahead below only knows the next trips' own targets and would say "covered")
+            want = a.get("wanted_soc") or a.get("target_soc")
+            if want and float(want) > v.need_must.target_soc + 0.5:
+                return {"departure": v.departure, "target_soc": float(want)}, week, "planned", None
         if h.get("status") != "ok":
             return None, week, "no_departure", None
         fn = h.get("first_need")
@@ -1778,16 +1788,46 @@ class Plugwhen:
         """Compute the plans of all cars (one car's change can move the others: the same house, the same peak, maybe the same
         wallbox). One after the other: plugged in first, then by departure; a later car sees what the earlier ones planned."""
         order = plan_order([{"id": x.sub_id, "plugged": x.plugged, "departure": x.departure, "name": x.name} for x in self.vehicles.values()])
-        done: list[tuple[set[str], dict]] = []
+
+        def run(ahead: bool) -> dict[str, tuple[str | None, float]]:
+            self._ahead_off = not ahead
+            done: list[tuple[set[str], dict]] = []
+            try:
+                for sid in order:
+                    x = self.vehicles[sid]
+                    mine = set(self.wallboxes(x))
+                    others, blocked = taken_by_others(done, mine)
+                    self._compute_plan(x, now, others or None, blocked or None)
+                    cp = x.charge_plan or {}
+                    if cp.get("status") in ("planned", "infeasible") and cp.get("quarters"):
+                        done.append((mine, cp["quarters"]))
+            finally:
+                self._ahead_off = False
+            return {sid: ((self.vehicles[sid].charge_plan or {}).get("status"),
+                          float((self.vehicles[sid].charge_plan or {}).get("shortfall_kwh") or 0.0)) for sid in order}
+
+        if len(order) > 1:
+            # several cars: a charge for several days of one car must never take the time (a shared wallbox) or the room
+            # below the peak limit that another car needs for its NEXT trip. First every car's next trip alone; if charging
+            # ahead makes a plan impossible that was possible, nobody charges ahead in this run.
+            must_only = run(False)
+            keys = ("ahead_filling", "ahead_target", "ahead_for")
+            fills = {sid: {k: rec[k] for k in keys if k in rec} for sid, rec in self._direct.items() if isinstance(rec, dict)}
+            with_ahead = run(True)
+            # worse = a plan that was possible is not any more, or more is missing than before (a car that was short already
+            # must not lose the rest as well)
+            if any((must_only[s][0] != "infeasible" and with_ahead[s][0] == "infeasible")
+                   or with_ahead[s][1] > must_only[s][1] + 0.1 for s in order):
+                for sid, rec in self._direct.items():   # a fill started in the dropped run never happened
+                    if isinstance(rec, dict):
+                        for k in keys:
+                            rec.pop(k, None)
+                        rec.update(fills.get(sid, {}))
+                run(False)
+        else:
+            run(True)
         for sid in order:
-            x = self.vehicles[sid]
-            mine = set(self.wallboxes(x))
-            others, blocked = taken_by_others(done, mine)
-            self._compute_plan(x, now, others or None, blocked or None)
-            self._shadow_step(x, now)
-            cp = x.charge_plan or {}
-            if cp.get("status") in ("planned", "infeasible") and cp.get("quarters"):
-                done.append((mine, cp["quarters"]))
+            self._shadow_step(self.vehicles[sid], now)
 
     def insight(self, v: Vehicle) -> dict[str, Any]:
         """Does the learning bring anything for this car (walks through the history; cached until the reserve or the history changes)."""
@@ -1865,12 +1905,14 @@ class Plugwhen:
         self._look_ahead(v, now, avail, max_kw)
         plan_departure = v.departure or (vl.evening(v.weekly_day, now.tzinfo) if v.weekly_active and v.weekly_day else None)
         pref = self._pref_kw(v, max_kw)
+        own_pref = float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF))
+        early = not self._peak_matters()   # where peaks cost nothing: charge as soon as plugged in (a slow car has the whole night)
 
         def plan_for(kwh: float) -> dict[str, Any]:
             return make_plan(
                 now, plan_departure or now, kwh, max_kw, float(v.cfg.get(V_CHARGE_MIN, DEFAULT_CHARGE_MIN)),
                 load=load, target_kw=target_kw if load is not None else None, available_kw=avail,
-                pref_kw=pref, others_kw=others, blocked=blocked)
+                pref_kw=pref, others_kw=others, blocked=blocked, pref_kw2=own_pref if own_pref < pref else None, early=early)
 
         v.charge_plan = self._fit_ahead(v, plan_for)
         v.horizon = self._horizon(v, now, avail, max_kw)
@@ -1950,10 +1992,17 @@ class Plugwhen:
         """Charging for several days at once (voraus.py): below the need of the next trip a charge starts and fills to the
         trips of the next days, at most the everyday limit; what the forecast sun brings at home in between is left to the sun.
         The fill survives a restart (kept with what Plugwhen set on the wallbox)."""
-        if v.soc is None or v.need is None or v.departure is None:
+        if getattr(self, "_ahead_off", False) or v.soc is None or v.need is None or v.departure is None:
             return
         capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
         mine = self._direct.setdefault(v.sub_id, {})
+        # a fill ends at the latest when the departure it was started for is past: without a plug sensor "unplugged" is
+        # never seen, and a car with its own charge limit below the target never gets there - the fill must not go on
+        # day after day (it would top up every night again)
+        started_for = dt_util.parse_datetime(str(mine.get("ahead_for") or ""))
+        if mine.get("ahead_filling") and started_for is not None and now >= started_for:
+            for key in ("ahead_filling", "ahead_target", "ahead_for"):
+                mine.pop(key, None)
         filling = bool(mine.get("ahead_filling"))
         held = mine.get("ahead_target") if filling else None
         eff = self.efficiency_of(v)
@@ -1971,9 +2020,10 @@ class Plugwhen:
         if a.filling != filling or (a.filling and mine.get("ahead_target") != a.target_soc):
             if a.filling:
                 mine["ahead_filling"], mine["ahead_target"] = True, a.target_soc
+                mine.setdefault("ahead_for", v.departure.isoformat())
             else:
-                mine.pop("ahead_filling", None)
-                mine.pop("ahead_target", None)
+                for key in ("ahead_filling", "ahead_target", "ahead_for"):
+                    mine.pop(key, None)
             self._evcc_store.async_delay_save(self._evcc_data, 30)
         if a.target_soc > v.need.target_soc + 0.05:
             charge = max(0.0, (a.target_soc - v.soc) / 100.0 * capacity) / max(0.1, eff)

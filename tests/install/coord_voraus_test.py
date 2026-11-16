@@ -201,6 +201,145 @@ class SunHabitTests(unittest.TestCase):
         self.assertEqual(co.Plugwhen._plug_share(v, MON_EVENING + timedelta(hours=1)), a)
 
 
+class TwoCarsTests(unittest.TestCase):
+    """Independent review of 0.10: with two cars at one wallbox the first car's charge for several days was handed on as taken,
+    and the second car's NEXT trip no longer fitted (replayed: 30 kWh needed, 2.75 kWh planned)."""
+
+    def household(self, conflict: bool):
+        p = bare()
+        a, b_ = car(30.0), car(30.0)
+        a.sub_id, b_.sub_id, a.name, b_.name = "a", "b", "A", "B"
+        b_.departure = TUE_7 - timedelta(hours=1)
+        b_.plugged = False                                               # not plugged in yet: planned after car A
+        p.vehicles = {"a": a, "b": b_}
+        p.wallboxes = lambda v: ["sensor.wb"]
+        p.calls: list[tuple[str, bool]] = []
+        p.shadow: list[str] = []
+        p.short_anyway = 0.0   # what car B misses even beside car A's next trip alone
+
+        def compute_plan(x, now, others=None, blocked=None):
+            ahead = not p._ahead_off
+            p.calls.append((x.sub_id, ahead))
+            if x.sub_id == "a":   # plugged in: planned first; with the charge ahead it takes the whole night
+                quarters = {MON_EVENING + timedelta(minutes=15 * k): 11.0 for k in range(48 if ahead else 4)}
+                x.charge_plan = {"status": "planned", "quarters": quarters, "ahead": ahead}
+                if ahead:   # as _look_ahead does: the fill is remembered
+                    p._direct.setdefault("a", {}).update(ahead_filling=True, ahead_target=80.0, ahead_for=TUE_7.isoformat())
+            else:
+                short = conflict and blocked is not None and len(blocked) > 8
+                missing = (p.short_anyway + (30.0 if short else 0.0))
+                x.charge_plan = {"status": "infeasible" if missing else "planned", "quarters": {}, "ahead": ahead,
+                                 "shortfall_kwh": missing}
+
+        p._compute_plan = compute_plan
+        p._shadow_step = lambda x, now: p.shadow.append(x.sub_id)
+        return p, a, b_
+
+    def test_the_other_cars_next_trip_comes_before_charging_ahead(self):
+        p, a, b_ = self.household(conflict=True)
+        p._compute(None, MON_EVENING)
+        self.assertEqual(b_.charge_plan["status"], "planned")            # its next trip fits
+        self.assertFalse(a.charge_plan["ahead"])                         # nobody charges ahead in this run
+        self.assertEqual(len(p.calls), 6)                                # next trips alone, with charging ahead, back again
+        self.assertEqual(sorted(p.shadow), ["a", "b"])                   # the learn mode notes each car once
+        self.assertFalse(p._ahead_off)
+
+    def test_a_car_that_is_short_anyway_must_not_lose_the_rest(self):
+        # follow-up of the independent review: car B's next trip does not fit even beside car A's next trip (9 kWh missing);
+        # beside car A's charge ahead it would get nothing at all. "Infeasible before and after" is no reason to let that be
+        p, a, b_ = self.household(conflict=True)
+        p.short_anyway = 9.0
+        p._compute(None, MON_EVENING)
+        self.assertFalse(a.charge_plan["ahead"])
+        self.assertEqual(b_.charge_plan["shortfall_kwh"], 9.0)
+
+    def test_a_fill_started_in_the_dropped_run_is_forgotten(self):
+        p, a, _b = self.household(conflict=True)
+        p._direct["a"] = {"select.wb_mode": {"set": "Eco"}}            # what Plugwhen set on the wallbox stays
+        p._compute(None, MON_EVENING)
+        self.assertEqual(p._direct["a"], {"select.wb_mode": {"set": "Eco"}})
+        p2, _a2, _b2 = self.household(conflict=True)
+        p2._direct["a"] = {"ahead_filling": True, "ahead_target": 76.0, "ahead_for": TUE_7.isoformat()}
+        p2._compute(None, MON_EVENING)
+        self.assertEqual(p2._direct["a"]["ahead_target"], 76.0)          # a fill that ran before is kept as it was
+
+    def test_without_a_conflict_both_charge_ahead(self):
+        p, a, b_ = self.household(conflict=False)
+        p._compute(None, MON_EVENING)
+        self.assertTrue(a.charge_plan["ahead"])
+        self.assertEqual(len(p.calls), 4)
+
+    def test_one_car_is_planned_once(self):
+        p, a, _b = self.household(conflict=False)
+        p.vehicles = {"a": a}
+        p._compute(None, MON_EVENING)
+        self.assertEqual(p.calls, [("a", True)])
+
+    def test_the_look_ahead_is_off_in_the_run_for_the_next_trips_alone(self):
+        p, v = bare(three_days()), car(30.0)
+        v.need = v.need_must = must_need(v, MODE_PLUS)
+        p._ahead_off = True
+        p._look_ahead(v, MON_EVENING, None, 11.0)
+        self.assertEqual(v.need.target_soc, v.need_must.target_soc)
+        self.assertEqual(p._direct, {})                                  # and nothing is remembered or forgotten
+
+
+class FillEndsTests(unittest.TestCase):
+    """Independent review of 0.10: without a plug sensor "unplugged" is never seen, and a car with its own charge limit below
+    the target never gets there: the fill went on day after day and topped up every night again."""
+
+    def step(self, p, v, now):
+        v.need = v.need_must = must_need(v, MODE_PLUS)
+        p._look_ahead(v, now, None, 11.0)
+
+    def test_a_fill_ends_when_its_departure_is_past(self):
+        p, v = bare(three_days()), car(30.0)
+        v.plugged = None                                                 # no plug sensor
+        self.step(p, v, MON_EVENING)
+        self.assertEqual(p._direct["sub"]["ahead_for"], TUE_7.isoformat())
+        v.soc = 70.0                                                     # the car's own limit: never reaches 75.7 %
+        self.step(p, v, MON_EVENING + timedelta(hours=6))
+        self.assertEqual(v.need.source, "ahead")                         # still the same night: the fill goes on
+        v.soc, v.departure = 62.0, TUE_7 + timedelta(days=1)             # Tuesday evening, back home, above the next trip's need
+        p._trips = lambda *a: [Trip(TUE_7 + timedelta(days=i), 37.0, 146.0, 46.0) for i in (1, 2, 3)]
+        self.step(p, v, TUE_7 + timedelta(hours=12))
+        self.assertEqual(v.need.charge_kwh, 0.0)                         # not topped up again
+        self.assertNotIn("ahead_filling", p._direct["sub"])
+        self.assertNotIn("ahead_for", p._direct["sub"])
+
+
+class EvccFillTests(unittest.TestCase):
+    """Independent review of 0.10: in the mode "via evcc" the charge for several days ended at the next trip's need - the
+    look-ahead said "covered" and the plan was taken out of evcc."""
+
+    def evcc_car(self, filling: bool):
+        p, v = bare(three_days()), car(55.0)
+        p._trip_at = lambda v, dep: None
+        v.learn_km, v.weekly_full = True, False
+        v.need_must = must_need(v, MODE_PLUS)                            # 46.5 %: covered at 55 %
+        v.need = v.need_must
+        v.horizon = {"status": "ok", "first_need": None, "lasts_until": "2026-11-19T07:00:00+01:00"}
+        v.ahead = {"filling": filling, "target_soc": 75.7, "must_soc": 46.5}
+        return p, v
+
+    def test_a_running_fill_is_a_plan_for_evcc(self):
+        p, v = self.evcc_car(True)
+        plan, _week, reason, _lasts = p.evcc_plan_inputs(v, MON_EVENING)
+        self.assertEqual((reason, plan["departure"], plan["target_soc"]), ("planned", TUE_7, 75.7))
+
+    def test_cut_to_fit_evcc_still_gets_the_whole_wish(self):
+        p, v = self.evcc_car(True)
+        v.ahead.update(target_soc=60.0, cut_to_fit=True, wanted_soc=75.7)
+        plan, *_ = p.evcc_plan_inputs(v, MON_EVENING)
+        self.assertEqual(plan["target_soc"], 75.7)
+
+    def test_without_a_fill_it_is_covered_as_before(self):
+        p, v = self.evcc_car(False)
+        plan, _week, reason, _lasts = p.evcc_plan_inputs(v, MON_EVENING)
+        self.assertIsNone(plan)
+        self.assertEqual(reason, "covered")
+
+
 class PeakMattersTests(unittest.TestCase):
     """Wish of the user: capping peaks is the guard's job. Where peaks cost nothing (no guard, no demand charge) the plan need
     not charge flat."""
@@ -220,6 +359,14 @@ class PeakMattersTests(unittest.TestCase):
         self.assertEqual(plan["status"], "planned")
         self.assertAlmostEqual(plan["planned_kwh"], 22.0, places=1)
         self.assertGreaterEqual(min(plan["quarters"].values()), 8.2)
+
+    def test_where_peaks_cost_nothing_a_slow_car_has_the_whole_night(self):
+        # the plan assumes the wallbox power that is set; a car that really takes 3.7 kW must still be ready: early
+        p, v = self.plugwhen(), car(30.0)
+        plan = make_plan(MON_EVENING, TUE_7, 20.0, 11.0, 1.4, pref_kw=p._pref_kw(v, 11.0), pref_kw2=4.0, early=not p._peak_matters())
+        start = min(plan["quarters"])
+        self.assertEqual(start, MON_EVENING)
+        self.assertGreaterEqual((TUE_7 - start).total_seconds() / 3600.0 * 3.7, 20.0)   # even at 3.7 kW it gets there
 
     def test_with_a_guard_a_load_forecast_or_a_demand_charge_it_stays_flat(self):
         for options in ({co.O_WAECHTER: "entry"}, {co.O_LOAD: "sensor.load"}, {co.O_PRICE_LOW: 33.82}, {co.O_PRICE_HIGH: "67.64"}):

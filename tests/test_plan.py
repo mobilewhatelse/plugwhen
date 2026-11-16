@@ -138,10 +138,53 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(p["status"], "planned")
         grid = [t for t in p["quarters"] if t not in sun]
         self.assertLess(min(grid), min(sun))                              # the morning: not everything is left to the end
-        # with four hours behind the sun everything would fit there (44 kWh at 11 kW): then the grid part waits
-        later = make_plan(now, dep + timedelta(hours=2), 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0,
-                          load=quiet_morning + [{"t": dep + timedelta(minutes=15 * k), "typical": 0.1, "high": 1.5, "n": 4} for k in range(8)])
+        # with eight hours behind the sun everything would fit there even at the preferred 4 kW (32 kWh): then the grid part waits
+        later = make_plan(now, dep + timedelta(hours=6), 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0,
+                          load=quiet_morning + [{"t": dep + timedelta(minutes=15 * k), "typical": 0.1, "high": 1.5, "n": 4} for k in range(24)])
         self.assertGreater(min(t for t in later["quarters"] if t not in sun), max(sun))
+
+    def test_compact_charging_steps_down_to_the_preferred_power_not_to_the_minimum(self):
+        """Independent review of 0.10: a need too small for the compact power fell straight to the wallbox minimum (4 kWh as
+        eleven quarter hours at 1.45 kW, the worst efficiency) instead of the car's preferred power."""
+        for need in (2.0, 4.0, 6.0):
+            p = make_plan(NOW, DEPART, need, 11.0, 1.4, pref_kw=8.25, pref_kw2=4.0)
+            self.assertEqual(p["status"], "planned")
+            self.assertAlmostEqual(p["planned_kwh"], need, places=1)
+            self.assertGreaterEqual(min(p["quarters"].values()), 3.9, need)
+        big = make_plan(NOW, DEPART, 22.0, 11.0, 1.4, pref_kw=8.25, pref_kw2=4.0)
+        self.assertGreaterEqual(min(big["quarters"].values()), 8.2)       # enough energy: compact
+        tiny = make_plan(NOW, DEPART, 0.6, 11.0, 1.4, pref_kw=8.25, pref_kw2=4.0)
+        self.assertEqual(tiny["status"], "planned")                       # less than a quarter hour at 4 kW: the minimum
+
+    def test_early_charges_as_soon_as_plugged_in(self):
+        """Independent review of 0.10: where peaks cost nothing the compact plan was a short window right before the departure.
+        A car that charges slower than set (3.7 instead of 11 kW) would not have been ready. Early, it has the whole night."""
+        late = make_plan(NOW, DEPART, 22.0, 11.0, 1.4, pref_kw=8.25, pref_kw2=4.0)
+        early = make_plan(NOW, DEPART, 22.0, 11.0, 1.4, pref_kw=8.25, pref_kw2=4.0, early=True)
+        self.assertEqual(early["status"], "planned")
+        self.assertAlmostEqual(early["planned_kwh"], 22.0, places=1)
+        self.assertEqual(min(early["quarters"]), NOW.replace(minute=0))   # the running quarter hour
+        self.assertLess(early["ready_at"], NOW + timedelta(hours=4))
+        self.assertGreater(min(late["quarters"]), NOW + timedelta(hours=8))   # as before: the later ones stay
+        self.assertGreaterEqual(min(early["quarters"].values()), 8.2)
+
+    def test_behind_the_sun_counts_on_the_preferred_power_not_on_the_wallbox(self):
+        """Follow-up of the independent review: 30 kWh, sun 10 to 14, departure 18:00. Behind the sun 44 kWh fit at 11 kW - but a
+        car that really takes 3.7 kW gets 15 kWh there. At the preferred 4 kW only 16 kWh fit: the grid part does not wait."""
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        sun = {now + timedelta(hours=2, minutes=15 * k): 3.0 for k in range(16)}   # 10:00 to 14:00, 12 kWh
+        p = make_plan(now, now + timedelta(hours=10), 30.0, 11.0, 1.4, available_kw=sun, pref_kw=8.25, pref_kw2=4.0, early=True)
+        self.assertEqual(p["status"], "planned")
+        self.assertEqual(min(t for t in p["quarters"] if t not in sun), now)      # at once, the whole day is there for it
+
+    def test_early_keeps_the_sun_first(self):
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        sun = {now + timedelta(hours=3, minutes=15 * k): 5.0 for k in range(12)}   # 11:00 to 14:00, 15 kWh
+        p = make_plan(now, now + timedelta(hours=23), 30.0, 11.0, 1.4, available_kw=sun, pref_kw=8.25, pref_kw2=4.0, early=True)
+        self.assertAlmostEqual(p["available_kwh"], 15.0, places=1)
+        grid = [t for t in p["quarters"] if t not in sun]
+        self.assertGreater(min(grid), max(sun))                           # behind the sun, and there as early as possible
+        self.assertLess(max(grid), max(sun) + timedelta(hours=3))
 
     def test_without_sun_only_spread(self):
         p = plan(available_kw=None, target_kw=None, load=None, need_kwh=20.0)
