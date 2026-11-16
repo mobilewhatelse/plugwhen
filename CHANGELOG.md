@@ -22,6 +22,10 @@
   charge nothing changes. Capping peaks stays the guard's job.
 - **Several cars:** a charge for several days of one car never takes the time (a shared wallbox) or the room below the peak
   limit that another car needs for its next trip; then nobody charges ahead.
+- **Evening reminder to plug in (found in the field test):** a warning sent during the day (for example "not reachable" at
+  noon for a trip at 22:00) was the last word; in the evening the car was still not plugged in and nothing came. Now a car
+  known not to be plugged in gets one reminder from the evening hour on. "Not reachable" and "too late" also ask to plug
+  in all the same when the car is not plugged in, and the title says today, tomorrow or the weekday.
 - Create the dashboard again: the status line shows the target of the next trip and, while it runs, what a charge ahead fills to.
   *Deutsch:* **Die Reserve bleibt nach der Fahrt übrig (neuer Standard, je Auto wählbar).** Bisher war die Reserve die
   Mindestreichweite bei der Abfahrt, die Fahrt war darin schon enthalten: mit 100 km Reserve und einem Tag mit 46 km fuhr das Auto
@@ -44,6 +48,10 @@
   Das Kappen von Spitzen bleibt Aufgabe des Wächters.
   **Mehrere Autos:** Die Ladung für mehrere Tage eines Autos nimmt einem anderen Auto nie die Zeit (gemeinsame Wallbox) oder
   den Platz unter der Spitzengrenze für dessen nächste Fahrt; dann lädt niemand im Voraus.
+  **Erinnerung am Abend (gefunden im Praxistest):** Eine Warnung am Tag (etwa „nicht erreichbar“ zu Mittag für eine Fahrt
+  um 22:00) war das letzte Wort; am Abend war das Auto noch nicht angesteckt, und es kam nichts mehr. Jetzt bekommt ein Auto,
+  das sicher nicht angesteckt ist, ab der Abendstunde einmal eine Erinnerung. „Nicht erreichbar“ und „zu spät“ bitten bei
+  nicht angestecktem Auto trotzdem ums Anstecken, und die Überschrift sagt heute, morgen oder den Wochentag.
   Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
 
 ## 0.9.2 - unreleased - once a week full

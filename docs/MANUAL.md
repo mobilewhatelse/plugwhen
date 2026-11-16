@@ -89,8 +89,10 @@ not last until the next departure.
 ## The warning
 
 *Ready for departure* is `ready`, or what to do: `plug_in`, `low` (plug state unknown), `too_late` (not enough time even at
-full power), `not_reachable`, or `unknown` (no fresh state of charge). From a chosen evening hour on, once per departure and
-kind, to every notify service set. German and English texts.
+full power), `not_reachable`, or `unknown` (no fresh state of charge). From a chosen evening hour on (earlier for a departure
+within 12 hours), once per departure and kind, to every notify service set. A car known not to be plugged in that was warned
+during the day gets one reminder from the evening hour on; with `not_reachable` and `too_late` it asks to plug in all the
+same (Plugwhen charges as much as it can). German and English texts.
 
 ## Potential calculator
 

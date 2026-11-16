@@ -13,6 +13,10 @@ except ImportError:  # pragma: no cover
 TEXTS = {
     "de": {
         "title": "{name}: morgen nicht bereit",
+        "title_today": "{name}: heute nicht bereit",
+        "title_day": "{name}: nicht bereit für {day}",
+        "plug_anyway": " Bitte trotzdem anstecken: Plugwhen lädt so viel wie möglich.",
+        "reminder": "Erinnerung: {name} ist noch nicht angesteckt. Bis {dep} fehlen {kwh} kWh (Ziel {target} %).",
         "plug_in": "Bitte anstecken: {name} liegt bei {soc} %, bis {dep} fehlen {kwh} kWh (Ziel {target} %, {km} km Reichweite).",
         "low": "{name} liegt bei {soc} %, bis {dep} fehlen {kwh} kWh (Ziel {target} %, {km} km Reichweite). Ob angesteckt ist, ist unbekannt.",
         "too_late": "{name} wird bis {dep} nicht mehr voll: es fehlen {kwh} kWh, möglich sind noch höchstens {possible} kWh (Ziel {target} %).",
@@ -28,6 +32,10 @@ TEXTS = {
     },
     "en": {
         "title": "{name}: not ready for tomorrow",
+        "title_today": "{name}: not ready for today",
+        "title_day": "{name}: not ready for {day}",
+        "plug_anyway": " Please plug in all the same: Plugwhen charges as much as it can.",
+        "reminder": "Reminder: {name} is still not plugged in. {kwh} kWh are missing by {dep} (target {target} %).",
         "plug_in": "Please plug in: {name} is at {soc} %, {kwh} kWh are missing by {dep} (target {target} %, {km} km range).",
         "low": "{name} is at {soc} %, {kwh} kWh are missing by {dep} (target {target} %, {km} km range). It is not known whether it is plugged in.",
         "too_late": "{name} will not be full by {dep}: {kwh} kWh are missing, at most {possible} kWh can still be charged (target {target} %).",
@@ -44,14 +52,32 @@ TEXTS = {
 }
 
 
-def notice_text(language: str, n: Notice, name: str, departure: datetime | None) -> tuple[str, str]:
-    """(title, message) of a warning in German or English (anything else falls back to English)."""
+def notice_text(language: str, n: Notice, name: str, departure: datetime | None, now: datetime | None = None,
+                reminder: bool = False) -> tuple[str, str]:
+    """(title, message) of a warning in German or English (anything else falls back to English). With `now` the title says
+    today / tomorrow / the weekday of the departure (without it: tomorrow, as before). `reminder` = the evening reminder to plug in."""
     t = TEXTS["de" if (language or "").lower().startswith("de") else "en"]
     dep = departure.strftime("%H:%M") if departure is not None else t["unknown_dep"]
     soc = f"{n.soc:.0f}" if n.soc is not None else t["unknown_soc"]
     values = dict(name=name, soc=soc, dep=dep, kwh=f"{n.shortfall_kwh:.1f}", target=f"{n.target_soc:.0f}", km=f"{n.km:.0f}",
                   possible=f"{n.max_possible_kwh:.1f}" if n.max_possible_kwh is not None else "?")
-    return t["title"].format(**values), t[n.kind].format(**values)
+    title = t["title"]
+    if now is not None and departure is not None:
+        days = (departure.date() - now.date()).days
+        if days <= 0:
+            title = t["title_today"]
+        elif days > 1:
+            title = t["title_day"]
+            values["day"] = t["weekdays"][departure.weekday()]
+    if reminder:
+        msg = t["reminder"].format(**values)
+        if n.kind in ("not_reachable", "too_late"):
+            msg += t["plug_anyway"]
+        return title.format(**values), msg
+    msg = t[n.kind].format(**values)
+    if n.plugged_out and n.kind in ("not_reachable", "too_late"):
+        msg += t["plug_anyway"]
+    return title.format(**values), msg
 
 
 def ahead_text(language: str, a: Ahead, name: str, pref_kw: float | None = None, today: Any = None) -> tuple[str, str]:

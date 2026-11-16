@@ -95,7 +95,9 @@ Attribut `plugging`: wie oft und wie viele Nächte in vier Wochen angesteckt, ty
 
 *Bereit zur Abfahrt* ist `ready` oder sagt, was zu tun ist: `plug_in` (anstecken), `low` (Steckerzustand unbekannt, zu wenig), `too_late` (auch mit
 voller Leistung reicht die Zeit nicht), `not_reachable` (Ziel mit dem Akku nicht erreichbar), `unknown` (kein frischer Ladestand). Ab einer
-gewählten Abendstunde, einmal je Abfahrt und Art, an alle eingetragenen Dienste. Texte auf Deutsch und Englisch.
+gewählten Abendstunde (bei einer Abfahrt in den nächsten 12 Stunden auch früher), einmal je Abfahrt und Art, an alle eingetragenen
+Dienste. Ist das Auto sicher nicht angesteckt und kam die Warnung schon am Tag, kommt ab der Abendstunde einmal eine Erinnerung.
+Bei „nicht erreichbar“ und „zu spät“ bittet sie dann trotzdem ums Anstecken (Plugwhen lädt so viel wie möglich). Texte auf Deutsch und Englisch.
 
 ## Potenzialrechner
 

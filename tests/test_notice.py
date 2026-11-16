@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
 from need import Need  # noqa: E402
-from notice import check_ready, dedupe_key, remember_sent, should_check  # noqa: E402
+from notice import check_ready, dedupe_key, remember_sent, reminder_key, should_check  # noqa: E402
 
 
 def need(charge=10.0, reachable=True, target=60.0, km=136.0):
@@ -68,6 +68,25 @@ class NoticeTest(unittest.TestCase):
 
 
 class TimingTest(unittest.TestCase):
+    def test_unplugged_rides_along_with_not_reachable_and_too_late(self):
+        # the realtest of 16.11.: 300 km at 22:00, target not reachable, car not plugged in
+        self.assertTrue(check_ready(need(charge=52.0, reachable=False), 29.0, plugged=False, charging=False,
+                                    hours_to_departure=3.0).plugged_out)
+        self.assertFalse(check_ready(need(charge=52.0, reachable=False), 29.0, plugged=True, charging=False,
+                                     hours_to_departure=3.0).plugged_out)
+        self.assertFalse(check_ready(need(charge=52.0, reachable=False), 29.0, plugged=None, charging=False,
+                                     hours_to_departure=3.0).plugged_out)
+        self.assertTrue(check().plugged_out)
+
+    def test_evening_reminder_only_unplugged_and_from_the_hour(self):
+        d = date(2026, 11, 16)
+        out = check_ready(need(charge=52.0, reachable=False), 29.0, plugged=False, charging=False, hours_to_departure=10.0)
+        self.assertIsNone(reminder_key(out, d, 12.0, 19.0))                      # noon: the normal warning, no reminder
+        self.assertEqual(reminder_key(out, d, 19.0, 19.0), "2026-11-16:plug_evening")
+        self.assertNotEqual(reminder_key(out, d, 19.5, 19.0), dedupe_key(out, d))  # its own key: a warning at noon does not block it
+        plugged = check_ready(need(charge=52.0, reachable=False), 29.0, plugged=True, charging=False, hours_to_departure=3.0)
+        self.assertIsNone(reminder_key(plugged, d, 20.0, 19.0))
+
     def test_dedupe_once_per_day_and_kind(self):
         a, b = check(), check(need(charge=30.0), hours_to_departure=2.0)
         d = date(2026, 11, 6)

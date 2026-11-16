@@ -13,6 +13,10 @@ Kinds, most urgent first:
 * `low`: short of the target, plug state unknown and nothing planned that covers it.
 
 Nothing is sent if the shortfall is small, if the car is charging or (plugged in or unknown) a plan covers the shortfall.
+
+A car known not to be plugged in gets one more reminder from the evening hour on, even if a warning for the same departure
+went out earlier in the day (`reminder_key`): a warning at noon for a trip at 22:00 must not be the last word. For
+`not_reachable` and `too_late` the plug state rides along (`plugged_out`), so the text can still ask to plug in.
 """
 
 from __future__ import annotations
@@ -39,6 +43,7 @@ class Notice:
     km: float
     hours_left: float | None
     max_possible_kwh: float | None  # most that can still be charged before departure (too_late)
+    plugged_out: bool = False       # known not to be plugged in (also for not_reachable / too_late)
 
 
 def check_ready(
@@ -58,7 +63,7 @@ def check_ready(
 
     def notice(kind: str, possible: float | None = None) -> Notice:
         return Notice(kind, round(shortfall, 1), soc, need.target_soc, need.km, hours_to_departure,
-                      None if possible is None else round(possible, 1))
+                      None if possible is None else round(possible, 1), plugged is False)
 
     if not need.reachable:
         return notice("not_reachable")
@@ -141,6 +146,13 @@ def ahead_key(a: Ahead) -> str:
 def dedupe_key(n: Notice, departure_day: date) -> str:
     """Send a warning once per departure day and kind (a worse kind is a new warning)."""
     return f"{departure_day.isoformat()}:{n.kind}"
+
+
+def reminder_key(n: Notice, departure_day: date, now_hour: float, from_hour: float) -> str | None:
+    """The one evening reminder to plug in (None = none due): only for a car known not to be plugged in, only from `from_hour`."""
+    if not n.plugged_out or now_hour < from_hour:
+        return None
+    return f"{departure_day.isoformat()}:plug_evening"
 
 
 ONCE_KEYS = frozenset({"switch_ready"})   # messages sent once per car, never again

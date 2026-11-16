@@ -51,7 +51,7 @@ from .need import MIN_SAMPLES, MODE_FLOOR, MODE_PLUS, Need, compute_need
 from .const import DEFAULT_RESERVE_MODE, RESERVE_AT, V_DAILY_CAP, V_DAYS_AHEAD, V_RESERVE_MODE
 from . import voraus
 from .startwerte import charge_efficiency
-from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, should_check
+from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, reminder_key, should_check
 from .plan import make_plan
 from . import vollladen as vl
 from . import sicherheit
@@ -2193,12 +2193,20 @@ class Plugwhen:
         if n is None or not v.notice_enabled or v.departure is None or not services:
             return
         hours = (v.departure - now).total_seconds() / 3600.0
-        if not should_check(now.hour + now.minute / 60.0, float(v.cfg.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)), hours):
+        now_hour, from_hour = now.hour + now.minute / 60.0, float(v.cfg.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR))
+        if not should_check(now_hour, from_hour, hours):
             return
         key = dedupe_key(n, v.departure.date())
+        evening = reminder_key(n, v.departure.date(), now_hour, from_hour)
         sent = self._sent.setdefault(v.sub_id, [])
-        if key in sent:
+        if key not in sent:
+            title, message = notice_text(self.hass.config.language, n, v.name, v.departure, now)
+            if await self._deliver(v, services, title, message, key):
+                _LOGGER.info("Plugwhen: warning '%s' sent for %s", n.kind, v.name)
+                if evening:   # sent in the evening already: no second reminder
+                    remember_sent(sent, evening, SENT_KEEP)
             return
-        title, message = notice_text(self.hass.config.language, n, v.name, v.departure)
-        if await self._deliver(v, services, title, message, key):
-            _LOGGER.info("Plugwhen: warning '%s' sent for %s", n.kind, v.name)
+        if evening and evening not in sent:   # warned earlier in the day, still not plugged in in the evening
+            title, message = notice_text(self.hass.config.language, n, v.name, v.departure, now, reminder=True)
+            if await self._deliver(v, services, title, message, evening):
+                _LOGGER.info("Plugwhen: evening reminder to plug in sent for %s", v.name)

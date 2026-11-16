@@ -115,6 +115,32 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(title, "Car: not ready for tomorrow")
         self.assertIn("Please plug in", msg)
 
+    def test_title_today_tomorrow_or_weekday(self):
+        dep = datetime(2026, 11, 16, 22, 0, tzinfo=TZ)
+        self.assertEqual(notice_text("de", self.n("plug_in"), "Mercedes", dep, dep - timedelta(hours=10))[0],
+                         "Mercedes: heute nicht bereit")
+        self.assertEqual(notice_text("de", self.n("plug_in"), "Mercedes", dep, dep - timedelta(days=1))[0],
+                         "Mercedes: morgen nicht bereit")
+        self.assertEqual(notice_text("en", self.n("plug_in"), "Car", dep, dep - timedelta(days=2))[0], "Car: not ready for Mon")
+        self.assertEqual(notice_text("de", self.n("plug_in"), "Mercedes", dep, dep - timedelta(days=3))[0],
+                         "Mercedes: nicht bereit für Mo")
+
+    def test_not_reachable_and_unplugged_still_asks_to_plug_in(self):
+        _, msg = notice_text("de", self.n("not_reachable", plugged_out=True), "Mercedes", self.DEP)
+        self.assertIn("nicht erreichbar", msg)
+        self.assertIn("trotzdem anstecken", msg)
+        _, msg = notice_text("de", self.n("not_reachable"), "Mercedes", self.DEP)
+        self.assertNotIn("anstecken", msg)
+
+    def test_evening_reminder_text(self):
+        for lang, word in (("de", "Erinnerung"), ("en", "Reminder")):
+            for kind in ("plug_in", "not_reachable", "too_late"):
+                _, msg = notice_text(lang, self.n(kind, plugged_out=True, max_possible_kwh=3.0), "Car", self.DEP, reminder=True)
+                self.assertIn(word, msg)
+                self.assertNotIn("{", msg)
+        _, msg = notice_text("de", self.n("not_reachable", plugged_out=True), "Car", self.DEP, reminder=True)
+        self.assertIn("trotzdem anstecken", msg)
+
     def test_every_kind_has_a_text_in_both_languages(self):
         for lang in ("de", "en"):
             for kind in ("plug_in", "low", "too_late", "not_reachable"):
