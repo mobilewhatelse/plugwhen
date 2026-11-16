@@ -201,6 +201,42 @@ class SunHabitTests(unittest.TestCase):
         self.assertEqual(co.Plugwhen._plug_share(v, MON_EVENING + timedelta(hours=1)), a)
 
 
+class PeakMattersTests(unittest.TestCase):
+    """Wish of the user: capping peaks is the guard's job. Where peaks cost nothing (no guard, no demand charge) the plan need
+    not charge flat."""
+
+    def plugwhen(self, **options) -> co.Plugwhen:
+        p = bare()
+        p.entry = SimpleNamespace(options=options)
+        p.wallboxes = lambda v: []
+        p.shared_wallboxes = lambda: set()
+        return p
+
+    def test_without_guard_and_price_the_plan_charges_compactly(self):
+        p, v = self.plugwhen(), car(30.0)
+        self.assertFalse(p._peak_matters())
+        self.assertEqual(p._pref_kw(v, 11.0), 8.25)
+        plan = make_plan(MON_EVENING, TUE_7, 22.0, 11.0, 1.4, pref_kw=p._pref_kw(v, 11.0))
+        self.assertEqual(plan["status"], "planned")
+        self.assertAlmostEqual(plan["planned_kwh"], 22.0, places=1)
+        self.assertGreaterEqual(min(plan["quarters"].values()), 8.2)
+
+    def test_with_a_guard_a_load_forecast_or_a_demand_charge_it_stays_flat(self):
+        for options in ({co.O_WAECHTER: "entry"}, {co.O_LOAD: "sensor.load"}, {co.O_PRICE_LOW: 33.82}, {co.O_PRICE_HIGH: "67.64"}):
+            p, v = self.plugwhen(**options), car(30.0)
+            self.assertTrue(p._peak_matters(), options)
+            self.assertEqual(p._pref_kw(v, 11.0), 4.0)
+
+    def test_a_higher_preferred_power_of_the_car_is_kept(self):
+        p, v = self.plugwhen(), car(30.0, **{co.V_CHARGE_PREF: 10.0})
+        self.assertEqual(p._pref_kw(v, 11.0), 10.0)
+
+    def test_a_shared_wallbox_charges_compactly_also_with_a_guard(self):
+        p, v = self.plugwhen(**{co.O_WAECHTER: "entry"}), car(30.0)
+        p.wallboxes, p.shared_wallboxes = (lambda v: ["sensor.wb"]), (lambda: {"sensor.wb"})
+        self.assertEqual(p._pref_kw(v, 11.0), 8.25)
+
+
 class FitTests(unittest.TestCase):
     """Review of 0.10: a charge for several days that does not fit before the departure made the plan say "the target cannot
     be reached", although the next trip was fine."""

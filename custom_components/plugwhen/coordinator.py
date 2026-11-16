@@ -1864,10 +1864,7 @@ class Plugwhen:
         v.need_must = v.need   # the next trip alone (with the weekly full charge): what is promised and warned about
         self._look_ahead(v, now, avail, max_kw)
         plan_departure = v.departure or (vl.evening(v.weekly_day, now.tzinfo) if v.weekly_active and v.weekly_day else None)
-        # a wallbox shared with another car: charge compactly (at least three quarters of the wallbox power), so that the other
-        # car still fits into the night
-        pref = (max(SHARED_COMPACT * max_kw, float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
-                if set(self.wallboxes(v)) & self.shared_wallboxes() else float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF)))
+        pref = self._pref_kw(v, max_kw)
 
         def plan_for(kwh: float) -> dict[str, Any]:
             return make_plan(
@@ -1897,6 +1894,29 @@ class Plugwhen:
         # only a wallbox that says it does not charge counts: one that is not reachable (Wi-Fi restart at night) says nothing
         known = (self._is_on(v.cfg.get(V_CHARGING)) is not None) if v.cfg.get(V_CHARGING) else v.evcc_live is not None
         v.stall_since = sicherheit.stall_start(v.stall_since, now, running, v.plugged, known, v.charging)
+
+    def _peak_matters(self) -> bool:
+        """Does the height of the grid import cost anything here? Only with a peak guard, a load forecast or a demand charge
+        (a price per kW) set. Capping peaks is the guard's job; Plugwhen only plans gently where that is worth something."""
+        o = self.entry.options
+
+        def price(key: str) -> float:
+            try:
+                return float(o.get(key) or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        return bool(o.get(O_WAECHTER) or o.get(O_LOAD) or price(O_PRICE_LOW) > 0 or price(O_PRICE_HIGH) > 0)
+
+    def _pref_kw(self, v: Vehicle, max_kw: float) -> float:
+        """The lowest power the plan spreads the charging with: the car's preferred power (4 kW by default) where peaks cost
+        money. Compactly (at least three quarters of the wallbox power) where they do not - in a country without a demand
+        charge flat charging gains nothing and only loses a little in the car's charger - and at a wallbox shared with
+        another car, so that the other car still fits into the night."""
+        pref = float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF))
+        if not self._peak_matters() or set(self.wallboxes(v)) & self.shared_wallboxes():
+            return max(SHARED_COMPACT * max_kw, pref)
+        return pref
 
     @staticmethod
     def _plug_share(v: Vehicle, now: datetime) -> dict[tuple[int, int], float] | None:

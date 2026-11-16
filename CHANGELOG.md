@@ -15,6 +15,9 @@
   Without a forecast nothing is left out. Solar power that comes while the car is plugged in is always used, plan or not.
   In a plan with sun the grid part now lies behind the sun hours whenever it fits there without a higher power: the battery
   keeps room for a sun that turns out stronger than forecast (before, a quiet morning could be charged from the grid first).
+- **Without a peak guard and without a demand charge the plan charges compactly** (at least three quarters of the wallbox
+  power) instead of flat at 4 kW: where peaks cost nothing, flat charging gains nothing and loses a little in the car's
+  charger. With a guard, a load forecast or a demand charge nothing changes. Capping peaks stays the guard's job.
 - Create the dashboard again: the status line shows the target of the next trip and, while it runs, what a charge ahead fills to.
   *Deutsch:* **Die Reserve bleibt nach der Fahrt übrig (neuer Standard, je Auto wählbar).** Bisher war die Reserve die
   Mindestreichweite bei der Abfahrt, die Fahrt war darin schon enthalten: mit 100 km Reserve und einem Tag mit 46 km fuhr das Auto
@@ -30,6 +33,9 @@
   wird immer genutzt, mit oder ohne Plan. In einem Plan mit Sonne liegt der Netzanteil jetzt hinter den Sonnenstunden, wenn er
   dort ohne höhere Leistung Platz hat: Der Akku behält Platz für eine Sonne, die stärker ausfällt als die Prognose (bisher
   konnte zuerst ein ruhiger Vormittag aus dem Netz geladen werden).
+  **Ohne Spitzenwächter und ohne Leistungspreis lädt der Plan kompakt** (mindestens drei Viertel der Wallbox-Leistung) statt
+  flach mit 4 kW: Wo Spitzen nichts kosten, bringt flaches Laden nichts und verliert etwas im Ladegerät des Autos. Mit Wächter,
+  Lastprognose oder Leistungspreis ändert sich nichts. Das Kappen von Spitzen bleibt Aufgabe des Wächters.
   Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
 
 ## 0.9.2 - unreleased - once a week full
