@@ -51,6 +51,25 @@ class DashboardTest(unittest.TestCase):
             self.assertEqual((t["type"], t["color"], t["hide_state"]), ("tile", "green", True))
             self.assertEqual(t["tap_action"], {"action": "toggle"})
 
+    def test_weekly_full_shows_only_the_switch_while_off(self):
+        """Field test 16.11.2026: with the switch off the days stayed. Now target, days and status sit in one conditional card."""
+        views = build_views([{"name": "Car", "ids": ids("car")}], "de")
+        sw = ids("car")["weekly_full"]
+        cards = [c for v in views for s in v.get("sections", []) for c in s.get("cards", [])]
+        top = [c for c in cards if c["type"] == "entities" and any(e.get("entity") == sw for e in c["entities"])]
+        self.assertEqual(len(top), 1)
+        self.assertEqual(len(top[0]["entities"]), 1)                    # the switch alone
+        cond = [c for c in cards if c["type"] == "conditional" and c["conditions"][0].get("entity") == sw]
+        self.assertEqual(len(cond), 1)
+        self.assertEqual(cond[0]["conditions"][0]["state"], "on")
+        inner = json.dumps(cond[0])
+        self.assertIn(ids("car")["weekly_target"], inner)
+        for d in range(7):
+            self.assertIn(ids("car")[f"weekly_day_{d}"], inner)
+        self.assertIn("Volladen", inner)
+        outside = json.dumps([c for c in cards if c is not cond[0]])
+        self.assertNotIn(ids("car")["weekly_day_0"], outside)
+
     def test_two_vehicles_have_their_names_in_the_headings(self):
         views = build_views([{"name": "A", "ids": ids("a")}, {"name": "B", "ids": ids("b")}], "de")
         heads = [c["heading"] for s in views[0]["sections"] for c in s["cards"] if c["type"] == "heading"]

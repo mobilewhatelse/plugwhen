@@ -478,10 +478,11 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
                   "{% if a.active %}" + t["wf_active"].replace("{t}", "{{ states('" + str(tg) + "') | int(100) }}")
                   + "{% elif a.day %}" + t["wf_planned"].replace("{d}", "{{ " + names + "[as_datetime(a.day).weekday()] }}")
                   + "{% elif a.done %}" + t["wf_done"] + "{% else %}" + t["wf_none"] + "{% endif %}{% endif %}")
-        ents = [{"entity": sw, "name": t["wf"]}]
+        # only the switch while it is off; the target, the days and the status appear when it is switched on (the ticked days
+        # are kept all the same) - field test 16.11.2026: days ticked while nothing happens only puzzle
+        cards: list[dict[str, Any]] = []
         if tg:
-            ents.append({"entity": tg, "name": t["wf_target"]})
-        cards: list[dict[str, Any]] = [{"type": "entities", "show_header_toggle": False, "entities": ents}]
+            cards.append({"type": "entities", "show_header_toggle": False, "entities": [{"entity": tg, "name": t["wf_target"]}]})
         day_ids = [ids.get(f"weekly_day_{d}") for d in range(7)]
         if all(day_ids):   # the day bar: seven buttons Mo..So, tap to tick
             short = t["wf_days_short"].split(",")
@@ -494,7 +495,11 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
                      "hold_action": {"action": "more-info"}}
                     for d, eid in enumerate(day_ids)]},
             ]
-        details[-1]["cards"] += cards + [{"type": "markdown", "content": status}]
+        details[-1]["cards"] += [
+            {"type": "entities", "show_header_toggle": False, "entities": [{"entity": sw, "name": t["wf"]}]},
+            {"type": "conditional", "conditions": [{"condition": "state", "entity": sw, "state": "on"}],
+             "card": {"type": "vertical-stack", "cards": cards + [{"type": "markdown", "content": status}]}},
+        ]
     return {"overview": overview, "learning": learning, "details": details}
 
 
