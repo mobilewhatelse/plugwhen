@@ -13,7 +13,8 @@ Order of choice:
 
 1. Quarter hours with available power come first (the one with most available power first): the sun, when there is any.
 2. The rest is spread over the parking time with the lowest even grid import (behind the last planned sun quarter hour,
-   if all of it fits there without a higher power: the battery keeps room for a sun stronger than forecast): house and car are topped up to one common
+   if it fits there without a higher power and the whole need would fit there even if the sun failed: the battery
+   keeps room for a sun stronger than forecast, and a sun that does not come costs nothing): house and car are topped up to one common
    level (quiet quarter hours get more, busy ones less or nothing), never above the peak target. Quarter hours where the
    car would get less than the wallbox minimum are dropped and the rest filled again (among equals the later ones stay:
    the battery waits less at a high state of charge). Households without solar get only this step.
@@ -124,7 +125,10 @@ def make_plan(
     # there and needs no higher power than it would otherwise (or than the preferred one). A battery filled from the grid in the
     # morning has no room left for a sun that turns out stronger than forecast.
     after_sun = [q for q in rest if q["t"] > max(plan)] if plan else []
-    if after_sun and len(after_sun) < len(rest) and remaining >= 0.05:
+    # ... and only if the WHOLE need would still fit behind the sun at full power: a forecast is no promise, and if the sun
+    # fails the car must be charged all the same
+    room_after = sum(_room(q, max_kw, min_kw, target_kw) * QUARTER_H * q["frac"] for q in after_sun)
+    if after_sun and len(after_sun) < len(rest) and remaining >= 0.05 and room_after >= need_kwh:
         s, d, f = spread_over(after_sun)
         if remaining - d <= 0.1 and max(s.values(), default=0.0) <= max(max(spread.values(), default=0.0), floor) + 0.05:
             spread, delivered, used_floor = s, d, f
@@ -172,6 +176,12 @@ def make_plan(
     if result["windows"]:
         result["ready_at"] = result["windows"][-1]["end"]
     return result
+
+
+def _room(q: dict[str, Any], max_kw: float, min_kw: float, target_kw: float | None) -> float:
+    """The most the car can charge in this quarter hour (below the peak target, if there is one); 0 if less than the wallbox minimum."""
+    room = min(max_kw, max_kw if target_kw is None else target_kw - q["high"] + q["avail"])
+    return room if room >= min_kw else 0.0
 
 
 def _spread(quarters: list[dict[str, Any]], energy: float, max_kw: float, min_kw: float,

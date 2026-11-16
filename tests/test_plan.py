@@ -126,6 +126,23 @@ class PlanTest(unittest.TestCase):
         self.assertLess(max(p["quarters"][t] for t in grid), 6.0)         # spread over morning and afternoon instead
         self.assertLess(min(grid), min(sun))
 
+    def test_behind_the_sun_only_if_everything_fits_there_when_the_sun_fails(self):
+        """Review: the forecast promises 25 of the 30 kWh, the grid part of 5 kWh would fit into the two hours behind the sun.
+        But if the sun fails, 30 kWh do not fit into two hours: then the quiet morning is used, as before."""
+        now = datetime(2027, 6, 12, 8, 0, tzinfo=TZ)
+        dep = now + timedelta(hours=8)                                    # 16:00, two hours behind the sun
+        sun = {now + timedelta(hours=1, minutes=15 * k): 5.0 for k in range(20)}   # 09:00 to 14:00, 25 kWh
+        quiet_morning = [{"t": now + timedelta(minutes=15 * k), "typical": 0.1, "high": 0.2 if k < 4 else 1.5, "n": 4}
+                         for k in range(32)]
+        p = make_plan(now, dep, 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0, load=quiet_morning)
+        self.assertEqual(p["status"], "planned")
+        grid = [t for t in p["quarters"] if t not in sun]
+        self.assertLess(min(grid), min(sun))                              # the morning: not everything is left to the end
+        # with four hours behind the sun everything would fit there (44 kWh at 11 kW): then the grid part waits
+        later = make_plan(now, dep + timedelta(hours=2), 30.0, 11.0, 1.4, available_kw=sun, pref_kw=4.0,
+                          load=quiet_morning + [{"t": dep + timedelta(minutes=15 * k), "typical": 0.1, "high": 1.5, "n": 4} for k in range(8)])
+        self.assertGreater(min(t for t in later["quarters"] if t not in sun), max(sun))
+
     def test_without_sun_only_spread(self):
         p = plan(available_kw=None, target_kw=None, load=None, need_kwh=20.0)
         self.assertEqual(p["available_kwh"], 0.0)
