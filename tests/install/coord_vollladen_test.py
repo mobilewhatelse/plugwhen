@@ -85,6 +85,19 @@ class WeeklyFullTests(unittest.TestCase):
         self.assertEqual(len(mon), 1)
         self.assertAlmostEqual(mon[0].km_target, 300.0)   # 100 % of 60 kWh at 0.2 kWh/km
 
+    def test_look_ahead_full_target_also_for_a_calendar_trip(self):
+        # field test 16.11.2026: the departure came from the calendar (Buero, 59 km); the look-ahead kept its 100 km range
+        v = car(50.0)
+        v.departure_source, v.consumption = "calendar", 0.2
+        v.trips = [{"departure": MON_MORNING.isoformat(), "km": 59.0, "range_km": 100.0}]
+        bare()._weekly_full(v, FRI_EVENING, None)
+        mon = [t for t in bare()._trips(v, FRI_EVENING, 60.0) if t.departure == MON_MORNING]
+        self.assertEqual(len(mon), 1)
+        self.assertAlmostEqual(mon[0].km_target, 300.0)
+        v.weekly_full = False
+        mon = [t for t in bare()._trips(v, FRI_EVENING, 60.0) if t.departure == MON_MORNING]
+        self.assertLess(mon[0].km_target, 300.0)
+
     def test_look_ahead_unchanged_when_off(self):
         v = car(50.0)
         v.weekly_full = False
@@ -173,6 +186,26 @@ class KeptOverMidnightTests(unittest.TestCase):
         v.departure = MON_MORNING + timedelta(days=1)   # the car was not used Monday, the plan now goes to Tuesday
         bare()._weekly_full(v, AFTER_MIDNIGHT, None)
         self.assertFalse(v.weekly_active)
+
+    def test_kept_departure_deleted_on_the_chosen_day_counts_for_the_next(self):
+        # field test 16.11.2026: Monday ticked at 20:00 while a calendar trip at 22:00 was the departure, then the trip was
+        # deleted and the next departure was Tuesday 08:00. The hold stayed on 22:00 and the full charge did not count
+        mon_20 = datetime(2026, 11, 16, 20, 0, tzinfo=TZ)
+        v = car(30.0, departure=mon_20 + timedelta(hours=2))
+        v.weekly_days = frozenset({0})
+        bare()._weekly_full(v, mon_20, None)
+        self.assertTrue(v.weekly_active)
+        self.assertEqual(v.weekly_hold, mon_20 + timedelta(hours=2))
+        fresh_need(v)
+        v.departure = mon_20 + timedelta(hours=12)      # the trip deleted: Tuesday 08:00
+        bare()._weekly_full(v, mon_20 + timedelta(minutes=7), None)
+        self.assertTrue(v.weekly_active)
+        self.assertEqual(v.need.target_soc, 100.0)
+        self.assertEqual(v.weekly_hold, mon_20 + timedelta(hours=12))
+        fresh_need(v)
+        bare()._weekly_full(v, mon_20 + timedelta(hours=5), None)   # after midnight: still kept for Tuesday 08:00
+        self.assertTrue(v.weekly_active)
+        self.assertEqual(v.need.target_soc, 100.0)
 
     def test_switched_off_drops_the_kept_target(self):
         v = self.sunday_plan()

@@ -2046,7 +2046,11 @@ class Plugwhen:
         if v.weekly_hold is not None:   # promised for a departure: kept past midnight and into the next week
             v.weekly_day = v.weekly_hold_day
             v.weekly_active = vl.applies_held(now, v.departure, v.weekly_hold)
-        else:
+            if not v.weekly_active and v.departure is not None:
+                # the departure is further away than the kept one (a calendar trip deleted, a plan moved to the next day): the hold
+                # only lengthens a full charge, it never prevents one - choose again as if nothing was kept (field test 16.11.2026)
+                v.weekly_hold = v.weekly_hold_day = None
+        if v.weekly_hold is None:
             v.weekly_day = vl.choose_day(now.date(), v.weekly_days, avail, v.weekly_done) if v.weekly_full else None
             v.weekly_active = vl.applies(now, v.departure, v.weekly_day)
             if v.weekly_active and v.departure is not None:
@@ -2097,9 +2101,13 @@ class Plugwhen:
             if d is None or d <= now:
                 continue
             after = self._need_mode(v) == MODE_PLUS   # reserve left after the trip: its kilometres plus the reserve
-            cal.append(Trip(d, float(t["km"]), max(float(t["km"]) + v.reserve_km, float(t["range_km"])) if after else float(t["range_km"]),
-                            float(t["km"]))
-                       if t.get("km") else trip_for(d, d.weekday()))
+            if t.get("km"):
+                target = max(float(t["km"]) + v.reserve_km, float(t["range_km"])) if after else float(t["range_km"])
+                if v.weekly_full and self._weekly_applies(v, now, d):   # once a week full also for a trip from the calendar
+                    target = max(target, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
+                cal.append(Trip(d, float(t["km"]), target, float(t["km"])))
+            else:
+                cal.append(trip_for(d, d.weekday()))
         # a calendar trip replaces the learned departure only when it is the same trip (within two hours); calendar trips never replace each other
         return with_calendar(out, cal)[:HORIZON_TRIPS]
 

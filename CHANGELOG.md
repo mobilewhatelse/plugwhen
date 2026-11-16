@@ -26,6 +26,9 @@
   noon for a trip at 22:00) was the last word; in the evening the car was still not plugged in and nothing came. Now a car
   known not to be plugged in gets one reminder from the evening hour on. "Not reachable" and "too late" also ask to plug
   in all the same when the car is not plugged in, and the title says today, tomorrow or the weekday.
+- **Once a week full, two fixes from the field test:** a full charge kept for a departure that then went away (a calendar trip
+  deleted) blocked the full charge for the next one, now the day is chosen again; and a trip from the calendar got the full
+  target only in the plan, not in the look-ahead (it then told to charge again the day after).
 - **Once a week full on the dashboard:** while the switch is off only the switch is shown; the target, the days and the status
   appear when it is switched on (the ticked days are kept).
 - Create the dashboard again: the status line shows the target of the next trip and, while it runs, what a charge ahead fills to.
@@ -54,6 +57,9 @@
   um 22:00) war das letzte Wort; am Abend war das Auto noch nicht angesteckt, und es kam nichts mehr. Jetzt bekommt ein Auto,
   das sicher nicht angesteckt ist, ab der Abendstunde einmal eine Erinnerung. „Nicht erreichbar“ und „zu spät“ bitten bei
   nicht angestecktem Auto trotzdem ums Anstecken, und die Überschrift sagt heute, morgen oder den Wochentag.
+  **Einmal pro Woche voll, zwei Korrekturen aus dem Praxistest:** Ein für eine Abfahrt gemerktes Volladen, deren Fahrt dann
+  wegfiel (Kalendertermin gelöscht), verhinderte das Volladen für die nächste; jetzt wird der Tag neu gewählt. Und eine Fahrt aus
+  dem Kalender bekam das volle Ziel nur im Plan, nicht in der Vorausschau (die meldete dann für den Tag danach erneut Laden).
   **Einmal pro Woche voll im Dashboard:** Solange der Schalter aus ist, steht nur der Schalter da; Ziel, Tage und Status erscheinen
   beim Einschalten (die angehakten Tage bleiben gemerkt).
   Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
