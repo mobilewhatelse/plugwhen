@@ -167,6 +167,22 @@ class DashboardTest(unittest.TestCase):
         views = build_views([{"name": "X", "ids": ids("x")}], "en")   # without the main device: no card
         self.assertNotIn("Fleet values", json.dumps(views))
 
+    def test_waechter_card_only_while_the_peak_guard_is_missing(self):
+        car = [{"name": "X", "ids": ids("x")}]
+        for lang, head, after in (("de", "Passt dazu: Viertelstunden-Wächter", "Dashboard neu erstellen"),
+                                  ("en", "Goes well with: Viertelstunden-Wächter", "create the dashboard again")):
+            views = build_views(car, lang, waechter=False)
+            last = views[0]["sections"][-1]                             # tab Overview, at the end
+            text = json.dumps(last, ensure_ascii=False)
+            self.assertEqual(last["cards"][0], {"type": "heading", "heading": head, "icon": "mdi:shield-check-outline"})
+            self.assertIn("repository=viertelstunden-waechter", text)    # straight into the marketplace
+            self.assertIn("aiwhatelse.eu/spitzenwaechter", text)
+            self.assertIn(after, text)
+            for v in views[1:]:
+                self.assertNotIn("Viertelstunden-Wächter", json.dumps(v, ensure_ascii=False))   # only once, in the overview
+        for state in (True, None):                                       # installed, or not known: no card
+            self.assertNotIn("Passt dazu", json.dumps(build_views(car, "de", waechter=state), ensure_ascii=False))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -425,6 +425,8 @@ def main():
         "the dashboard service builds the dashboard with this installation's entities", f"{s_d} {len(text)} chars")
     log("evcc_plan" in text and ("Ohne evcc" in text or "Without evcc" in text) and ".sources" in text,
         "the dashboard has the cards 'plan for evcc' (says what happens without evcc) and 'where the data comes from'")
+    log("repository=viertelstunden-waechter" in text,
+        "without the quarter-hour peak guard the dashboard has the card 'Goes well with: Viertelstunden-Waechter' (link to the marketplace)")
     cards_md = [c for v in dash.get("views", []) for sec in v.get("sections", []) for c in sec.get("cards", [])
                 if c.get("type") == "markdown"]
     bad = []

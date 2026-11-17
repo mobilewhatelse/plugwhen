@@ -119,6 +119,8 @@ def main():
     s_p, d_p = it.api("POST", "/api/services/plugwhen/create_dashboard?return_response", {})
     ptext = json.dumps((d_p or {}).get("service_response") or {}) if isinstance(d_p, dict) else ""
     log(s_p == 200 and pid in ptext and "zweitauto" in ptext.lower(), "Plugwhen's dashboard has both vehicles", f"{s_p} {len(ptext)} chars")
+    log(s_p == 200 and "repository=viertelstunden-waechter" not in ptext,
+        "with the guard installed Plugwhen's dashboard has no card 'Goes well with: Viertelstunden-Waechter'")
 
     # ---------- taking over from the guard: a car the guard knows is filled in when it is added to Plugwhen ----------
     gcar = {"name": "Gastauto", "soc_entity": "sensor.test_last", "target_soc": 80, "capacity_kwh": 77, "departure_entity": "input_datetime.abfahrt",

@@ -504,8 +504,9 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
 
 
 def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None,
-                main_ids: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    """Three tabs: Overview (ready for the next departure, plan, trips, look-ahead, plan for evcc), Learning, Details."""
+                main_ids: dict[str, str] | None = None, waechter: bool | None = None) -> list[dict[str, Any]]:
+    """Three tabs: Overview (ready for the next departure, plan, trips, look-ahead, plan for evcc), Learning, Details.
+    `waechter` False (the peak guard is not installed) adds the card 'Goes well with' at the end of the overview."""
     t = dict(TEXT["de"] if (language or "").lower().startswith("de") else TEXT["en"])
     cur = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "€")
     t = {k: v.replace("{cur}", cur) for k, v in t.items()}
@@ -519,6 +520,8 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
         tabs["details"].append(feedback_section(main_ids, language))
     if main_ids and "share_usage" in main_ids:   # quiet, only while sharing is off: what the fleet values would bring
         tabs["learning"].insert(0, fleet_off_section(main_ids["share_usage"], language))
+    if waechter is False:   # only when we know it is missing; it disappears with "Create the dashboard" after installing it
+        tabs["overview"].append(waechter_section(language))
     return [
         {"title": t["v_overview"], "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2, "sections": tabs["overview"]},
         {"title": t["v_learning"], "path": "lernen", "icon": "mdi:school-outline", "type": "sections", "max_columns": 2, "sections": tabs["learning"]},
@@ -537,6 +540,31 @@ FLEET_OFF_TEXT = {
            "With *Share anonymous data* it starts with the consumption of many cars of the same model, in cold and warm weather, "
            "from the first day.", "Share anonymous data"),
 }
+
+
+WAECHTER_LINK = "https://my.home-assistant.io/redirect/hacs_repository/?owner=mobilewhatelse&repository=viertelstunden-waechter&category=integration"
+WAECHTER_TEXT = {
+    "de": ("Passt dazu: Viertelstunden-Wächter",
+           "Der **Viertelstunden-Wächter** hält die Viertelstunden-Spitze Ihres Hauses unter einer Grenze: Er schaltet Wallbox, "
+           "Wärmepumpe oder Boiler kurz zurück, bevor eine teure Spitze entsteht. Plugwhen findet ihn automatisch und plant das "
+           "Laden dann unter dieser Grenze.\n\n"
+           f"Kostenlos im [HACS-Marketplace]({WAECHTER_LINK}) · mehr auf [aiwhatelse.eu/spitzenwaechter](https://www.aiwhatelse.eu/spitzenwaechter/)\n\n"
+           "*Nach der Installation: Dashboard neu erstellen, dann verschwindet diese Karte.*"),
+    "en": ("Goes well with: Viertelstunden-Wächter",
+           "The **Viertelstunden-Wächter** (quarter-hour peak guard) keeps the quarter-hour peak of your house below a limit: it "
+           "turns the wallbox, heat pump or water heater down for a moment before an expensive peak builds up. Plugwhen finds it "
+           "automatically and then plans the charging below that limit.\n\n"
+           f"Free in the [HACS marketplace]({WAECHTER_LINK}) · more at [aiwhatelse.eu/spitzenwaechter](https://www.aiwhatelse.eu/spitzenwaechter/?lang=en)\n\n"
+           "*After installing it: create the dashboard again, then this card disappears.*"),
+}
+
+
+def waechter_section(lang: str | None) -> dict:
+    """A quiet card at the end of the overview, only while the quarter-hour peak guard is not installed."""
+    head, text = WAECHTER_TEXT["de" if str(lang or "").lower().startswith("de") else "en"]
+    return {"type": "grid", "cards": [
+        {"type": "heading", "heading": head, "icon": "mdi:shield-check-outline"},
+        {"type": "markdown", "content": text}]}
 
 
 def fleet_off_section(share_id: str, lang: str | None) -> dict:
