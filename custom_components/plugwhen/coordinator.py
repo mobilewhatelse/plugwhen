@@ -78,6 +78,7 @@ TRIPS_REFRESH = timedelta(minutes=15)   # the calendar is read this often
 MIN_DRIVE_SHARE = 0.5        # a weekday counts as a day of departure if the car is used on at least half of its days
 SHARED_COMPACT = 0.75        # at a shared wallbox a plan charges with at least this share of the wallbox power
 SENT_KEEP = 8                # warnings remembered per vehicle (so that a restart does not repeat them)
+MESSAGES_KEEP = 10           # messages kept per vehicle for the dashboard (a message swiped away on the phone stays readable)
 
 
 @dataclass
@@ -187,6 +188,7 @@ class Plugwhen:
         self._act_again = False   # a run was asked for meanwhile: once more afterwards, with the newest values
         self._store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.sent")
         self._sent: dict[str, list[str]] = {}
+        self._messages: dict[str, list[dict[str, str]]] = {}   # per vehicle the latest messages, newest first
         self._plug_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.plugs")
         self._shadow_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.shadow")
         self._calib_store: Store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.calib")
@@ -216,7 +218,9 @@ class Plugwhen:
 
     async def async_start(self) -> None:
         logging.getLogger(__package__).addHandler(self._diag_lines)
-        self._sent = (await self._store.async_load() or {}).get("sent", {})
+        stored = await self._store.async_load() or {}
+        self._sent = stored.get("sent", {})
+        self._messages = stored.get("messages", {}) if isinstance(stored.get("messages"), dict) else {}
         ev = await self._evcc_store.async_load() or {}
         self._written = ev.get("written", {}) if isinstance(ev.get("written"), dict) else {}
         self._routes = ev.get("routes", {}) if isinstance(ev.get("routes"), dict) else {}
@@ -1178,7 +1182,8 @@ class Plugwhen:
         services = [x.strip() for x in str(v.cfg.get(V_NOTIFY) or "").split(",") if "." in x]
         if not (services and await self._deliver(v, services, title, message, key)):
             remember_sent(sent, key, SENT_KEEP)
-            self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
+            self._remember_message(v, message)
+            self._store.async_delay_save(self._store_data, 10)
 
     def _min_soc(self, v: Vehicle) -> float:
         """Never plan below this: the stock for unplanned trips (setting), at least 20 %."""
@@ -2203,8 +2208,21 @@ class Plugwhen:
         if not delivered:
             return False
         remember_sent(sent, key, SENT_KEEP)
-        self._store.async_delay_save(lambda: {"sent": self._sent}, 10)
+        self._remember_message(v, message)
+        self._store.async_delay_save(self._store_data, 10)
         return True
+
+    def _store_data(self) -> dict[str, Any]:
+        return {"sent": self._sent, "messages": self._messages}
+
+    def _remember_message(self, v: Vehicle, message: str) -> None:
+        """Keep the message for the dashboard ('Latest messages'), newest first."""
+        kept = self._messages.setdefault(v.sub_id, [])
+        kept.insert(0, {"t": dt_util.now().isoformat(timespec="minutes"), "text": message})
+        del kept[MESSAGES_KEEP:]
+
+    def recent_messages(self, v: Vehicle) -> list[dict[str, str]]:
+        return list(self._messages.get(v.sub_id, []))
 
     async def _send_ahead(self, v: Vehicle, now: datetime) -> None:
         """The heads-up of the evening before the day on which charging has to happen (or pays with the sun)."""

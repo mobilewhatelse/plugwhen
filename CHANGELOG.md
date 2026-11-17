@@ -2,6 +2,11 @@
 
 ## Unreleased (0.10.1)
 
+- **Latest messages on the dashboard:** the overview lists the latest messages sent to the phone (date, time, text), so a message
+  swiped away there can still be read. *Deutsch:* Letzte Hinweise im Dashboard: Die Übersicht zeigt die letzten Meldungen ans Handy (Datum, Uhrzeit, Text); eine dort weggeklickte Meldung bleibt so lesbar.
+- **Settings as full-width tiles:** on a phone the names in the settings list were cut off; each setting is now a tile with the
+  name on its own line, shorter names, the days without the unit "d". "Would switch" only appears while the trial run is on
+  ("off" only puzzled). *Deutsch:* Einstellungen als Kacheln über die ganze Breite: Am Handy waren die Namen abgeschnitten; jede Einstellung ist jetzt eine Kachel mit eigener Namenszeile, kürzere Namen, die Tage ohne Einheit „d“. „Würde schalten“ erscheint nur noch bei laufendem Probelauf („aus“ verwirrte nur).
 - **Charging for several days on the dashboard:** "Charge for this many days at once" and the limit (%) are now in the settings
   card of each car. They change the same value as the car's settings form, take effect at once and do not reload the integration.
   *Deutsch:* Laden für mehrere Tage im Dashboard: „Für so viele Tage auf einmal laden“ und die Grenze (%) stehen jetzt in der Einstellungen-Karte jedes Autos. Sie ändern denselben Wert wie das Einstellungsformular des Autos, wirken sofort und laden die Integration nicht neu. Danach: Dashboard neu erstellen.

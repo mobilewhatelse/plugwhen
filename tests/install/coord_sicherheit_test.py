@@ -39,7 +39,7 @@ def plugwhen(caps: dict, states: dict[str, str] | None = None) -> co.Plugwhen:
     services = FakeServices()
     p.hass = SimpleNamespace(config=SimpleNamespace(language="de"), services=services,
                              states=SimpleNamespace(get=lambda e: SimpleNamespace(state=(states or {}).get(e)) if e in (states or {}) else None))
-    p._sent, p._direct, p._evcc_data = {}, {}, {}
+    p._sent, p._direct, p._evcc_data, p._messages = {}, {}, {}, {}
     p._store = p._evcc_store = SimpleNamespace(async_delay_save=lambda *a, **k: None)
     p.diag: list[str] = []
     p._diag_action = lambda v, now, text: p.diag.append(text)

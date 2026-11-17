@@ -30,6 +30,32 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual([v["path"] for v in views], ["plugwhen", "lernen", "details"])
         self.assertEqual(views[0]["type"], "sections")
 
+    def test_the_latest_messages_can_be_read_on_the_dashboard(self):
+        """Field 17.11.2026: a message swiped away on the phone could not be read again. The overview lists the latest ones."""
+        views = build_views([{"name": "Car", "ids": ids("car")}], "de")
+        overview = views[0]["sections"]
+        heads = [c.get("heading") for s in overview for c in s["cards"] if c["type"] == "heading"]
+        self.assertIn("Letzte Hinweise", heads)
+        md = [c["content"] for s in overview for c in s["cards"] if c["type"] == "markdown" and "'recent'" in c["content"]]
+        self.assertEqual(len(md), 1)
+        self.assertIn(f"state_attr('{ids('car')['notice_enabled']}', 'recent')", md[0])
+        self.assertIn("weggeklickt", md[0])                     # what shows while there is none yet
+        try:
+            import jinja2
+        except ImportError:
+            return
+        jinja2.Environment().parse(md[0])
+
+    def test_would_switch_only_while_the_trial_run_is_on(self):
+        """Field 17.11.2026: 'Würde schalten: aus' in the mode 'direct' only puzzled. The tile is shown while it is not 'off'."""
+        views = build_views([{"name": "Car", "ids": ids("car")}], "de")
+        cards = [c for v in views for s in v.get("sections", []) for c in s.get("cards", [])]
+        ws = ids("car")["would_switch"]
+        self.assertFalse([c for c in cards if c["type"] == "tile" and c.get("entity") == ws])
+        cond = [c for c in cards if c["type"] == "conditional" and c["card"].get("entity") == ws]
+        self.assertEqual(len(cond), 1)
+        self.assertEqual(cond[0]["conditions"][0], {"condition": "state", "entity": ws, "state_not": "off"})
+
     def test_several_days_can_be_set_on_the_dashboard(self):
         """Field 17.11.2026: 'kann man das nicht aufs dashboard legen' - days at once and the limit in the settings card."""
         text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], "de"), ensure_ascii=False)

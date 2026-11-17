@@ -65,6 +65,11 @@ class NoticeSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
     def is_on(self) -> bool:
         return self.vehicle.notice_enabled
 
+    @property
+    def extra_state_attributes(self) -> dict:
+        """The latest messages to the phone (newest first), for the dashboard: a message swiped away stays readable."""
+        return {"recent": self.plug.recent_messages(self.vehicle)}
+
     async def async_turn_on(self, **kwargs) -> None:
         self.vehicle.notice_enabled = True
         self.async_write_ha_state()

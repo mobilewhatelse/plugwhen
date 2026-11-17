@@ -54,6 +54,7 @@ TEXT = {
         hz_h="Die nächsten Abfahrten", hz_next="Nächstes nötiges Laden", hz_for="für", hz_latest="spätestens ab", hz_at="bei", hz_pre="Mit Sonne vorladen",
         hz_replaces="ersetzt Netzstrom vor", hz_note="Eine Empfehlung: Plugwhen schaltet nichts. Ohne Solaranlage zeigt die Grafik nur den Bedarf je Abfahrt.",
         learn_h="Lernmodus", mode_name="Betriebsart", would="Würde schalten",
+        msg_h="Letzte Hinweise", msg_none="Noch keine Hinweise. Hier stehen die Meldungen ans Handy, auch wenn sie dort weggeklickt wurden.",
         w_charge="Laden", w_pause="Pausieren", w_none="Keine Entscheidung", w_off="Aus",
         r_in_window="im geplanten Fenster", r_waiting_for_window="wartet auf das nächste Fenster", r_plan_done="der Plan ist abgearbeitet",
         r_cannot_reach_target="das Ziel ist knapp: so viel wie möglich sofort", r_unknown_soc="Ladestand unbekannt",
@@ -157,6 +158,7 @@ TEXT = {
         hz_h="The next departures", hz_next="Next charging needed", hz_for="for", hz_latest="latest start", hz_at="at", hz_pre="Charge ahead with the sun",
         hz_replaces="replaces grid energy before", hz_note="A recommendation: Plugwhen switches nothing. Without a solar plant the chart only shows the need per departure.",
         learn_h="Learn mode", mode_name="Mode", would="Would switch",
+        msg_h="Latest messages", msg_none="No messages yet. The messages to the phone appear here, even when swiped away there.",
         w_charge="Charge", w_pause="Pause", w_none="No decision", w_off="Off",
         r_in_window="in a planned window", r_waiting_for_window="waiting for the next window", r_plan_done="the plan is done",
         r_cannot_reach_target="the target is tight: as much as possible at once", r_unknown_soc="state of charge unknown",
@@ -403,6 +405,13 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
             {"type": "tile", "entity": ids["switch_ready"], "name": t["rd_h"]},
             {"type": "markdown", "content": rd},
         ]},
+        {"type": "grid", "cards": [   # the messages to the phone, readable after they were swiped away (field 17.11.2026)
+            {"type": "heading", "heading": head(t["msg_h"]), "icon": "mdi:message-text-clock-outline"},
+            {"type": "markdown", "content": (
+                "{% set m = state_attr('" + ids["notice_enabled"] + "', 'recent') or [] %}{% for x in m[:5] %}"
+                "- **{{ (x.t | as_datetime | as_local).strftime('%d.%m. %H:%M') }}** {{ x.text }}\n"
+                "{% else %}" + t["msg_none"] + "{% endfor %}")},
+        ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["tr_h"]), "icon": "mdi:calendar-month"},
             *([{"type": "calendar", "entities": [calendar], "initial_view": "listWeek"}] if calendar else []),
@@ -416,15 +425,17 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["ep_h"]), "icon": "mdi:calendar-sync"},
-            *([{"type": "entities", "show_header_toggle": False, "entities": [{"entity": ids["mode"], "name": t["mode_name"]}]}] if evcc else []),
+            *([_setting(ids["mode"], t["mode_name"])] if evcc else []),
             {"type": "markdown", "content": ep},
         ]},
     ]
     learning = [
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["learn_h"]), "icon": "mdi:school-outline"},
-            {"type": "tile", "entity": ids["would_switch"], "name": t["would"]},
-            {"type": "entities", "show_header_toggle": False, "entities": [{"entity": ids["mode"], "name": t["mode_name"]}]},
+            # 'would switch: off' only puzzled (field 17.11.2026): the tile appears while the trial run is on
+            {"type": "conditional", "conditions": [{"condition": "state", "entity": ids["would_switch"], "state_not": "off"}],
+             "card": {"type": "tile", "entity": ids["would_switch"], "name": t["would"]}},
+            _setting(ids["mode"], t["mode_name"]),
             {"type": "markdown", "content": learn_line},
             # the chart is empty while the learn mode is off (for example in the mode 'direct'): no empty card then
             {"type": "conditional", "conditions": [{"condition": "state", "entity": ids["would_switch"], "state_not": "off"}],
@@ -511,6 +522,8 @@ def _setting(entity_id: str, name: str, slider: bool = False) -> dict[str, Any]:
     tile: dict[str, Any] = {"type": "tile", "entity": entity_id, "name": name, "grid_options": {"columns": "full"}}
     if entity_id.startswith("number."):
         tile.update(features=[{"type": "numeric-input", "style": "slider" if slider else "buttons"}], features_position="bottom")
+    elif entity_id.startswith("select."):
+        tile.update(features=[{"type": "select-options"}], features_position="bottom")
     else:
         tile.update(tap_action={"action": "toggle"}, icon_tap_action={"action": "toggle"}, hold_action={"action": "more-info"})
     return tile
