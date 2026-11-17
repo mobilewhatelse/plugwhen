@@ -173,7 +173,8 @@ ausgelassen wurden, steht im Attribut `trip_days_skipped`.
 ## Mit evcc
 
 - evcc ist **optional** und wird nur **gelesen** (über seine Adresse, evcc kann irgendwo im Netz laufen). Die Adresse kommt aus dem Wächter
-  oder wird in den Einstellungen von Plugwhen eingetragen; ein evcc auf demselben Rechner (Add-on) wird vorgeschlagen.
+  oder wird in den Einstellungen von Plugwhen eingetragen; ein evcc auf demselben Rechner (Add-on) wird vorgeschlagen. Ein **Passwort** für evcc
+  tragen Sie immer in Plugwhen selbst ein: Plugwhen liest nie ein Passwort, das eine andere Integration (auch der Wächter) gespeichert hat.
 - Kilometerstand und Ladestand bleiben die Sensoren des Autos: ohne sie kann Plugwhen nicht rechnen.
 - Beim Hinzufügen eines Fahrzeugs werden die Autos aus evcc angeboten (Name, Akkugröße, Ladeleistung). „Angesteckt“ und „lädt“ kommen aus
   evcc, solange dafür kein Sensor eingetragen ist.

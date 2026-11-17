@@ -22,7 +22,7 @@ from .const import (
     V_CONSUMPTION, V_DEPARTURE, V_NAME, V_NOTIFY, V_NOTIFY_HOUR, V_ODOMETER, V_PLUGGED, V_RESERVE, V_SOC, V_SOC_MAX_AGE, V_WALLBOX_ENERGY, V_WALLBOX_MORE,
     O_OUTDOOR_TEMP, O_WEATHER,
 )
-from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
+from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, without_secrets, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
 from .takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
 
@@ -91,19 +91,26 @@ def _vehicle_fields(d: dict[str, Any]) -> dict[Any, Any]:
     })
 
 
-async def evcc_state(hass: HomeAssistant, url: str, password: str | None) -> dict[str, Any]:
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+async def evcc_state(hass: HomeAssistant, url: str, password: str | None, timeout: float | None = None) -> dict[str, Any]:
+    """evcc's state on a session of its own, closed again right away: a login cookie of evcc never lands in the session that
+    Home Assistant shares with every integration (HACS review 17.11.2026)."""
+    from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-    return await EvccClient(async_get_clientsession(hass), url, password).state()
+    session = async_create_clientsession(hass, auto_cleanup=False)
+    try:
+        client = EvccClient(session, url, password) if timeout is None else EvccClient(session, url, password, timeout=timeout)
+        state = await client.state()
+        await client.check_password()   # a wrong password shows right away, not never
+        return state
+    finally:
+        await session.close()
 
 
 async def find_local_evcc(hass: HomeAssistant) -> str | None:
     """The address of an evcc on the same machine (add-on), if one answers there within two seconds; offered, never forced."""
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
     for url in LOCAL_URLS:
         try:
-            await EvccClient(async_get_clientsession(hass), url, None, timeout=PROBE_TIMEOUT_S).state()
+            await evcc_state(hass, url, None, timeout=PROBE_TIMEOUT_S)
             return url
         except EvccAuthError:
             return url   # it is there, it only wants a password
@@ -115,7 +122,7 @@ async def find_local_evcc(hass: HomeAssistant) -> str | None:
 def _guard_cfg(hass: HomeAssistant, entry: ConfigEntry | None) -> dict[str, Any]:
     wid = (entry.options if entry else {}).get(O_WAECHTER) or find_waechter_entry(hass)
     guard = hass.config_entries.async_get_entry(wid) if wid else None
-    return {**guard.data, **guard.options} if guard is not None and guard.domain == WAECHTER_DOMAIN else {}
+    return without_secrets({**guard.data, **guard.options}) if guard is not None and guard.domain == WAECHTER_DOMAIN else {}
 
 
 def vehicle_title(d: dict[str, Any]) -> str:
@@ -284,7 +291,7 @@ def guard_proposal(hass: HomeAssistant, entry: ConfigEntry) -> tuple[dict[str, A
     car = next_vehicle(devices, {t for t in taken if t})
     if car is None:
         return {}, None
-    out = vehicle_from_guard(car, devices, {**guard.data, **guard.options}.get("notify_services"))
+    out = vehicle_from_guard(car, devices, without_secrets({**guard.data, **guard.options}).get("notify_services"))
     odo = _beside(hass, out.get(V_SOC), DISTANCE_UNITS)
     if odo:
         out[V_ODOMETER] = odo

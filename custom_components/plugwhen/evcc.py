@@ -23,7 +23,6 @@ VOLTAGE = 230.0
 
 # settings of the guard that hold evcc's address and password
 GUARD_URL = "evcc_site_url"
-GUARD_PASSWORD = "evcc_site_password"
 
 
 class EvccError(Exception):
@@ -41,14 +40,23 @@ def normalize_url(url: str | None) -> str:
     return u
 
 
+SECRET_MARKERS = ("password", "token", "secret", "api_key")
+
+
+def without_secrets(cfg: dict[str, Any] | None) -> dict[str, Any]:
+    """Another integration's settings without anything secret: Plugwhen never reads credentials stored by another config entry
+    (HACS review 17.11.2026), only addresses and entity ids."""
+    return {k: v for k, v in (cfg or {}).items() if not any(m in str(k).lower() for m in SECRET_MARKERS)}
+
+
 def connection(own_url: str | None, own_password: str | None, guard_cfg: dict[str, Any] | None) -> tuple[str, str | None, str] | None:
-    """(url, password, source) of evcc: Plugwhen's own setting wins, else the guard's, else None. `source` is "own" or "guard".
-    The password belongs to its address: an own address never takes the guard's password."""
+    """(url, password, source) of evcc: Plugwhen's own address wins, else the guard's address, else None. `source` is "own" or
+    "guard". The password is always Plugwhen's own: the guard's address may be taken over, its password never."""
     if normalize_url(own_url):
         return normalize_url(own_url), (own_password or None), "own"
     g = guard_cfg or {}
     if normalize_url(g.get(GUARD_URL)):
-        return normalize_url(g.get(GUARD_URL)), (g.get(GUARD_PASSWORD) or None), "guard"
+        return normalize_url(g.get(GUARD_URL)), (own_password or None), "guard"
     return None
 
 
@@ -222,6 +230,18 @@ class EvccClient:
             raise EvccAuthError("evcc wants a password" if not self._password else "password refused")
         if status >= 400:
             raise EvccError(f"evcc answered {status}: {text[:120]}")
+
+    async def check_password(self) -> None:
+        """evcc answers what Plugwhen uses without a login, so a wrong password would never show. With a password entered, log in
+        once: raises EvccAuthError if evcc refuses it. Anything else (no login on this evcc) is not an error here."""
+        if not self._password:
+            return
+        try:
+            await self._login()
+        except EvccAuthError:
+            raise
+        except EvccError:
+            return
 
     async def set_plan(self, vehicle: str, soc: int, when: datetime) -> None:
         """evcc's one-time plan of a vehicle: charge to `soc` % by `when`."""

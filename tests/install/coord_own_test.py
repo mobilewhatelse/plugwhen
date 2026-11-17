@@ -173,8 +173,8 @@ class EvccLoadpointTests(unittest.TestCase):
                 sent.append((number, mode))
 
         import homeassistant.helpers.aiohttp_client as ac
-        orig_client, orig_session = co.EvccClient, ac.async_get_clientsession
-        co.EvccClient, ac.async_get_clientsession = Client, lambda hass: None
+        orig_client, orig_session = co.EvccClient, ac.async_create_clientsession
+        co.EvccClient, ac.async_create_clientsession = Client, lambda hass, **kw: None   # Plugwhen's own session (HACS review)
         try:
             for _ in range(4):   # several runs before evcc is read again
                 run(p._evcc_loadpoint_mode(v, "now"))
@@ -183,7 +183,7 @@ class EvccLoadpointTests(unittest.TestCase):
             run(p._evcc_loadpoint_mode(v, None))
             self.assertEqual(sent, [(1, "now"), (1, "pv")])
         finally:
-            co.EvccClient, ac.async_get_clientsession = orig_client, orig_session
+            co.EvccClient, ac.async_create_clientsession = orig_client, orig_session
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ import asyncio  # noqa: E402
 
 sys.path.append(_INTEGRATION)
 
-from evcc import (  # noqa: E402
+from evcc import (without_secrets,   # noqa: E402
     EvccAuthError, EvccClient, EvccError, connection, live_vehicle, loadpoint_index, loadpoint_kw, match_vehicle, parse_vehicles, vehicle_from_evcc,
 )
 
@@ -39,9 +39,18 @@ class ConnectionTest(unittest.TestCase):
     def test_own_address_wins(self):
         self.assertEqual(connection("192.168.1.5:7070", "pw", {"evcc_site_url": "http://other:7070"}), ("http://192.168.1.5:7070", "pw", "own"))
 
-    def test_guard_address_with_its_password(self):
+    def test_guard_address_but_never_its_password(self):
+        # HACS review 17.11.2026: the guard's address may be taken over, its stored password never
         self.assertEqual(connection("", None, {"evcc_site_url": "http://evcc.local:7070/", "evcc_site_password": "g"}),
-                         ("http://evcc.local:7070", "g", "guard"))
+                         ("http://evcc.local:7070", None, "guard"))
+        self.assertEqual(connection("", "mine", {"evcc_site_url": "http://evcc.local:7070/", "evcc_site_password": "g"}),
+                         ("http://evcc.local:7070", "mine", "guard"))
+
+    def test_without_secrets(self):
+        cfg = {"evcc_site_url": "http://e:7070", "evcc_site_password": "g", "api_token": "t", "client_secret": "s",
+               "API_KEY": "k", "grid_energy": "sensor.x"}
+        self.assertEqual(without_secrets(cfg), {"evcc_site_url": "http://e:7070", "grid_energy": "sensor.x"})
+        self.assertEqual(without_secrets(None), {})
 
     def test_own_address_never_takes_the_guards_password(self):
         self.assertEqual(connection("http://a:7070", None, {"evcc_site_url": "http://b:7070", "evcc_site_password": "g"}),
@@ -150,6 +159,18 @@ class ClientTest(unittest.TestCase):
         s = _Session([_Resp(200, "")])
         self.run_(EvccClient(s, "http://evcc").set_loadpoint_mode(1, "off"))
         self.assertEqual(s.calls[0][:2], ("POST", "http://evcc/api/loadpoints/1/mode/off"))
+
+    def test_check_password(self):
+        # evcc answers /api/state without a login: a wrong password is found only by logging in once
+        with self.assertRaises(EvccAuthError):
+            self.run_(EvccClient(_Session([_Resp(401, "no")]), "http://evcc", "wrong").check_password())
+        s = _Session([_Resp(200, "", cookie="abc")])
+        self.run_(EvccClient(s, "http://evcc", "pw").check_password())
+        self.assertEqual(s.calls[0][3], {"password": "pw"})
+        s = _Session([])
+        self.run_(EvccClient(s, "http://evcc").check_password())   # no password: nothing asked
+        self.assertEqual(s.calls, [])
+        self.run_(EvccClient(_Session([_Resp(500, "boom")]), "http://evcc", "pw").check_password())   # no login here: fine
 
     def test_errors(self):
         with self.assertRaises(EvccAuthError):

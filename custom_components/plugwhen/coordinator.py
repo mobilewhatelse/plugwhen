@@ -29,7 +29,7 @@ from dataclasses import replace
 from . import direct_stats, fehlerbericht as fb, flotte
 from . import rueckmeldung as rm
 
-from .evcc import EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index, note_loadpoint_mode
+from .evcc import without_secrets, EvccClient, EvccError, connection as evcc_connection, live_vehicle, loadpoint_index, note_loadpoint_mode
 from .evcc_plan import decide_write, evcc_plan
 from .readiness import switch_readiness
 from .direct import detect as detect_wallbox, in_grid_window, next_action, trip_energy_due, trip_settings
@@ -154,6 +154,8 @@ def err_text(err: BaseException) -> str:
 
 
 class Plugwhen:
+    _evcc_session: Any = None   # Plugwhen's own client session for evcc, created on first use (its login cookie stays here)
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
@@ -241,8 +243,20 @@ class Plugwhen:
             self._unsub_states = async_track_state_change_event(self.hass, list(watched), self._state_changed)
         self.entry.async_create_background_task(self.hass, self._tick(), f"{DOMAIN} first run")
 
+    def evcc_session(self) -> Any:
+        """The client session for evcc: one per config entry, not Home Assistant's shared one, so that evcc's login cookie never
+        reaches the other integrations (HACS review 17.11.2026). Closed when the entry is unloaded."""
+        if self._evcc_session is None or self._evcc_session.closed:
+            from homeassistant.helpers.aiohttp_client import async_create_clientsession
+
+            self._evcc_session = async_create_clientsession(self.hass, auto_cleanup=False)
+        return self._evcc_session
+
     async def async_stop(self) -> None:
         logging.getLogger(__package__).removeHandler(self._diag_lines)
+        if self._evcc_session is not None and not self._evcc_session.closed:
+            await self._evcc_session.close()
+        self._evcc_session = None
         for unsub in (self._unsub, self._unsub_states, self._pending):
             if unsub:
                 unsub()
@@ -969,9 +983,7 @@ class Plugwhen:
             if value == "user_changed" or (wanted is None and rec):
                 mine.pop("evcc_loadpoint", None)
             return None
-        from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-        await EvccClient(async_get_clientsession(self.hass), conn[0], conn[1]).set_loadpoint_mode(lp[0], value)
+        await EvccClient(self.evcc_session(), conn[0], conn[1]).set_loadpoint_mode(lp[0], value)
         note_loadpoint_mode(self.evcc_state, lp[0], value)   # evcc is read again only at the next run
         if action == "set":
             mine["evcc_loadpoint"] = {"set": value, "orig": rec.get("orig", lp[1])}
@@ -1159,15 +1171,24 @@ class Plugwhen:
         """Write the plan for the next needed departure into evcc (only when switched on, only plans Plugwhen wrote itself)."""
         key = v.cfg.get(V_EVCC_VEHICLE)
         conn = self.evcc_connection()
-        if not key or v.mode != "evcc" or conn is None or self.evcc_state is None:
+        if not key or conn is None or self.evcc_state is None:
             return
         plan = self.evcc_plan_for(v, now) or {}
-        action, why = decide_write(plan.get("would_write"), plan.get("current"), self._written.get(key))
+        if v.mode != "evcc":
+            # Off and Learn give everything back: a plan Plugwhen wrote is removed again; one the user changed in evcc stays
+            if key not in self._written:
+                return
+            action, why = decide_write(None, plan.get("current"), self._written.get(key))
+            if action is None:
+                self._written.pop(key, None)   # gone already, or the user's own now: forget it, never touch it
+                self._evcc_store.async_delay_save(self._evcc_data, 5)
+                return
+            why = "mode_left"
+        else:
+            action, why = decide_write(plan.get("would_write"), plan.get("current"), self._written.get(key))
         if action is None:
             return
-        from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-        client = EvccClient(async_get_clientsession(self.hass), conn[0], conn[1])
+        client = EvccClient(self.evcc_session(), conn[0], conn[1])
         try:
             if action == "set":
                 w = plan["would_write"]
@@ -1222,10 +1243,8 @@ class Plugwhen:
         if conn is None or not any(v.cfg.get(V_EVCC_VEHICLE) for v in self.vehicles.values()):
             self.evcc_state, self.evcc_info = None, ({"source": conn[2], "used": False} if conn else {})
             return
-        from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
         try:
-            self.evcc_state = await EvccClient(async_get_clientsession(self.hass), conn[0], conn[1]).state()
+            self.evcc_state = await EvccClient(self.evcc_session(), conn[0], conn[1]).state()
             self.evcc_info = {"source": conn[2], "used": True, "ok": True, "at": now.isoformat()}
         except EvccError as err:
             self.evcc_state = None
@@ -1373,7 +1392,7 @@ class Plugwhen:
 
         ents = {str(e.unique_id): e.entity_id for e in er.async_entries_for_config_entry(er.async_get(self.hass), wid)}
         num = lambda key: self._float(ents.get(f"{wid}_{key}"))  # noqa: E731
-        out: dict[str, Any] = {"grid_energy": {**entry.data, **entry.options}.get("grid_energy") or None}
+        out: dict[str, Any] = {"grid_energy": without_secrets({**entry.data, **entry.options}).get("grid_energy") or None}
         for key in ("limit", "margin", "price_low", "price_high", "price_threshold"):
             out[key] = num(key)
         mp = self._state(ents.get(f"{wid}_month_peak"))
@@ -1648,7 +1667,7 @@ class Plugwhen:
     def _waechter_cfg(self) -> dict[str, Any]:
         wid = self.entry.options.get(O_WAECHTER)
         entry = self.hass.config_entries.async_get_entry(wid) if wid else None
-        return {**entry.data, **entry.options} if entry else {}
+        return without_secrets({**entry.data, **entry.options}) if entry else {}   # never another integration's password
 
     async def _solar_production_ids(self) -> list[str]:
         try:
