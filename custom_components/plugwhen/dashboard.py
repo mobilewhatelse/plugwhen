@@ -24,9 +24,9 @@ TEXT = {
         next="Nächste Abfahrt", departure="Erwartete Abfahrt", charge="Noch zu laden", range="Nötige Reichweite",
         target="Ziel-Ladestand", ready="Bereit zur Abfahrt", plan_h="Ladeplan", plan="Ladeplan", pot_h="Potenzial",
         pot="Potenzial", plugs_h="Steckzeiten", settings="Einstellungen", week_h="Gelernter Wochenplan",
-        reserve="Reserve (km), mit der das Auto mindestens losfährt", learn="Kilometer je Wochentag lernen",
-        notice="Warnen, wenn das Auto nicht bereit sein wird",
-        days_ahead="Für so viele Tage auf einmal laden", daily_cap="Bis zu diesem Ladestand für mehrere Tage",
+        reserve="Reserve beim Losfahren", learn="Kilometer je Wochentag lernen",
+        notice="Warnen, wenn nicht bereit",
+        days_ahead="Tage auf einmal laden", daily_cap="Grenze für mehrere Tage",
         wf="Einmal pro Woche voll laden", wf_days="An diesen Tagen (mit PV: der sonnigste)", wf_target="Ziel beim Volladen",
         wf_days_names="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag", wf_days_short="Mo,Di,Mi,Do,Fr,Sa,So",
         wf_days_hint="Tage antippen. Mehrere Tage: mit Solarprognose der sonnigste, sonst der erste.",
@@ -127,9 +127,9 @@ TEXT = {
         next="Next departure", departure="Expected departure", charge="Still to charge", range="Range needed",
         target="Target state of charge", ready="Ready for departure", plan_h="Charge plan", plan="Charge plan", pot_h="Potential",
         pot="Potential", plugs_h="Plug-in times", settings="Settings", week_h="Learned week",
-        reserve="Reserve (km) the car always leaves with", learn="Learn kilometres per weekday",
-        notice="Warn when the car will not be ready",
-        days_ahead="Charge for this many days at once", daily_cap="Charge for several days up to",
+        reserve="Reserve at departure", learn="Learn kilometres per weekday",
+        notice="Warn if not ready in time",
+        days_ahead="Days charged at once", daily_cap="Limit for several days",
         wf="Once a week full", wf_days="On these days (with PV: the sunniest)", wf_target="Target of the full charge",
         wf_days_names="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday", wf_days_short="Mo,Tu,We,Th,Fr,Sa,Su",
         wf_days_hint="Tap the days. Several days: the sunniest with a solar forecast, otherwise the first.",
@@ -466,11 +466,11 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         ]},
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["settings"]), "icon": "mdi:tune"},
-            {"type": "entities", "show_header_toggle": False, "entities": [
-                {"entity": ids["reserve_km"], "name": t["reserve"]},
-                {"entity": ids["learn_km"], "name": t["learn"]},
-                {"entity": ids["notice_enabled"], "name": t["notice"]},
-            ] + [{"entity": ids[k], "name": t[k]} for k in ("days_ahead", "daily_cap") if ids.get(k)]},
+            # one full-width tile per setting: the name gets the whole line (in an entities row it was cut off on a phone)
+            _setting(ids["reserve_km"], t["reserve"]),
+            _setting(ids["learn_km"], t["learn"]),
+            _setting(ids["notice_enabled"], t["notice"]),
+            *[_setting(ids[k], t[k], slider=k == "days_ahead") for k in ("days_ahead", "daily_cap") if ids.get(k)],
         ]},
     ]
     if ids.get("weekly_full"):   # once a week full (0.9.2)
@@ -484,7 +484,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         # are kept all the same) - field test 16.11.2026: days ticked while nothing happens only puzzle
         cards: list[dict[str, Any]] = []
         if tg:
-            cards.append({"type": "entities", "show_header_toggle": False, "entities": [{"entity": tg, "name": t["wf_target"]}]})
+            cards.append(_setting(tg, t["wf_target"]))
         day_ids = [ids.get(f"weekly_day_{d}") for d in range(7)]
         if all(day_ids):   # the day bar: seven buttons Mo..So, tap to tick
             short = t["wf_days_short"].split(",")
@@ -498,11 +498,22 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
                     for d, eid in enumerate(day_ids)]},
             ]
         details[-1]["cards"] += [
-            {"type": "entities", "show_header_toggle": False, "entities": [{"entity": sw, "name": t["wf"]}]},
+            _setting(sw, t["wf"]),
             {"type": "conditional", "conditions": [{"condition": "state", "entity": sw, "state": "on"}],
              "card": {"type": "vertical-stack", "cards": cards + [{"type": "markdown", "content": status}]}},
         ]
     return {"overview": overview, "learning": learning, "details": details}
+
+
+def _setting(entity_id: str, name: str, slider: bool = False) -> dict[str, Any]:
+    """A setting as a full-width tile: the name on its own line, the value below it. A number gets +/- buttons (or a slider),
+    a switch is toggled with a tap."""
+    tile: dict[str, Any] = {"type": "tile", "entity": entity_id, "name": name, "grid_options": {"columns": "full"}}
+    if entity_id.startswith("number."):
+        tile.update(features=[{"type": "numeric-input", "style": "slider" if slider else "buttons"}], features_position="bottom")
+    else:
+        tile.update(tap_action={"action": "toggle"}, icon_tap_action={"action": "toggle"}, hold_action={"action": "more-info"})
+    return tile
 
 
 def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None,

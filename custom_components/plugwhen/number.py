@@ -4,7 +4,7 @@ and the two settings of charging for several days (also in the car's settings fo
 from __future__ import annotations
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode, RestoreNumber
-from homeassistant.const import PERCENTAGE, UnitOfLength, UnitOfTime
+from homeassistant.const import PERCENTAGE, UnitOfLength
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -109,7 +109,7 @@ class DaysAheadNumber(_CarSetting):
     _attr_native_min_value = 1
     _attr_native_max_value = voraus.MAX_DAYS
     _attr_native_step = 1
-    _attr_native_unit_of_measurement = UnitOfTime.DAYS
+    # no unit: "3 d" read as English on the dashboard; the name says "days"
     _attr_icon = "mdi:calendar-range"
     _cfg_key = V_DAYS_AHEAD
     _default = voraus.DEFAULT_DAYS

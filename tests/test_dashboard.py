@@ -33,8 +33,8 @@ class DashboardTest(unittest.TestCase):
     def test_several_days_can_be_set_on_the_dashboard(self):
         """Field 17.11.2026: 'kann man das nicht aufs dashboard legen' - days at once and the limit in the settings card."""
         text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], "de"), ensure_ascii=False)
-        for s in ('"entity": "number.car_days_ahead", "name": "Für so viele Tage auf einmal laden"',
-                  '"entity": "number.car_daily_cap", "name": "Bis zu diesem Ladestand für mehrere Tage"'):
+        for s in ('"entity": "number.car_days_ahead", "name": "Tage auf einmal laden"',
+                  '"entity": "number.car_daily_cap", "name": "Grenze für mehrere Tage"'):
             self.assertIn(s, text)
         old = {k: v for k, v in ids("car").items() if k not in ("days_ahead", "daily_cap")}
         self.assertNotIn("days_ahead", json.dumps(build_views([{"name": "Car", "ids": old}], "de")))   # older ids: nothing breaks
@@ -65,9 +65,8 @@ class DashboardTest(unittest.TestCase):
         views = build_views([{"name": "Car", "ids": ids("car")}], "de")
         sw = ids("car")["weekly_full"]
         cards = [c for v in views for s in v.get("sections", []) for c in s.get("cards", [])]
-        top = [c for c in cards if c["type"] == "entities" and any(e.get("entity") == sw for e in c["entities"])]
-        self.assertEqual(len(top), 1)
-        self.assertEqual(len(top[0]["entities"]), 1)                    # the switch alone
+        top = [c for c in cards if c["type"] == "tile" and c.get("entity") == sw]
+        self.assertEqual(len(top), 1)                                   # the switch alone
         cond = [c for c in cards if c["type"] == "conditional" and c["conditions"][0].get("entity") == sw]
         self.assertEqual(len(cond), 1)
         self.assertEqual(cond[0]["conditions"][0]["state"], "on")
@@ -78,6 +77,27 @@ class DashboardTest(unittest.TestCase):
         self.assertIn("Volladen", inner)
         outside = json.dumps([c for c in cards if c is not cond[0]])
         self.assertNotIn(ids("car")["weekly_day_0"], outside)
+
+    def test_settings_are_full_width_tiles_so_the_names_are_not_cut_off(self):
+        """Field 17.11.2026 (phone): in an entities row the names were cut off ('Für so viele Tag…'). Now one tile per setting,
+        full width, short names; numbers with +/- (days: a slider), switches toggle on a tap."""
+        views = build_views([{"name": "Car", "ids": ids("car")}], "de")
+        cards = [c for v in views for s in v.get("sections", []) for c in s.get("cards", [])]
+        keys = ("reserve_km", "learn_km", "notice_enabled", "days_ahead", "daily_cap", "weekly_full")
+        for k in keys:
+            eid = ids("car")[k]
+            tile = [c for c in cards if c["type"] == "tile" and c.get("entity") == eid]
+            self.assertEqual(len(tile), 1, k)
+            self.assertEqual(tile[0]["grid_options"], {"columns": "full"}, k)
+            self.assertLessEqual(len(tile[0]["name"]), 32, tile[0]["name"])
+            if eid.startswith("number."):
+                self.assertEqual(tile[0]["features"][0]["type"], "numeric-input")
+            else:
+                self.assertEqual(tile[0]["tap_action"], {"action": "toggle"})
+        days = [c for c in cards if c.get("entity") == ids("car")["days_ahead"]][0]
+        self.assertEqual(days["features"][0]["style"], "slider")
+        self.assertFalse(any(c["type"] == "entities" and any(e.get("entity") in [ids("car")[k] for k in keys] for e in c["entities"])
+                             for c in cards))
 
     def test_two_vehicles_have_their_names_in_the_headings(self):
         views = build_views([{"name": "A", "ids": ids("a")}, {"name": "B", "ids": ids("b")}], "de")
