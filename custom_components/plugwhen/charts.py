@@ -202,29 +202,35 @@ def chart_plan(plan: dict[str, Any] | None, now: datetime, max_kw: float, lang: 
         return _msg(t["no_dep"])
     if status == "not_needed":
         return _msg(f"✓ {t['nothing']} · {t['departure_at']} {t['wd'][dep.weekday()]} {dep:%H:%M}", GREEN)
-    W, H, L, R, top, ph = 640, 190, 16, 16, 34, 100
+    # narrow and with large type: on a phone the chart is shrunk to the width of the card
+    W, H, L, R, top, ph = 480, 214, 12, 12, 40, 112
     start = now.replace(minute=0, second=0, microsecond=0)
     end = min(dep, start + timedelta(hours=72))
     span = max(1.0, (end - start).total_seconds())
+    tz = now.tzinfo
 
     def x(tt: datetime) -> float:
         return L + (W - L - R) * max(0.0, min(1.0, (tt - start).total_seconds() / span))
 
+    def width(text: str, size: int) -> float:   # rough width of a text, to leave out labels that would collide
+        return len(text) * size * 0.58
+
     body = [f"<rect x='{L}' y='{top}' width='{W - L - R}' height='{ph}' rx='6' fill='{GREY}' fill-opacity='0.10'/>"]
-    step = 3 if span <= 30 * 3600 else 6
+    step = 1 if span <= 6 * 3600 else 2 if span <= 12 * 3600 else 3 if span <= 20 * 3600 else 6 if span <= 40 * 3600 else 12
     tt = start + timedelta(hours=(step - start.hour % step) % step)
     while tt <= end:
         xx = x(tt)
         body.append(f"<line x1='{xx:.1f}' y1='{top}' x2='{xx:.1f}' y2='{top + ph}' stroke='{GREY}' stroke-opacity='0.25'/>")
         label = t["wd"][tt.weekday()] if tt.hour == 0 else f"{tt.hour}"
-        body.append(_text(xx, top + ph + 16, label, "middle", size=10))
+        body.append(_text(xx, top + ph + 19, label, "middle", size=14))
         tt += timedelta(hours=step)
     peak = max([max_kw] + [float(w.get("peak_kw") or 0) for w in (plan or {}).get("windows", [])]) or 1.0
+    labels: list[tuple[float, float, float, float, str, str]] = []
     for w in (plan or {}).get("windows", []):
         a, b = _as_dt(w.get("start")), _as_dt(w.get("end"))
-        if a is None or b is None or b <= start:
+        if a is None or b is None or b <= now:
             continue
-        x1, x2 = x(max(a, start)), x(min(b, end))
+        x1, x2 = x(max(a, now)), x(min(b, end))      # what lies before now is no longer part of the plan
         hh = max(6.0, ph * float(w.get("peak_kw") or 0) / peak)
         energy = float(w.get("energy_kwh") or 0)
         sun = min(1.0, float(w.get("available_kwh") or 0) / energy) if energy > 0 else 0.0
@@ -232,27 +238,70 @@ def chart_plan(plan: dict[str, Any] | None, now: datetime, max_kw: float, lang: 
         body.append(f"<rect x='{x1:.1f}' y='{y0:.1f}' width='{max(2.0, x2 - x1):.1f}' height='{hh:.1f}' fill='{BLUE}'/>")
         if sun > 0.01:
             body.append(f"<rect x='{x1:.1f}' y='{top + ph - hh * sun:.1f}' width='{max(2.0, x2 - x1):.1f}' height='{hh * sun:.1f}' fill='{SUN}'/>")
-        if x2 - x1 > 34:
-            body.append(_text((x1 + x2) / 2, y0 - 5, f"{energy:.1f} kWh", "middle", size=10))
+        when = f"{max(a, now).astimezone(tz):%H:%M}–{b.astimezone(tz):%H:%M}"
+        kwh = f"{energy:.1f} kWh"
+        labels.append(((x1 + x2) / 2, x2 - x1, y0, hh, when, kwh))
+    taken: list[tuple[float, float, float, float]] = [(L, W - R, top - 32, top - 1)]   # boxes used by a text: x0, x1, y0, y1; the row of 'now' and the departure is kept free
     ls = _as_dt((plan or {}).get("latest_start"))
     if ls is not None and start <= ls < end and status in ("planned", "infeasible"):          # the latest start at full power
         xl = x(ls)
         body.append(f"<line x1='{xl:.1f}' y1='{top}' x2='{xl:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='1.5' stroke-dasharray='5 4'/>")
-        body.append(_text(xl - 5, top + 14, f"{t['latest']} {t['wd'][ls.weekday()]} {ls:%H:%M}", "end", fill=RED, size=11))
+        latest = f"{t['latest']} {t['wd'][ls.weekday()]} {ls:%H:%M}"
+        wl = width(latest, 13)
+        if xl - 5 - wl < x(now) + 8 and xl + 5 + wl <= W - R:   # no room left of the line (now is right there): put it right of it
+            body.append(_text(xl + 5, top + 16, latest, "start", fill=RED, size=13))
+            taken.append((xl + 5, xl + 5 + wl, top + 2, top + 20))
+        else:
+            body.append(_text(xl - 5, top + 16, latest, "end", fill=RED, size=13))
+            taken.append((xl - 5 - wl, xl - 5, top + 2, top + 20))
+    body += _window_labels(labels, taken, L, W - R, top, width)
     xd = x(end)
-    body.append(f"<line x1='{xd:.1f}' y1='{top - 8}' x2='{xd:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='2'/>")
-    body.append(_text(min(xd, W - R), top - 12, f"{t['departure_at']} {t['wd'][dep.weekday()]} {dep:%H:%M}", "end", fill=RED, weight="700"))
+    dep_label = f"{t['departure_at']} {t['wd'][dep.weekday()]} {dep:%H:%M}"
+    body.append(f"<line x1='{xd:.1f}' y1='{top - 8}' x2='{xd:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='2.5'/>")
+    body.append(_text(min(xd, W - R), top - 14, dep_label, "end", fill=RED, weight="700", size=15))
     xn = x(now)   # the current time: orange, so it is never mistaken for the red departure or latest start
-    body.append(f"<line x1='{xn:.1f}' y1='{top - 6}' x2='{xn:.1f}' y2='{top + ph}' stroke='{ORANGE}' stroke-width='2'/>"
-                f"<path d='M{xn - 5:.1f} {top - 8} L{xn + 5:.1f} {top - 8} L{xn:.1f} {top - 1} Z' fill='{ORANGE}'/>")
-    body.append(_text(max(L, xn - 6), top - 12, f"{t['now']} {now:%H:%M}", fill=ORANGE, weight="700"))
-    ly = H - 12
-    body.append(f"<rect x='{L}' y='{ly - 9}' width='10' height='10' fill='{SUN}'/>" + _text(L + 15, ly, t["sun"], size=11))
-    body.append(f"<rect x='{L + 90}' y='{ly - 9}' width='10' height='10' fill='{BLUE}'/>" + _text(L + 105, ly, t["grid"], size=11))
+    body.append(f"<line x1='{xn:.1f}' y1='{top - 6}' x2='{xn:.1f}' y2='{top + ph}' stroke='{ORANGE}' stroke-width='2.5'/>"
+                f"<path d='M{xn - 6:.1f} {top - 9} L{xn + 6:.1f} {top - 9} L{xn:.1f} {top - 1} Z' fill='{ORANGE}'/>")
+    now_label, nx = f"{t['now']} {now:%H:%M}", max(L, xn - 6)
+    if nx + width(now_label, 15) < min(xd, W - R) - width(dep_label, 15) - 8:   # left out when the departure is right next to it
+        body.append(_text(nx, top - 14, now_label, fill=ORANGE, weight="700", size=15))
+    ly = H - 10
+    body.append(f"<rect x='{L}' y='{ly - 11}' width='12' height='12' fill='{SUN}'/>" + _text(L + 17, ly, t["sun"], size=14))
+    body.append(f"<rect x='{L + 96}' y='{ly - 11}' width='12' height='12' fill='{BLUE}'/>" + _text(L + 113, ly, t["grid"], size=14))
     if status == "infeasible":
-        body.append(_text(W - R, ly, t["missing"].format(kwh=(plan or {}).get("shortfall_kwh")), "end", fill=RED, weight="700"))
+        body.append(_text(W - R, ly, t["missing"].format(kwh=(plan or {}).get("shortfall_kwh")), "end", fill=RED, weight="700", size=14))
     return _svg(W, H, "".join(body))
 
+
+
+def _window_labels(labels, taken, left: float, right: float, top: float, width) -> list[str]:
+    """From when to when and how much, for each charging window. Inside the bar when it is tall and wide enough, else above it;
+    a label may be wider than its bar but never covers another label (then only the energy, or nothing)."""
+    out: list[str] = []
+
+    def free(x0: float, x1: float, y0: float, y1: float) -> bool:
+        return x0 >= left and x1 <= right and all(x1 < a or x0 > b or y1 < c or y0 > d for a, b, c, d in taken)
+
+    def place(mid: float, text: str, size: int, y: float, **kw: str) -> bool:
+        w = width(text, size)
+        x0 = min(max(mid - w / 2, left), right - w)
+        box = (x0 - 3, x0 + w + 3, y - size, y + 2)
+        if not free(*box):
+            return False
+        taken.append(box)
+        out.append(_text(x0 + w / 2, y, text, "middle", size=size, **kw))
+        return True
+
+    for mid, room, y0, hh, when, kwh in labels:
+        if hh >= 40 and room >= width(when, 13) + 6:
+            place(mid, when, 13, y0 + 17, fill="#ffffff", weight="700")
+            place(mid, kwh, 13, y0 + 34, fill="#ffffff")
+            continue
+        if place(mid, when, 13, y0 - 22, weight="700"):
+            place(mid, kwh, 12, y0 - 6)
+        elif not place(mid, f"{when} · {kwh}", 12, y0 - 6):
+            place(mid, kwh, 12, y0 - 6)
+    return out
 
 def chart_potential(potential: dict[str, Any] | None, lang: str | None = None, currency: str = "€") -> str:
     """Per way of charging one bar: the highest quarter hour of a month (kW); behind it the demand charge per year and how often

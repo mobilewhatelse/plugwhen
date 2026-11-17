@@ -42,11 +42,40 @@ class PlanChartTest(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         # the timeline starts at the full hour (17:00) and ends at the departure (07:00): 5 of 840 minutes in
         x = float(lines[0].get("x1"))
-        self.assertAlmostEqual(x, 16 + (640 - 32) * 5 / 840, delta=0.2)
+        self.assertAlmostEqual(x, 12 + (480 - 24) * 5 / 840, delta=0.2)
         self.assertNotEqual(ORANGE, RED)   # never the colour of the departure
         later = chart_plan(p, NOW + timedelta(minutes=40), 11.0, "de")
         x2 = float([e for e in parse(later).iter() if e.tag.endswith("line") and e.get("stroke") == ORANGE][0].get("x1"))
         self.assertGreater(x2, x)          # moves on with the time
+
+    def test_each_window_shows_from_when_to_when(self):
+        p = make_plan(NOW, DEPART, 11.0, 11.0, 1.4)
+        svg = chart_plan(p, NOW, 11.0, "de")
+        for w in p["windows"]:
+            a = datetime.fromisoformat(w["start"]) if isinstance(w["start"], str) else w["start"]
+            b = datetime.fromisoformat(w["end"]) if isinstance(w["end"], str) else w["end"]
+            self.assertIn(f"{a.astimezone(TZ):%H:%M}–{b.astimezone(TZ):%H:%M}", svg)
+        root = parse(svg)
+        sizes = [int(e.get("font-size")) for e in root.iter() if e.tag.endswith("text") and e.get("font-size")]
+        self.assertGreaterEqual(min(sizes), 12)            # readable on a phone: nothing smaller than 12
+        self.assertEqual(root.get("viewBox"), "0 0 480 214")
+
+    def test_shortly_before_the_departure_the_bar_starts_at_now_and_every_hour_is_marked(self):
+        now = DEPART - timedelta(hours=2, minutes=40)               # 04:20
+        root = parse(chart_plan(make_plan(now, DEPART, 20.0, 11.0, 1.4), now, 11.0, "de"))
+        xn = float([e for e in root.iter() if e.tag.endswith("line") and e.get("stroke") == ORANGE][0].get("x1"))
+        bars = [e for e in root.iter() if e.tag.endswith("rect") and e.get("fill") == BLUE and float(e.get("height")) > 12]
+        self.assertTrue(bars)
+        self.assertGreaterEqual(min(float(b.get("x")) for b in bars), xn - 0.2)   # nothing drawn before now
+        ticks = [e.text for e in root.iter() if e.tag.endswith("text") and e.text in ("4", "5", "6", "7")]
+        self.assertEqual(ticks, ["4", "5", "6", "7"])
+
+    def test_now_label_left_out_when_the_departure_is_right_next_to_it(self):
+        dep = NOW + timedelta(minutes=50)
+        svg = chart_plan(make_plan(NOW, dep, 3.0, 11.0, 1.4), NOW, 11.0, "de")
+        parse(svg)
+        self.assertIn("Abfahrt", svg)
+        self.assertIn(f"stroke='{ORANGE}'", svg)           # the line stays
 
     def test_sun_part_is_yellow(self):
         avail = {datetime(2027, 1, 12, 18, 0, tzinfo=TZ) + timedelta(minutes=15 * i): 3.0 for i in range(4)}
