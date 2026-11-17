@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from charts import BLUE, RED, SUN, chart_plan, chart_plugs, chart_potential  # noqa: E402
+from charts import BLUE, ORANGE, RED, SUN, chart_plan, chart_plugs, chart_potential  # noqa: E402
 from plan import make_plan  # noqa: E402
 
 TZ = timezone(timedelta(hours=1))
@@ -31,6 +31,22 @@ class PlanChartTest(unittest.TestCase):
         self.assertNotIn(f"fill='{SUN}'/><text", svg.split("Sonne")[0][-40:] if False else "")
         self.assertIn("Abfahrt Mi 07:00", svg)
         self.assertIn("jetzt", svg)
+
+    def test_now_is_an_orange_line_at_the_current_time(self):
+        p = make_plan(NOW, DEPART, 11.0, 11.0, 1.4)
+        root = parse(chart_plan(p, NOW, 11.0, "de"))
+        svg = chart_plan(p, NOW, 11.0, "de")
+        self.assertIn("jetzt 17:05", svg)
+        self.assertIn("now 17:05", chart_plan(p, NOW, 11.0, "en"))
+        lines = [e for e in root.iter() if e.tag.endswith("line") and e.get("stroke") == ORANGE]
+        self.assertEqual(len(lines), 1)
+        # the timeline starts at the full hour (17:00) and ends at the departure (07:00): 5 of 840 minutes in
+        x = float(lines[0].get("x1"))
+        self.assertAlmostEqual(x, 16 + (640 - 32) * 5 / 840, delta=0.2)
+        self.assertNotEqual(ORANGE, RED)   # never the colour of the departure
+        later = chart_plan(p, NOW + timedelta(minutes=40), 11.0, "de")
+        x2 = float([e for e in parse(later).iter() if e.tag.endswith("line") and e.get("stroke") == ORANGE][0].get("x1"))
+        self.assertGreater(x2, x)          # moves on with the time
 
     def test_sun_part_is_yellow(self):
         avail = {datetime(2027, 1, 12, 18, 0, tzinfo=TZ) + timedelta(minutes=15 * i): 3.0 for i in range(4)}

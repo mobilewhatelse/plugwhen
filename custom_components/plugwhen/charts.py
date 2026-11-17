@@ -242,7 +242,10 @@ def chart_plan(plan: dict[str, Any] | None, now: datetime, max_kw: float, lang: 
     xd = x(end)
     body.append(f"<line x1='{xd:.1f}' y1='{top - 8}' x2='{xd:.1f}' y2='{top + ph}' stroke='{RED}' stroke-width='2'/>")
     body.append(_text(min(xd, W - R), top - 12, f"{t['departure_at']} {t['wd'][dep.weekday()]} {dep:%H:%M}", "end", fill=RED, weight="700"))
-    body.append(_text(L, top - 12, t["now"], weight="700"))
+    xn = x(now)   # the current time: orange, so it is never mistaken for the red departure or latest start
+    body.append(f"<line x1='{xn:.1f}' y1='{top - 6}' x2='{xn:.1f}' y2='{top + ph}' stroke='{ORANGE}' stroke-width='2'/>"
+                f"<path d='M{xn - 5:.1f} {top - 8} L{xn + 5:.1f} {top - 8} L{xn:.1f} {top - 1} Z' fill='{ORANGE}'/>")
+    body.append(_text(max(L, xn - 6), top - 12, f"{t['now']} {now:%H:%M}", fill=ORANGE, weight="700"))
     ly = H - 12
     body.append(f"<rect x='{L}' y='{ly - 9}' width='10' height='10' fill='{SUN}'/>" + _text(L + 15, ly, t["sun"], size=11))
     body.append(f"<rect x='{L + 90}' y='{ly - 9}' width='10' height='10' fill='{BLUE}'/>" + _text(L + 105, ly, t["grid"], size=11))
