@@ -98,6 +98,16 @@ class WeeklyFullTests(unittest.TestCase):
         mon = [t for t in bare()._trips(v, FRI_EVENING, 60.0) if t.departure == MON_MORNING]
         self.assertLess(mon[0].km_target, 300.0)
 
+    def test_the_card_shows_the_range_of_the_full_target(self):
+        # field test 16.11.2026: '100 % (100.0 km)' - the reserve range stood next to the full target
+        v = car(50.0)
+        v.consumption = 0.2
+        bare()._weekly_full(v, FRI_EVENING, None)
+        self.assertEqual(v.need.source, "weekly_full")
+        self.assertEqual(v.need.target_soc, 100.0)
+        self.assertGreater(v.need.km, 100.0)
+        self.assertAlmostEqual(v.need.kwh, 100.0 / 100.0 * float(v.cfg.get("capacity_kwh") or 60.0), places=1)
+
     def test_look_ahead_unchanged_when_off(self):
         v = car(50.0)
         v.weekly_full = False

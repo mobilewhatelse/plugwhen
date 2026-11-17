@@ -2,6 +2,7 @@
 
 ## 0.10.0 - unreleased - the reserve stays after the trip, charging for several days
 
+- **Full charge: the card shows the range of the full target** instead of the reserve range ("100 % (100 km)"). *Deutsch:* Volladen: Die Karte zeigt die Reichweite des vollen Ziels statt der Reserve („100 % (100 km)“).
 - **The reserve is left after the trip (new default, selectable per car).** Until now the reserve was the least range at the
   departure and already contained the trip: with 100 km reserve and a 46 km day the car left with 100 km and came home with 54.
   Now it is charged for the trip plus the reserve. *Least range at the departure* (as before) can be chosen in the car's settings.

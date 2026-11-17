@@ -2084,7 +2084,9 @@ class Plugwhen:
         if v.weekly_target > v.need.target_soc:
             capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
             charge = max(0.0, (v.weekly_target - (v.soc or 0.0)) / 100.0 * capacity) / max(0.1, self.efficiency_of(v))
+            full_kwh = v.weekly_target / 100.0 * capacity
             v.need = replace(v.need, target_soc=round(v.weekly_target, 1), charge_kwh=round(charge, 1), reachable=True,
+                             km=round(full_kwh / max(0.05, v.consumption), 1), kwh=round(full_kwh, 1),   # the range of the full target, not the reserve
                              source="weekly_full")
 
     # ---------- the look-ahead ----------
