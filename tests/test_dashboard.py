@@ -30,6 +30,15 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual([v["path"] for v in views], ["plugwhen", "lernen", "details"])
         self.assertEqual(views[0]["type"], "sections")
 
+    def test_several_days_can_be_set_on_the_dashboard(self):
+        """Field 17.11.2026: 'kann man das nicht aufs dashboard legen' - days at once and the limit in the settings card."""
+        text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], "de"), ensure_ascii=False)
+        for s in ('"entity": "number.car_days_ahead", "name": "Für so viele Tage auf einmal laden"',
+                  '"entity": "number.car_daily_cap", "name": "Bis zu diesem Ladestand für mehrere Tage"'):
+            self.assertIn(s, text)
+        old = {k: v for k, v in ids("car").items() if k not in ("days_ahead", "daily_cap")}
+        self.assertNotIn("days_ahead", json.dumps(build_views([{"name": "Car", "ids": old}], "de")))   # older ids: nothing breaks
+
     def test_day_bar_shows_which_days_are_ticked(self):
         """Field test 16.11.2026: the buttons without an icon looked the same on and off. Now tiles with a green check."""
         text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], "de"), ensure_ascii=False)

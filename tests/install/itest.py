@@ -219,7 +219,7 @@ def main():
 
     time.sleep(15)
     ents = states_like("testauto")
-    log(len(ents) == 25, "entities of the vehicle exist (25 with 'ready to switch', the weekly full charge and its seven day switches)",
+    log(len(ents) == 27, "entities of the vehicle exist (27 with 'ready to switch', the weekly full charge, its seven day switches and the two settings of charging for several days)",
         f"{len(ents)}: " + ", ".join(sorted(e["entity_id"].split(".")[1] for e in ents)))
     wf = find("switch", "once_a_week_full")
     wt = find("number", "target_of_the_weekly")
@@ -230,6 +230,27 @@ def main():
         "weekly full charge: off by default, day bar Saturday and Sunday, 100 %",
         str([(x or {}).get("state") for x in days]) + " " + str([(x or {}).get("entity_id") for x in (wf, wt)]))
     log(find("select", "days_for_the_weekly") is None, "the former day selection is gone")
+    # charging for several days on the dashboard (field 17.11.2026): the numbers show the values of the car's settings form, a change
+    # is written there without reloading the integration, and survives a reload
+    da, dc = find("number", "days_charged_at_once"), find("number", "limit_for_several_days")
+    log(bool(da and dc and num(da["entity_id"]) == 3 and num(dc["entity_id"]) == 80), "several days: two numbers with the form's values (3 days, 80 %)",
+        str([(x or {}).get("entity_id") for x in (da, dc)]))
+    if da and dc:
+        mode_before = (find("select", "testauto_mode") or {}).get("last_changed")
+        svc("number", "set_value", {"entity_id": da["entity_id"], "value": 5})
+        svc("number", "set_value", {"entity_id": dc["entity_id"], "value": 90})
+        ok = wait_for(lambda: num(da["entity_id"]) == 5 and num(dc["entity_id"]) == 90, 20)
+        time.sleep(5)
+        log(bool(ok) and (find("select", "testauto_mode") or {}).get("last_changed") == mode_before,
+            "several days: set on the dashboard, applied without a reload")
+        api("POST", f"/api/config/config_entries/entry/{entry_id}/reload")
+        time.sleep(5)
+        kept = wait_for(lambda: num(da["entity_id"]) == 5 and num(dc["entity_id"]) == 90, 60)
+        log(bool(kept), "several days: the values are in the car's settings (kept after a reload)",
+            f"{num(da['entity_id'])} / {num(dc['entity_id'])}")
+        svc("number", "set_value", {"entity_id": da["entity_id"], "value": 3})
+        svc("number", "set_value", {"entity_id": dc["entity_id"], "value": 80})
+        wait_for(lambda: num(da["entity_id"]) == 3 and num(dc["entity_id"]) == 80, 20)
     if days[2]:   # tap Wednesday on and off again
         svc("switch", "turn_on", {"entity_id": days[2]["entity_id"]})
         on = wait_for(lambda: (state(days[2]["entity_id"]) or {}).get("state") == "on", 20)

@@ -2,6 +2,9 @@
 
 ## Unreleased (0.10.1)
 
+- **Charging for several days on the dashboard:** "Charge for this many days at once" and the limit (%) are now in the settings
+  card of each car. They change the same value as the car's settings form, take effect at once and do not reload the integration.
+  *Deutsch:* Laden für mehrere Tage im Dashboard: „Für so viele Tage auf einmal laden“ und die Grenze (%) stehen jetzt in der Einstellungen-Karte jedes Autos. Sie ändern denselben Wert wie das Einstellungsformular des Autos, wirken sofort und laden die Integration nicht neu. Danach: Dashboard neu erstellen.
 - **Charging plan readable on a phone:** an orange line marks the current time ("now 19:52"), the chart is narrower with larger
   type, each window shows from when to when and how many kWh, and midnight is "0" with the new day written below it (a bare "Wed"
   was read as "charging on Wednesday"). A narrow window at the right edge gets its start time and kWh.

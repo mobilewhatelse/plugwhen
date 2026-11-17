@@ -166,6 +166,7 @@ class Plugwhen:
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
+        self.quiet_updates = 0   # settings written by a number entity: the next update listener call reloads nothing
         self.signal = f"{DOMAIN}_{entry.entry_id}_update"
         self.share_usage = bool(entry.options.get("share_usage"))   # voluntary anonymous usage statistics (default off, rueckmeldung.py)
         self.feedback_text = ""

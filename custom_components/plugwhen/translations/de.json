@@ -425,6 +425,12 @@
       },
       "weekly_target": {
         "name": "Ziel beim wöchentlichen Volladen"
+      },
+      "days_ahead": {
+        "name": "Tage auf einmal laden"
+      },
+      "daily_cap": {
+        "name": "Grenze für mehrere Tage"
       }
     },
     "select": {

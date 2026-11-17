@@ -15,7 +15,7 @@ ENTITY_KEYS = {
     "readiness": "sensor", "potential": "sensor", "week_plan": "sensor", "reserve_km": "number", "learn_km": "switch",
     "mode": "select", "would_switch": "sensor", "learning_check": "sensor", "habit": "sensor",
     "notice_enabled": "switch", "switch_ready": "sensor",
-    "weekly_full": "switch", "weekly_target": "number",
+    "weekly_full": "switch", "weekly_target": "number", "days_ahead": "number", "daily_cap": "number",
     **{f"weekly_day_{d}": "switch" for d in range(7)},
 }
 
@@ -26,6 +26,7 @@ TEXT = {
         pot="Potenzial", plugs_h="Steckzeiten", settings="Einstellungen", week_h="Gelernter Wochenplan",
         reserve="Reserve (km), mit der das Auto mindestens losfährt", learn="Kilometer je Wochentag lernen",
         notice="Warnen, wenn das Auto nicht bereit sein wird",
+        days_ahead="Für so viele Tage auf einmal laden", daily_cap="Bis zu diesem Ladestand für mehrere Tage",
         wf="Einmal pro Woche voll laden", wf_days="An diesen Tagen (mit PV: der sonnigste)", wf_target="Ziel beim Volladen",
         wf_days_names="Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag", wf_days_short="Mo,Di,Mi,Do,Fr,Sa,So",
         wf_days_hint="Tage antippen. Mehrere Tage: mit Solarprognose der sonnigste, sonst der erste.",
@@ -128,6 +129,7 @@ TEXT = {
         pot="Potential", plugs_h="Plug-in times", settings="Settings", week_h="Learned week",
         reserve="Reserve (km) the car always leaves with", learn="Learn kilometres per weekday",
         notice="Warn when the car will not be ready",
+        days_ahead="Charge for this many days at once", daily_cap="Charge for several days up to",
         wf="Once a week full", wf_days="On these days (with PV: the sunniest)", wf_target="Target of the full charge",
         wf_days_names="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday", wf_days_short="Mo,Tu,We,Th,Fr,Sa,Su",
         wf_days_hint="Tap the days. Several days: the sunniest with a solar forecast, otherwise the first.",
@@ -468,7 +470,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
                 {"entity": ids["reserve_km"], "name": t["reserve"]},
                 {"entity": ids["learn_km"], "name": t["learn"]},
                 {"entity": ids["notice_enabled"], "name": t["notice"]},
-            ]},
+            ] + [{"entity": ids[k], "name": t[k]} for k in ("days_ahead", "daily_cap") if ids.get(k)]},
         ]},
     ]
     if ids.get("weekly_full"):   # once a week full (0.9.2)

@@ -425,6 +425,12 @@
       },
       "weekly_target": {
         "name": "Target of the weekly full charge"
+      },
+      "days_ahead": {
+        "name": "Days charged at once"
+      },
+      "daily_cap": {
+        "name": "Limit for several days"
       }
     },
     "select": {

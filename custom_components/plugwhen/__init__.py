@@ -155,4 +155,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:
 
 
 async def _reload(hass: HomeAssistant, entry: PlugwhenEntry) -> None:
+    plug = getattr(entry, "runtime_data", None)
+    if plug is not None and plug.quiet_updates > 0:   # a number on the dashboard wrote the car's settings: already applied
+        plug.quiet_updates -= 1
+        return
     await hass.config_entries.async_reload(entry.entry_id)
