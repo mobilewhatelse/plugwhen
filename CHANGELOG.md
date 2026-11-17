@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (0.10.1)
+
+- **Charging plan readable on a phone:** an orange line marks the current time ("now 19:52"), the chart is narrower with larger
+  type, each window shows from when to when and how many kWh, and midnight is "0" with the new day written below it (a bare "Wed"
+  was read as "charging on Wednesday"). A narrow window at the right edge gets its start time and kWh.
+  *Deutsch:* Ladeplan am Handy lesbar: Ein orangener Strich zeigt die aktuelle Uhrzeit („jetzt 19:52“), die Grafik ist schmaler mit größerer Schrift, jedes Fenster zeigt von wann bis wann und wie viele kWh, Mitternacht ist „0“ mit dem neuen Tag darunter (ein bloßes „Mi“ wurde als „am Mittwoch laden“ gelesen). Ein schmales Fenster am rechten Rand bekommt Startzeit und kWh.
+- **No lone quarter hour any more:** a grid piece of at most half an hour next to other windows is folded into them (each takes a
+  little more power), if the highest grid import rises by at most 0.5 kW and stays below the peak target. Found in the field:
+  12.4 + 7.3 + 1.0 kWh at 06:45 became 13.1 + 7.6 kWh. Sun windows are never moved.
+  *Deutsch:* Keine einzelne Viertelstunde mehr: Ein Netz-Stück von höchstens einer halben Stunde neben anderen Fenstern wird auf diese verteilt (jedes etwas mehr Leistung), wenn der höchste Netzbezug um höchstens 0,5 kW steigt und unter dem Spitzenziel bleibt. Gefunden im Praxistest: aus 12,4 + 7,3 + 1,0 kWh um 06:45 wurden 13,1 + 7,6 kWh. Sonnenfenster werden nie verschoben.
+- **Goes well with: Viertelstunden-Wächter:** without the peak guard installed the overview ends with a short tile and a link.
+  After installing it: create the dashboard again. *Deutsch:* Passt dazu: Viertelstunden-Wächter: Ohne Wächter endet die Übersicht mit einer kurzen Kachel und Link. Nach der Installation: Dashboard neu erstellen.
+
 ## 0.10.0 - 2026-11-17 - the reserve stays after the trip, charging for several days
 
 - **Safety check: fewer messages (found in the field test):** after a message about "charge now" there is no further one for three
