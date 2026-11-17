@@ -70,6 +70,30 @@ class PlanChartTest(unittest.TestCase):
         ticks = [e.text for e in root.iter() if e.tag.endswith("text") and e.text in ("4", "5", "6", "7")]
         self.assertEqual(ticks, ["4", "5", "6", "7"])
 
+    def test_midnight_is_0_and_the_new_day_is_written_below(self):
+        # a bare 'Mi' on the axis was read as 'charging on Wednesday' (field 17.11.2026)
+        root = parse(chart_plan(make_plan(NOW, DEPART, 11.0, 11.0, 1.4), NOW, 11.0, "de"))
+        texts = [e.text for e in root.iter() if e.tag.endswith("text")]
+        self.assertIn("0", texts)
+        self.assertIn("Mi 13.01.", texts)
+        self.assertNotIn("Mi", texts)
+
+    def test_a_narrow_window_at_the_right_edge_next_to_another_one_still_gets_its_time(self):
+        # field 17.11.2026: 03:00-04:45 and a lone quarter hour 06:45-07:00 right at the departure had no label
+        tz, dep = TZ, datetime(2026, 11, 18, 7, 0, tzinfo=TZ)
+        now = datetime(2026, 11, 17, 19, 52, tzinfo=tz)
+        p = {"status": "planned", "departure": dep, "latest_start": datetime(2026, 11, 18, 5, 7, tzinfo=tz), "windows": [
+            {"start": datetime(2026, 11, 17, 22, 45, tzinfo=tz), "end": datetime(2026, 11, 18, 1, 45, tzinfo=tz), "energy_kwh": 12.4, "available_kwh": 0, "peak_kw": 4.14},
+            {"start": datetime(2026, 11, 18, 3, 0, tzinfo=tz), "end": datetime(2026, 11, 18, 4, 45, tzinfo=tz), "energy_kwh": 7.2, "available_kwh": 0, "peak_kw": 4.14},
+            {"start": datetime(2026, 11, 18, 6, 45, tzinfo=tz), "end": dep, "energy_kwh": 1.04, "available_kwh": 0, "peak_kw": 4.14}]}
+        root = parse(chart_plan(p, now, 11.0, "de"))
+        texts = [e.text for e in root.iter() if e.tag.endswith("text")]
+        self.assertTrue(any(s.startswith("06:45") for s in texts), texts)
+        self.assertIn("1.0 kWh", texts)
+        for e in root.iter():
+            if e.tag.endswith("text") and e.get("text-anchor") == "middle":
+                self.assertLessEqual(float(e.get("x")), 480)
+
     def test_now_label_left_out_when_the_departure_is_right_next_to_it(self):
         dep = NOW + timedelta(minutes=50)
         svg = chart_plan(make_plan(NOW, dep, 3.0, 11.0, 1.4), NOW, 11.0, "de")

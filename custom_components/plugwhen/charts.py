@@ -221,8 +221,9 @@ def chart_plan(plan: dict[str, Any] | None, now: datetime, max_kw: float, lang: 
     while tt <= end:
         xx = x(tt)
         body.append(f"<line x1='{xx:.1f}' y1='{top}' x2='{xx:.1f}' y2='{top + ph}' stroke='{GREY}' stroke-opacity='0.25'/>")
-        label = t["wd"][tt.weekday()] if tt.hour == 0 else f"{tt.hour}"
-        body.append(_text(xx, top + ph + 19, label, "middle", size=14))
+        body.append(_text(xx, top + ph + 19, f"{tt.hour}", "middle", size=14))
+        if tt.hour == 0:   # midnight: the hour stays '0', the new day is written small below it (a bare 'Wed' read as 'charging on Wednesday')
+            body.append(_text(xx, top + ph + 34, f"{t['wd'][tt.weekday()]} {tt:%d.%m.}", "middle", size=12, weight="700"))
         tt += timedelta(hours=step)
     peak = max([max_kw] + [float(w.get("peak_kw") or 0) for w in (plan or {}).get("windows", [])]) or 1.0
     labels: list[tuple[float, float, float, float, str, str]] = []
@@ -284,7 +285,7 @@ def _window_labels(labels, taken, left: float, right: float, top: float, width) 
 
     def place(mid: float, text: str, size: int, y: float, **kw: str) -> bool:
         w = width(text, size)
-        x0 = min(max(mid - w / 2, left), right - w)
+        x0 = min(max(mid - w / 2, left + 3), right - w - 3)   # the 3 px margin of the box stays inside the chart too
         box = (x0 - 3, x0 + w + 3, y - size, y + 2)
         if not free(*box):
             return False
@@ -299,7 +300,14 @@ def _window_labels(labels, taken, left: float, right: float, top: float, width) 
             continue
         if place(mid, when, 13, y0 - 22, weight="700"):
             place(mid, kwh, 12, y0 - 6)
-        elif not place(mid, f"{when} · {kwh}", 12, y0 - 6):
+            continue
+        # no room right above the bar (a narrow window next to another one): one line, higher up if need be
+        if any(top + 14 <= y and place(mid, f"{when} · {kwh}", 12, y) for y in (y0 - 6, y0 - 40, y0 - 56, top + 36)):
+            continue
+        # still no room: the start time and the energy, short, above the bar
+        if place(mid, when.split("–")[0], 13, y0 - 22, weight="700"):
+            place(mid, kwh, 12, y0 - 6)
+        else:
             place(mid, kwh, 12, y0 - 6)
     return out
 

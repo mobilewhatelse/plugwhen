@@ -20,7 +20,9 @@ Order of choice:
    car would get less than the wallbox minimum are dropped and the rest filled again (among equals the later ones stay:
    the battery waits less at a high state of charge). Households without solar get only this step.
 3. Tiny remainders below the wallbox minimum go to the quietest quarter hours, the later one first.
-4. If the energy cannot be delivered by departure the plan says so and how much is missing; it never pretends.
+4. A lone grid piece of at most half an hour is folded into the other grid quarter hours (each a little more power), if the
+   highest grid import rises by at most `FOLD_KW`: the car is not started for a few minutes and a single kWh.
+5. If the energy cannot be delivered by departure the plan says so and how much is missing; it never pretends.
 
 The plan is advice. Carrying it out is a separate, optional step.
 """
@@ -33,6 +35,8 @@ from typing import Any
 
 QUARTER_H = 0.25
 DEFAULT_HIGH_KW = 1.0  # expected import for a quarter hour without learned data
+SMALL_PIECE_QUARTERS = 2   # a grid piece of at most half an hour next to other pieces is folded into them ...
+FOLD_KW = 0.5              # ... if the highest grid import of the house rises by no more than this
 
 
 def make_plan(
@@ -159,6 +163,9 @@ def make_plan(
             continue
         put(q, max(min_kw, min(max_kw, room, remaining / (QUARTER_H * q["frac"]))))
 
+    # 4. a lone short piece from the grid is folded into the other grid quarter hours: fewer starts and stops for the car
+    _fold_small_pieces(plan, {q["t"]: q for q in quarters}, max_kw, target_kw)
+
     total = sum(v["kw"] * QUARTER_H * v["frac"] for v in plan.values())
     avail = sum(v["avail"] * QUARTER_H * v["frac"] for v in plan.values())
     result.update({
@@ -188,6 +195,52 @@ def make_plan(
     if result["windows"]:
         result["ready_at"] = result["windows"][-1]["end"]
     return result
+
+
+def _fold_small_pieces(plan: dict[datetime, dict[str, float]], qmap: dict[datetime, dict[str, Any]], max_kw: float,
+                       target_kw: float | None) -> None:
+    """Fold a lone piece of at most `SMALL_PIECE_QUARTERS` grid quarter hours into the other grid quarter hours (each takes a
+    little more power), smallest piece first. Only if the highest grid import of the house rises by at most `FOLD_KW`, no
+    quarter hour goes above the wallbox power or the peak target, and at least one other piece stays. Pieces with
+    available power (sun) are never moved."""
+    def grid_only(t: datetime) -> bool:
+        return plan[t]["avail"] <= 1e-9
+
+    def imp(t: datetime, kw: float) -> float:
+        return qmap[t]["high"] - qmap[t]["avail"] + kw
+
+    while True:
+        pieces: list[list[datetime]] = []
+        for t in sorted(plan):
+            if pieces and pieces[-1][-1] + timedelta(minutes=15) == t:
+                pieces[-1].append(t)
+            else:
+                pieces.append([t])
+        if len(pieces) < 2:
+            return
+        small = [p for p in pieces if len(p) <= SMALL_PIECE_QUARTERS and all(grid_only(t) for t in p)]
+        small.sort(key=lambda p: sum(plan[t]["kw"] * plan[t]["frac"] for t in p))
+        for piece in small:
+            others = [t for t in plan if t not in piece and grid_only(t)]
+            hours = sum(QUARTER_H * plan[t]["frac"] for t in others)
+            if hours <= 0:
+                continue
+            add = sum(plan[t]["kw"] * QUARTER_H * plan[t]["frac"] for t in piece) / hours
+            new = {t: plan[t]["kw"] + add for t in others}
+            room = {t: max_kw if target_kw is None else min(max_kw, target_kw - qmap[t]["high"] + qmap[t]["avail"]) for t in others}
+            if any(kw > room[t] + 1e-9 for t, kw in new.items()):
+                continue
+            before = max(imp(t, v["kw"]) for t, v in plan.items())
+            if max(imp(t, kw) for t, kw in new.items()) > before + FOLD_KW + 1e-9:
+                continue
+            for t in piece:
+                del plan[t]
+            for t, kw in new.items():
+                plan[t]["kw"] = kw
+                plan[t]["grid"] = kw
+            break
+        else:
+            return
 
 
 def _room(q: dict[str, Any], max_kw: float, min_kw: float, target_kw: float | None) -> float:
