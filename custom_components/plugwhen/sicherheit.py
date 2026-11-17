@@ -26,6 +26,7 @@ DROP_PCT = 2.0          # the planned target fell this much below the promise: c
 DONE_MARGIN = 1.0       # the promise counts as kept this many percent below it (cars often stop at 99 %; the weekly full
                         # charge is booked as done there too, and its target then falls back on purpose)
 SAME_DEPARTURE = timedelta(hours=3)   # a departure that moved by up to this much is still the same one
+QUIET = timedelta(hours=3)            # after a message to the user no further one for this long (the wallbox is still switched)
 
 
 @dataclass(frozen=True)

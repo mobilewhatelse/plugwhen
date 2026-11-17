@@ -2,6 +2,9 @@
 
 ## 0.10.0 - unreleased - the reserve stays after the trip, charging for several days
 
+- **Safety check: fewer messages (found in the field test):** after a message about "charge now" there is no further one for three
+  hours, whatever the reason (it had sent seven in 18 minutes while settings were tried out). The wallbox is still switched.
+  *Deutsch:* Sicherheitsprüfung: weniger Meldungen (gefunden im Praxistest): Nach einer Meldung zu „Jetzt laden“ kommt drei Stunden lang keine weitere, egal aus welchem Grund (es waren sieben in 18 Minuten, während Einstellungen ausprobiert wurden). Die Wallbox wird weiter umgeschaltet.
 - **Full charge: the card shows the range of the full target** instead of the reserve range ("100 % (100 km)"). *Deutsch:* Volladen: Die Karte zeigt die Reichweite des vollen Ziels statt der Reserve („100 % (100 km)“).
 - **The reserve is left after the trip (new default, selectable per car).** Until now the reserve was the least range at the
   departure and already contained the trip: with 100 km reserve and a 46 km day the car left with 100 km and came home with 54.

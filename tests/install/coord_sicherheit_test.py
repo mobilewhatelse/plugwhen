@@ -110,6 +110,25 @@ class SafetyCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(phone(p)), 1)
         self.assertEqual(len(in_ha(p)), 1)
 
+    def test_no_second_message_within_a_few_hours_whatever_the_reason(self):
+        """Field test 16.11.: seven messages in 18 minutes (another reason each time while the user tried things)."""
+        p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
+        act(p, v, AT_4)                                                   # target_fell
+        v.safety = None
+        v.need = Need(km=100, kwh=20, target_soc=100.0, charge_kwh=5.0, reachable=True, source="learned")
+        v.stall_since = AT_4 - timedelta(minutes=5)
+        act(p, v, AT_4 + timedelta(minutes=6))                            # stalled
+        v.safety, v.stall_since = None, None
+        act(p, v, AT_4 + timedelta(minutes=12))                           # tight
+        self.assertEqual(len(phone(p)), 1)
+        self.assertEqual(len(in_ha(p)), 1)
+        self.assertIsNotNone(v.safety)   # the wallbox is still switched to charging now
+        v.safety = None
+        v.promise = sicherheit.Promise(MON_7 + timedelta(minutes=sicherheit.QUIET.seconds // 60), 100.0)
+        v.departure = v.promise.departure
+        act(p, v, AT_4 + sicherheit.QUIET + timedelta(minutes=1))         # long enough ago: told again
+        self.assertEqual(len(phone(p)), 2)
+
     def test_without_a_phone_service_only_in_home_assistant_and_once(self):
         p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
         v.cfg[co.V_NOTIFY] = ""

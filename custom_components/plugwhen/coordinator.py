@@ -150,6 +150,7 @@ class Vehicle:
     safety_alarm: Any = None                 # safety check: the alarm the user is still to be told about (after switching)
     safety: dict[str, Any] | None = None     # safety check: "charge now" is on (reason, since, departure)
     stall_since: datetime | None = None      # safety check: a planned window runs, but the car does not charge
+    safety_told: dict = field(default_factory=dict)   # safety check: when the user was last told ("ok" / "failed")
 
 
 def err_text(err: BaseException) -> str:
@@ -1162,8 +1163,11 @@ class Plugwhen:
             self._diag_action(v, now, "Sicherheitspruefung: Wallbox nicht umgeschaltet")
         key = f"safety-{v.safety['departure'][:10]}-{alarm.reason}" + ("" if switched else "-failed")
         sent = self._sent.setdefault(v.sub_id, [])
-        if key in sent:
-            return
+        told = "ok" if switched else "failed"
+        last = v.safety_told.get(told)
+        if key in sent or (last is not None and now - last < sicherheit.QUIET):
+            return   # once per departure and reason, and never again within a few hours (field test 16.11.: seven messages in 18 minutes)
+        v.safety_told[told] = now
         title, message = sicherheit.alarm_text(self.hass.config.language, alarm, v.name, switched)
         try:   # always also in Home Assistant's notifications, so it is there without a phone service and stays until read
             await self.hass.services.async_call("persistent_notification", "create", {
