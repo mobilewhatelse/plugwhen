@@ -64,8 +64,18 @@
   beim Einschalten (die angehakten Tage bleiben gemerkt).
   Dashboard neu erstellen: Die Statuszeile zeigt das Ziel der nächsten Fahrt und, solange es läuft, bis wohin im Voraus geladen wird.
 
-## 0.9.2 - unreleased - once a week full
+## 0.9.2 - 2026-11-17 - once a week full
 
+- **evcc: own connection, own password (HACS review):** Plugwhen talks to evcc on a client session of its own (one per
+  installation), so evcc's login cookie never reaches Home Assistant's shared session. The evcc address may still come from the
+  quarter-hour peak guard, its password never: an evcc with a password needs it in Plugwhen's own settings. *Deutsch:* evcc mit
+  eigener Verbindung und eigenem Passwort (HACS-Prüfung): Plugwhen spricht mit evcc über eine eigene Sitzung, das Anmelde-Cookie von
+  evcc landet nie in der gemeinsamen Sitzung von Home Assistant. Die Adresse darf weiter aus dem Wächter kommen, das Passwort nie:
+  ein evcc mit Passwort braucht es in den Einstellungen von Plugwhen.
+  A wrong evcc password is now refused when saving (evcc reads without a login, so before it never showed), and leaving the mode
+  *via evcc* removes the plan Plugwhen wrote into evcc (a plan you changed in evcc stays). *Deutsch:* Ein falsches evcc-Passwort
+  wird beim Speichern abgelehnt (evcc liest auch ohne Anmeldung, vorher fiel es nie auf), und wer *Über evcc* verlässt, dem nimmt
+  Plugwhen seinen in evcc geschriebenen Plan wieder heraus (ein in evcc geänderter Plan bleibt).
 - **Safety check before every departure (wish of a user after the field test):** from three hours before every departure, every
   day, Plugwhen compares what it promised for this departure with reality. If the target it planned fell below the promise, the
   wallbox does not charge although the plan says so, or the time left is getting short, it switches the wallbox to "charge now"

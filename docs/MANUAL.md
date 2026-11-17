@@ -131,7 +131,8 @@ Put it in the calendar and the car is still ready in time.
 ## With evcc (optional)
 
 - evcc is **optional** and only **read**, through its address (evcc may run anywhere on the network). The address comes from the
-  quarter-hour peak guard or is entered in Plugwhen's settings; an evcc on the same machine (add-on) is suggested.
+  quarter-hour peak guard or is entered in Plugwhen's settings; an evcc on the same machine (add-on) is suggested. A **password** for
+  evcc is always entered in Plugwhen itself: Plugwhen never reads a password stored by another integration (the guard included).
 - Odometer and state of charge stay the car's own sensors: Plugwhen cannot calculate without them (evcc usually asks the car only
   while it is plugged in, so it cannot tell the kilometres per day).
 - Adding a vehicle offers evcc's cars (the one at a loadpoint first) and fills in name, capacity and the charging power of the loadpoint.
