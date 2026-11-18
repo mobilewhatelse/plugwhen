@@ -161,6 +161,16 @@ class EveningBeforeCoordinatorTests(unittest.TestCase):
         self.assertIsNone(v.pre_evening)
         self.assertEqual(v.need.source, "calendar")
 
+    def test_earlier_learned_departure_moves_the_deadline(self):
+        v = self._car()
+        v.need = Need(km=300, kwh=0, target_soc=100.0, charge_kwh=13.1, reachable=True, source="weekly_full")
+        v.horizon = {"first_need": {"departure": "2026-11-19T07:00:00+01:00", "window_start": "2026-11-18T19:48:00+01:00",
+                                    "need_kwh": 13.1, "covered_by_sun": False}}
+        bare()._evening_before(v, datetime(2026, 11, 18, 19, 50, tzinfo=TZ))
+        self.assertEqual(v.pre_evening["by"], "2026-11-19T07:00:00+01:00")
+        self.assertAlmostEqual(v.need.charge_kwh, 13.1)   # not doubled
+        self.assertEqual(v.need.source, "weekly_full")
+
 
 class WeeklyReopenTests(unittest.TestCase):
     """Field test 18.11.2026: 'done this week' could not be opened again; ticking a day (or the main switch) does."""

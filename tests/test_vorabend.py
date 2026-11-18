@@ -57,6 +57,17 @@ class EveningBeforeTests(unittest.TestCase):
         e = vb.evening_before(NOW, hz(need_kwh=30.0), 95.0, 66.0, 0.9, True)
         self.assertEqual(e.target_soc, 100.0)
 
+    def test_earlier_learned_departure_decides_the_plan(self):
+        # 18.11.2026 weekly full: horizon needs 13.1 kWh by Thu 07:00, the plan was made for the calendar trip Thu 20:00
+        h = {"first_need": {"departure": "2026-11-19T07:00:00+01:00", "window_start": "2026-11-18T19:48:00+01:00",
+                            "need_kwh": 13.1, "covered_by_sun": False}}
+        cal = datetime(2026, 11, 19, 20, 0, tzinfo=TZ)
+        e = vb.earlier_departure(NOW, h, cal, 81.0, 66.0, 0.9, True)
+        self.assertEqual(e.by, datetime(2026, 11, 19, 7, 0, tzinfo=TZ))
+        self.assertEqual(e.kwh, 13.1)
+        self.assertIsNone(vb.earlier_departure(NOW, h, datetime(2026, 11, 19, 8, 0, tzinfo=TZ), 81.0, 66.0, 0.9, True))
+        self.assertIsNone(vb.earlier_departure(NOW, h, cal, 81.0, 66.0, 0.9, False))
+
     def test_text_in_both_languages(self):
         e = vb.evening_before(NOW, hz(), 81.0, 66.0, 0.9, True)
         self.assertIn("Do 07:00", messages.evening_text("de", e.as_dict()))

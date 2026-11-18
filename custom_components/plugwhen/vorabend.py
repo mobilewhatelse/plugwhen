@@ -61,3 +61,24 @@ def evening_before(now: datetime, horizon: dict | None, soc: float | None, capac
     if target <= soc + 0.05:
         return None
     return EveningBefore(round(kwh, 1), round(target, 1), by, dep)
+
+
+def earlier_departure(now: datetime, horizon: dict | None, departure: datetime | None, soc: float | None, capacity_kwh: float,
+                      efficiency: float, plugged: bool | None) -> EveningBefore | None:
+    """The look-ahead expects an earlier departure than the plan's (a learned morning trip before a calendar trip in the evening)
+    and the charge is needed already for it: the plan is made for that departure, i.e. charged in the standing time before it,
+    not in a window that exists only if the car is at home after it."""
+    if not horizon or soc is None or capacity_kwh <= 0 or departure is None or plugged is False:
+        return None
+    need = horizon.get("first_need")
+    if not need or need.get("covered_by_sun"):
+        return None
+    dep, kwh = _parse(need.get("departure")), float(need.get("need_kwh") or 0.0)
+    if dep is None or kwh < MIN_KWH or dep <= now + timedelta(hours=MIN_HOURS):
+        return None
+    if departure - dep < timedelta(hours=MIN_HOURS) or dep.date() > (now + timedelta(days=1)).date():
+        return None
+    target = min(100.0, soc + kwh * max(0.1, efficiency) / capacity_kwh * 100.0)
+    if target <= soc + 0.05:
+        return None
+    return EveningBefore(round(kwh, 1), round(target, 1), dep, departure)

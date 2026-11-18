@@ -2072,10 +2072,14 @@ class Plugwhen:
         capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
         have = max(0.0, v.need.charge_kwh or 0.0)
         e = vorabend.evening_before(now, v.horizon, v.soc, capacity, self.efficiency_of(v), v.plugged, have)
+        total = None
+        if e is None:   # the plan's need already counts for the earlier departure: not added, only the deadline moves
+            e = vorabend.earlier_departure(now, v.horizon, v.departure, v.soc, capacity, self.efficiency_of(v), v.plugged)
+            total = max(have, e.kwh) if e else None
         if e is None:
             return
         v.pre_evening = e.as_dict()
-        total = have + e.kwh
+        total = have + e.kwh if total is None else total
         target = min(100.0, v.soc + total * max(0.1, self.efficiency_of(v)) / capacity * 100.0)
         if target > v.need.target_soc + 0.05:
             v.need = replace(v.need, target_soc=round(target, 1), charge_kwh=round(total, 1), source="evening_before")
