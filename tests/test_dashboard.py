@@ -263,5 +263,10 @@ class MissingSensorTests(unittest.TestCase):
         self.assertEqual(bare, [])
 
 
+    def test_cards_wait_for_their_sensors(self):
+        text = json.dumps(build_views([{"name": "Car", "ids": {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}}], "de"))
+        self.assertIn("{% if states.sensor.car_charge_plan", text)
+
+
 if __name__ == "__main__":
     unittest.main()

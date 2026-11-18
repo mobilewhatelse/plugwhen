@@ -3,7 +3,6 @@
   "name": "Plugwhen",
   "after_dependencies": [
     "energy",
-    "http",
     "recorder"
   ],
   "codeowners": [

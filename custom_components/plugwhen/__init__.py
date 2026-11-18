@@ -32,14 +32,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: PlugwhenEntry) -> bool:
     await plug.async_start()
     entry.async_on_unload(entry.add_update_listener(_reload))
     _register_services(hass)
-    try:   # charts full screen (vollbild.py): a page that may be zoomed on the phone
-        from .vollbild_view import async_setup as vollbild_setup
-
-        await vollbild_setup(hass, DOMAIN, "Plugwhen")
-    except Exception as err:  # noqa: BLE001 - never stops the integration
-        import logging
-
-        logging.getLogger(__name__).debug("Plugwhen: full-screen charts not available: %s", err)
     return True
 
 
@@ -145,9 +137,9 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency,
                                    {k: v for k, v in main_ids.items() if v},
                                    waechter=bool(hass.config_entries.async_entries("viertelstunden_waechter")))}
-    from .vollbild_view import async_link
+    from .vollbild import link_charts
 
-    await async_link(hass, DOMAIN, config)   # every chart opens full screen (zoom on the phone)
+    link_charts(config, hass.config.language)   # a tap on a chart opens it over the whole width (held sideways: large)
     text = ha_yaml.dump(config)
     de = (hass.config.language or "").lower().startswith("de")
     hint = ("In ein neues Dashboard einfügen (drei Punkte > Bearbeiten > Raw-Konfigurationseditor):" if de

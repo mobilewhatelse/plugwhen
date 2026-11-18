@@ -533,6 +533,25 @@ def _setting(entity_id: str, name: str, slider: bool = False) -> dict[str, Any]:
     return tile
 
 
+def _wait_for_sensors(node: Any) -> None:
+    """A markdown card that reads attributes is drawn only once its sensors exist: right after a restart the dashboard draws
+    before the sensors are back, and a value read from the empty attributes wrote a template error to the log (18.11.2026)."""
+    import re
+
+    if isinstance(node, list):
+        for x in node:
+            _wait_for_sensors(x)
+    elif isinstance(node, dict):
+        content = node.get("content")
+        if node.get("type") == "markdown" and isinstance(content, str):
+            ids = sorted(set(re.findall(r"\(states\.([a-z_]+\.[a-z0-9_]+)\.attributes if states\.", content)))
+            if ids:
+                node["content"] = "{% if " + " and ".join(f"states.{i}" for i in ids) + " %}" + content + "{% endif %}"
+        for x in node.values():
+            if isinstance(x, (list, dict)):
+                _wait_for_sensors(x)
+
+
 def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: str | None = None,
                 main_ids: dict[str, str] | None = None, waechter: bool | None = None) -> list[dict[str, Any]]:
     """Three tabs: Overview (ready for the next departure, plan, trips, look-ahead, plan for evcc), Learning, Details.
@@ -552,6 +571,8 @@ def build_views(vehicles: list[dict[str, Any]], language: str | None, currency: 
         tabs["learning"].insert(0, fleet_off_section(main_ids["share_usage"], language))
     if waechter is False:   # only when we know it is missing; it disappears with "Create the dashboard" after installing it
         tabs["overview"].append(waechter_section(language))
+    for tab in tabs.values():
+        _wait_for_sensors(tab)
     return [
         {"title": t["v_overview"], "path": "plugwhen", "icon": "mdi:ev-plug-type2", "type": "sections", "max_columns": 2, "sections": tabs["overview"]},
         {"title": t["v_learning"], "path": "lernen", "icon": "mdi:school-outline", "type": "sections", "max_columns": 2, "sections": tabs["learning"]},
