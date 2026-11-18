@@ -115,8 +115,10 @@ class WeeklyDaySwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
         return "mdi:check-circle" if self.is_on else "mdi:circle-outline"
 
     async def async_turn_on(self, **kwargs) -> None:
+        was_on = self.is_on
         self._set(True)
-        self.vehicle.weekly_done = None   # the user ticks a day: "once more this week" opens the week again
+        if not was_on:   # ticked from off to on: "once more this week" opens the week again (a day that is on already does not)
+            self.vehicle.weekly_done = None
         self.async_write_ha_state()
         await self.plug.async_recompute(self.vehicle)
 

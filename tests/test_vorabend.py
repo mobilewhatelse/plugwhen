@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
+import horizon  # noqa: E402
 import messages  # noqa: E402
 import vorabend as vb  # noqa: E402
 
@@ -44,8 +45,17 @@ class EveningBeforeTests(unittest.TestCase):
     def test_only_tomorrow(self):
         self.assertIsNone(vb.evening_before(NOW, hz(window_start="2026-11-20T13:00:00+01:00"), 81.0, 66.0, 0.9, True))
 
-    def test_arising_today_is_not_evening_before(self):
-        self.assertIsNone(vb.evening_before(NOW, hz(window_start="2026-11-18T21:00:00+01:00"), 81.0, 66.0, 0.9, True))
+    def test_a_later_trip_today_is_charged_before_the_first_one_too(self):
+        # 10:00, trips today at 14:00 and 21:00: the energy for the evening is charged before 14:00, not "at the latest" at 20:00
+        now = datetime(2026, 11, 18, 10, 0, tzinfo=TZ)
+        h = {"lasts_until": "2026-11-18T14:00:00+01:00",
+             "first_need": {"departure": "2026-11-18T21:00:00+01:00", "window_start": "2026-11-18T18:00:00+01:00",
+                            "need_kwh": 4.0, "covered_by_sun": False}}
+        e = vb.evening_before(now, h, 60.0, 66.0, 0.9, True)
+        self.assertEqual(e.by, datetime(2026, 11, 18, 14, 0, tzinfo=TZ))
+
+    def test_gone_when_the_first_trip_is_past(self):
+        self.assertIsNone(vb.evening_before(datetime(2026, 11, 19, 7, 0, tzinfo=TZ), hz(), 81.0, 66.0, 0.9, True))
 
     def test_what_the_plan_charges_anyway_is_not_doubled(self):
         e = vb.evening_before(NOW, hz(), 81.0, 66.0, 0.9, True, have_kwh=2.0)
@@ -68,10 +78,87 @@ class EveningBeforeTests(unittest.TestCase):
         self.assertIsNone(vb.earlier_departure(NOW, h, datetime(2026, 11, 19, 8, 0, tzinfo=TZ), 81.0, 66.0, 0.9, True))
         self.assertIsNone(vb.earlier_departure(NOW, h, cal, 81.0, 66.0, 0.9, False))
 
+    def test_earlier_departure_kept_until_it_is_past(self):
+        h = {"first_need": {"departure": "2026-11-19T07:00:00+01:00", "window_start": "2026-11-18T19:48:00+01:00",
+                            "need_kwh": 13.1, "covered_by_sun": False}}
+        cal = datetime(2026, 11, 19, 20, 0, tzinfo=TZ)
+        for now in (datetime(2026, 11, 19, 5, 10, tzinfo=TZ), datetime(2026, 11, 19, 6, 55, tzinfo=TZ)):
+            self.assertIsNotNone(vb.earlier_departure(now, h, cal, 81.0, 66.0, 0.9, True), now)
+        self.assertIsNone(vb.earlier_departure(datetime(2026, 11, 19, 7, 0, tzinfo=TZ), h, cal, 81.0, 66.0, 0.9, True))
+
     def test_text_in_both_languages(self):
         e = vb.evening_before(NOW, hz(), 81.0, 66.0, 0.9, True)
         self.assertIn("Do 07:00", messages.evening_text("de", e.as_dict()))
         self.assertIn("Thu 20:00", messages.evening_text("en", e.as_dict()))
+
+
+class WholeNightTests(unittest.TestCase):
+    """Review 19.11.2026: every test above looks at 19:10 only. The charge must hold in every quarter hour from the evening to
+    the first departure - after midnight the need arose "today" and was dropped, two hours before the first trip the deadline
+    jumped back to the later one. The look-ahead is the real one (horizon.horizon_plan), nothing is made up."""
+
+    CAP, CONS, EFF = 66.0, 0.2, 0.9
+    MORNING, EVENING = datetime(2026, 11, 19, 7, 0, tzinfo=TZ), datetime(2026, 11, 19, 20, 0, tzinfo=TZ)
+
+    def _night(self):
+        t = datetime(2026, 11, 18, 17, 0, tzinfo=TZ)
+        while t < self.MORNING:
+            yield t
+            t += timedelta(minutes=15)
+
+    def _decide(self, now, soc, trips, departure, have):
+        h = horizon.horizon_plan(now, soc / 100.0 * self.CAP, self.CAP, self.CONS, trips, None, 11.0, efficiency=self.EFF, pref_kw=4.0)
+        e = vb.evening_before(now, h, soc, self.CAP, self.EFF, True, have)
+        if e is not None:
+            return e, have + e.kwh
+        e = vb.earlier_departure(now, h, departure, soc, self.CAP, self.EFF, True)
+        return e, (max(have, e.kwh) if e else have)
+
+    def test_later_trip_tomorrow_holds_all_night(self):
+        # the morning trip is covered, the evening trip (60 km, 160 km range wanted) is not: charged by 07:00, all night
+        trips = [horizon.Trip(self.MORNING, 40, 100), horizon.Trip(self.EVENING, 60, 160, 60)]
+        seen = set()
+        for now in self._night():
+            e, total = self._decide(now, 45.0, trips, self.MORNING, 0.0)
+            self.assertIsNotNone(e, f"dropped at {now:%a %H:%M}")
+            self.assertEqual(e.by, self.MORNING, now)
+            self.assertEqual(e.for_departure, self.EVENING, now)
+            seen.add(round(total, 1))
+        self.assertEqual(len(seen), 1, f"the need changed during the night: {sorted(seen)}")
+
+    def test_need_shrinks_only_by_what_was_charged(self):
+        # the car charges through the night: the rest falls with the state of charge and ends at nothing, never jumps up or away
+        trips = [horizon.Trip(self.MORNING, 40, 100), horizon.Trip(self.EVENING, 60, 160, 60)]
+        soc, last = 45.0, None
+        for now in self._night():
+            e, total = self._decide(now, soc, trips, self.MORNING, 0.0)
+            if e is None:
+                self.assertLess(total, vb.MIN_KWH + 0.01)
+                self.assertLess((last or 0.0), 2.0, f"dropped at {now:%a %H:%M} with {last} kWh open")
+                break
+            self.assertEqual(e.by, self.MORNING)
+            if last is not None:
+                self.assertLessEqual(total, last + 0.11, now)
+            last = total
+            soc = min(100.0, soc + 1.0 * self.EFF / self.CAP * 100.0)   # 4 kW for a quarter hour
+        else:
+            self.fail("the charge never ended")
+
+    def test_full_charge_before_an_earlier_expected_departure_holds_all_night(self):
+        # the plan's departure is the evening one, the look-ahead expects the car to leave at 07:00 and wants it full by then
+        trips = [horizon.Trip(self.MORNING, 40, 330), horizon.Trip(self.EVENING, 60, 330, 60)]
+        have = (100.0 - 81.0) / 100.0 * self.CAP / self.EFF
+        for now in self._night():
+            e, total = self._decide(now, 81.0, trips, self.EVENING, have)
+            self.assertIsNotNone(e, f"deadline back to the evening at {now:%a %H:%M}")
+            self.assertEqual(e.by, self.MORNING, now)
+            self.assertAlmostEqual(total, have, delta=0.2)
+
+    def test_nothing_two_days_ahead(self):
+        # Tuesday evening, both trips on Thursday: that is the job of charging for several days, not of tonight
+        trips = [horizon.Trip(self.MORNING, 40, 100), horizon.Trip(self.EVENING, 60, 160, 60)]
+        e, _ = self._decide(datetime(2026, 11, 17, 19, 0, tzinfo=TZ), 45.0, trips, self.MORNING, 0.0)
+        self.assertIsNone(e)
 
 
 if __name__ == "__main__":

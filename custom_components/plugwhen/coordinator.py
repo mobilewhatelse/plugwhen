@@ -45,7 +45,7 @@ from .links import pick
 from .inputs import availability_from_attributes, departure_from_state, load_from_hours, merge_available, surplus_from_solar
 from .plugs import PlugLog
 from .learning import MobilityModel, WeekdayPlan
-from .horizon import Trip, horizon_plan, with_calendar
+from .horizon import SAME_TRIP_WINDOW, Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
 from .need import MIN_SAMPLES, MODE_FLOOR, MODE_PLUS, Need, compute_need
 from .const import DEFAULT_RESERVE_MODE, RESERVE_AT, V_DAILY_CAP, V_DAYS_AHEAD, V_RESERVE_MODE
@@ -1245,7 +1245,7 @@ class Plugwhen:
             cal = self._trip_at(v, dep) is not None
             t = compute_need(self._plan_for(v, dep, weekday), v.reserve_km, None, capacity, v.consumption,
                              learn_km=v.learn_km or cal, min_soc=self._min_soc(v), mode=self._need_mode(v)).target_soc
-            if dep is not None and dep == v.departure and v.need is not None and v.need.source == "ahead":
+            if dep is not None and dep == v.departure and v.need is not None and v.need.source in ("ahead", "evening_before"):
                 t = max(t, (v.ahead or {}).get("wanted_soc") or v.need.target_soc)   # a fill for several days: evcc charges to it too
             if dep is not None and v.weekly_full and self._weekly_applies(v, now, dep):   # once a week full also into evcc
                 t = max(t, v.weekly_target)
@@ -1262,6 +1262,10 @@ class Plugwhen:
         if v.soc is None:
             return None, week, "unknown_soc", None
         a = v.ahead or {}
+        by = dt_util.parse_datetime(str((v.pre_evening or {}).get("by") or ""))
+        if by is not None and by > now and v.need is not None:
+            # charged before the first trip for tomorrow's later one (vorabend.py): evcc gets that deadline and target too
+            return {"departure": by, "target_soc": max(v.need.target_soc, float(a.get("wanted_soc") or 0.0))}, week, "planned", None
         if a.get("filling") and v.departure is not None and v.need_must is not None:
             # a fill for several days runs: evcc charges to it by the next departure - also once the next trip alone is
             # covered (the look-ahead below only knows the next trips' own targets and would say "covered")
@@ -1415,9 +1419,13 @@ class Plugwhen:
                 return tdep, "calendar"
         dep = self._learned_departure(v, now)
         trip = self._next_trip(v, now)
-        if trip is not None:   # a trip in the calendar before the learned departure comes first
+        if trip is not None:
+            # a trip in the calendar before the learned departure comes first; one shortly after it is the same trip (as in
+            # the look-ahead, horizon.with_calendar). A later one on the same day is a trip of its own: the learned
+            # departure stays the next one, or everything (need, warning, promise, safety check) would count for the
+            # evening while the car leaves in the morning (review 19.11.2026)
             tdep = dt_util.parse_datetime(trip["departure"])
-            if tdep is not None and (dep is None or tdep <= dep + timedelta(minutes=1) or tdep.date() == dep.date()):
+            if tdep is not None and (dep is None or tdep <= dep + SAME_TRIP_WINDOW):
                 return tdep, "calendar"
         return dep, ("learned" if dep is not None else None)
 
@@ -2003,11 +2011,11 @@ class Plugwhen:
         return v.plug_share_cache[1]
 
     def _fit_ahead(self, v: Vehicle, plan_for) -> dict[str, Any]:
-        """The plan for the need. A charge for several days that does not fit before the departure (little time, or the peak
+        """The plan for the need. A charge for several days (or for tomorrow's later trip) that does not fit before the departure (little time, or the peak
         limit) is cut to what fits: the plan must never say "cannot be reached" because of the days after the next trip. If
         not even the next trip fits, the plan is the one for the next trip alone and says so, as before."""
         plan = plan_for(v.need.charge_kwh)
-        if v.need.source != "ahead" or plan.get("status") != "infeasible" or v.need_must is None:
+        if v.need.source not in ("ahead", "evening_before") or plan.get("status") != "infeasible" or v.need_must is None:
             return plan
         wanted = v.need   # the wallbox and evcc keep getting this (steady), the plan shows what fits
         fit = math.floor(float(plan.get("planned_kwh") or 0.0) * 10.0) / 10.0

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 MIN_KWH = 0.5           # smaller gaps are not worth a charge
-MIN_HOURS = 2.0         # the first trip must be at least this far away (else the normal plan is at work)
+SAME_TRIP = timedelta(hours=2)   # an expected departure this close before the plan's is the same trip (horizon.SAME_TRIP_WINDOW)
 
 
 @dataclass(frozen=True)
@@ -50,8 +50,11 @@ def evening_before(now: datetime, horizon: dict | None, soc: float | None, capac
     kwh = float(need.get("need_kwh") or 0.0)
     if start is None or dep is None or kwh < MIN_KWH:
         return None
-    if by - now < timedelta(hours=MIN_HOURS) or start.date() <= now.date():
-        return None   # arises today or the first trip is imminent: nothing "before the evening" about it
+    if by <= now or dep <= by:
+        return None   # the first trip is past
+    # no "only from tomorrow" and no "not shortly before the first trip": what holds in the evening must hold all night, up
+    # to the departure (review 19.11.2026: after midnight the need arose "today" and the charge was dropped; two hours
+    # before the first trip the deadline jumped back to the later one)
     if start.date() > (now + timedelta(days=1)).date():
         return None   # only what is needed tomorrow, not the day after (that is the look-ahead's job)
     kwh = max(0.0, kwh - max(0.0, have_kwh))
@@ -74,9 +77,9 @@ def earlier_departure(now: datetime, horizon: dict | None, departure: datetime |
     if not need or need.get("covered_by_sun"):
         return None
     dep, kwh = _parse(need.get("departure")), float(need.get("need_kwh") or 0.0)
-    if dep is None or kwh < MIN_KWH or dep <= now + timedelta(hours=MIN_HOURS):
-        return None
-    if departure - dep < timedelta(hours=MIN_HOURS) or dep.date() > (now + timedelta(days=1)).date():
+    if dep is None or kwh < MIN_KWH or dep <= now:
+        return None   # kept until that departure itself: a deadline that jumps back shortly before it moves the charge away
+    if departure - dep < SAME_TRIP or dep.date() > (now + timedelta(days=1)).date():
         return None
     target = min(100.0, soc + kwh * max(0.1, efficiency) / capacity_kwh * 100.0)
     if target <= soc + 0.05:
