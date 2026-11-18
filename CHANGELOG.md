@@ -2,6 +2,8 @@
 
 ## Unreleased (0.10.1)
 
+- **Charged the evening before:** if the car leaves tomorrow, comes back and leaves again, the energy for the later trip is charged in the standing time before the first one, not "at the latest" the next afternoon. The limit for several days never cuts this need; the tip says "Charging beforehand" and no "charging needed tomorrow" message is sent. *Deutsch:* Am Vorabend geladen: Fährt das Auto morgen weg, kommt zurück und fährt noch einmal, wird die Energie für die spätere Fahrt in der Standzeit vor der ersten geladen, nicht „spätestens“ am nächsten Nachmittag. Die Grenze für mehrere Tage kappt diesen Bedarf nie; der Tipp sagt „Wird schon vorher geladen“, eine Meldung „Morgen laden nötig“ entfällt.
+- **Weekly full charge can be opened again:** ticking a weekday (or switching the main switch on) opens a week that was marked done, for "once more this week". *Deutsch:* Wöchentliches Volladen lässt sich wieder öffnen: Ein Wochentag (oder der Hauptschalter) von aus auf an öffnet eine als erledigt markierte Woche für „noch einmal diese Woche“.
 - **Latest messages on the dashboard:** the overview lists the latest messages sent to the phone (date, time, text), so a message
   swiped away there can still be read. *Deutsch:* Letzte Hinweise im Dashboard: Die Übersicht zeigt die letzten Meldungen ans Handy (Datum, Uhrzeit, Text); eine dort weggeklickte Meldung bleibt so lesbar.
 - **Settings as full-width tiles:** on a phone the names in the settings list were cut off; each setting is now a tile with the
