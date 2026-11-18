@@ -49,7 +49,7 @@ from .horizon import Trip, horizon_plan, with_calendar
 from .messages import ahead_text, notice_text
 from .need import MIN_SAMPLES, MODE_FLOOR, MODE_PLUS, Need, compute_need
 from .const import DEFAULT_RESERVE_MODE, RESERVE_AT, V_DAILY_CAP, V_DAYS_AHEAD, V_RESERVE_MODE
-from . import voraus
+from . import voraus, vorabend
 from .startwerte import charge_efficiency
 from .notice import Notice, ahead_key, check_ahead, check_ready, dedupe_key, remember_sent, reminder_key, should_check
 from .plan import make_plan
@@ -144,6 +144,7 @@ class Vehicle:
     weekly_hold: datetime | None = None      # the departure the full charge counted for; kept past midnight (restored with the switch)
     weekly_hold_day: date | None = None      # the chosen day of that kept full charge
     need_must: Need | None = None            # the need of the next trip alone (warning, promise and safety check use this one)
+    pre_evening: dict | None = None          # tomorrow's later trip charged the evening before (vorabend.py): kwh, target, by
     ahead: dict | None = None                # charging for several days: must, comfort, sun left out, fill running (voraus.py)
     plug_share_cache: tuple | None = None    # ((hour, number of plug-ins, plugged now), share per weekday and hour)
     promise: Any = None                      # safety check: the highest planned target for the coming departure (sicherheit.py)
@@ -1054,7 +1055,8 @@ class Plugwhen:
                 if variant == "trip":
                     # a charge ahead cut to what fits: the wallbox gets the whole wish and charges as much as it can
                     want = (v.ahead or {}).get("wanted_kwh") or (v.need.charge_kwh if v.need else None)
-                    ts = trip_settings(want, v.departure, now, caps.get("trip_energy_unit"))
+                    by = dt_util.parse_datetime(str((v.pre_evening or {}).get("by") or "")) or v.departure
+                    ts = trip_settings(want, by, now, caps.get("trip_energy_unit"))
                     if ts:
                         mine = self._direct.setdefault(v.sub_id, {})
                         kwh, soc = want, v.soc   # as planned now: a computation during a slow command must not mix in
@@ -1932,7 +1934,11 @@ class Plugwhen:
         self._weekly_full(v, now, avail)
         v.need_must = v.need   # the next trip alone (with the weekly full charge): what is promised and warned about
         self._look_ahead(v, now, avail, max_kw)
+        v.horizon = self._horizon(v, now, avail, max_kw)
+        self._evening_before(v, now)
         plan_departure = v.departure or (vl.evening(v.weekly_day, now.tzinfo) if v.weekly_active and v.weekly_day else None)
+        if v.pre_evening:   # charged by the departure the car has enough for, not by the later one it is needed for
+            plan_departure = dt_util.parse_datetime(v.pre_evening["by"]) or plan_departure
         pref = self._pref_kw(v, max_kw)
         own_pref = float(v.cfg.get(V_CHARGE_PREF, DEFAULT_CHARGE_PREF))
         early = not self._peak_matters()   # where peaks cost nothing: charge as soon as plugged in (a slow car has the whole night)
@@ -1944,7 +1950,6 @@ class Plugwhen:
                 pref_kw=pref, others_kw=others, blocked=blocked, pref_kw2=own_pref if own_pref < pref else None, early=early)
 
         v.charge_plan = self._fit_ahead(v, plan_for)
-        v.horizon = self._horizon(v, now, avail, max_kw)
         hours = (v.departure - now).total_seconds() / 3600.0 if v.departure else None
         planned = v.charge_plan["planned_kwh"] if v.charge_plan["status"] == "planned" else None
         v.notice = check_ready(   # the next trip alone: nobody is told to plug in for the days after it
@@ -2057,6 +2062,23 @@ class Plugwhen:
         if a.target_soc > v.need.target_soc + 0.05:
             charge = max(0.0, (a.target_soc - v.soc) / 100.0 * capacity) / max(0.1, eff)
             v.need = replace(v.need, target_soc=a.target_soc, charge_kwh=round(charge, 1), source="ahead")
+
+    def _evening_before(self, v: Vehicle, now: datetime) -> None:
+        """Tomorrow's later trip (after the car came back) is charged now, in the standing time before the first trip (vorabend.py).
+        Raises the need (source "evening_before"); the promise, the warning and the everyday limit are not touched."""
+        v.pre_evening = None
+        if v.soc is None or v.need is None or v.departure is None:
+            return
+        capacity = float(v.cfg.get(V_CAPACITY) or 60.0)
+        have = max(0.0, v.need.charge_kwh or 0.0)
+        e = vorabend.evening_before(now, v.horizon, v.soc, capacity, self.efficiency_of(v), v.plugged, have)
+        if e is None:
+            return
+        v.pre_evening = e.as_dict()
+        total = have + e.kwh
+        target = min(100.0, v.soc + total * max(0.1, self.efficiency_of(v)) / capacity * 100.0)
+        if target > v.need.target_soc + 0.05:
+            v.need = replace(v.need, target_soc=round(target, 1), charge_kwh=round(total, 1), source="evening_before")
 
     @staticmethod
     def _weekly_applies(v: Vehicle, now: datetime, departure: datetime | None) -> bool:
@@ -2230,7 +2252,7 @@ class Plugwhen:
         if not services or not v.notice_enabled or v.horizon is None:
             return
         a = check_ahead(v.horizon, now, float(v.cfg.get(V_NOTIFY_HOUR, DEFAULT_NOTIFY_HOUR)))
-        if a is None:
+        if a is None or (a.kind == "charge" and v.pre_evening):   # charged in the standing time before: no heads-up needed
             return
         key = ahead_key(a)
         if key in self._sent.setdefault(v.sub_id, []):

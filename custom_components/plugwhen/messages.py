@@ -26,6 +26,7 @@ TEXTS = {
         "ahead_title": "{name}: morgen laden",
         "ahead_charge": "Morgen ({day}) wird Laden nötig: für die Abfahrt {dep_day} {dep} fehlen {kwh} kWh. Spätestens ab {start_pref} mit {pref} kW, mit voller Leistung ab {start}.",
         "ahead_charge_nostart": "Morgen ({day}) wird Laden nötig: für die Abfahrt {dep_day} {dep} fehlen {kwh} kWh.",
+        "evening_before": "Wird schon vorher geladen: {kwh} kWh bis {by_day} {by}, damit es auch für die spätere Abfahrt {dep_day} {dep} reicht.",
         "ahead_sun": "Morgen ({day}) lohnt Vorladen mit Sonne: von {from} bis {to} Uhr etwa {kwh} kWh. Das ersetzt Netzstrom vor der Abfahrt {dep_day} {dep}.",
         "ahead_sun_today": "Heute lohnt Vorladen mit Sonne: von {from} bis {to} Uhr etwa {kwh} kWh. Das ersetzt Netzstrom vor der Abfahrt {dep_day} {dep}.",
         "weekdays": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
@@ -45,6 +46,7 @@ TEXTS = {
         "ahead_title": "{name}: charge tomorrow",
         "ahead_charge": "Tomorrow ({day}) charging will be needed: {kwh} kWh are missing for the departure {dep_day} {dep}. Latest start {start_pref} at {pref} kW, at full power {start}.",
         "ahead_charge_nostart": "Tomorrow ({day}) charging will be needed: {kwh} kWh are missing for the departure {dep_day} {dep}.",
+        "evening_before": "Charging beforehand: {kwh} kWh by {by_day} {by}, so that it also lasts for the later departure {dep_day} {dep}.",
         "ahead_sun": "Tomorrow ({day}) it pays to charge ahead with the sun: from {from} to {to} about {kwh} kWh. That replaces grid energy before the departure {dep_day} {dep}.",
         "ahead_sun_today": "Today it pays to charge ahead with the sun: from {from} to {to} about {kwh} kWh. That replaces grid energy before the departure {dep_day} {dep}.",
         "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -96,3 +98,14 @@ def ahead_text(language: str, a: Ahead, name: str, pref_kw: float | None = None,
     values.update(start=when(a.latest_start), start_pref=when(a.latest_start_pref))
     key = "ahead_charge" if a.latest_start is not None and a.latest_start_pref is not None else "ahead_charge_nostart"
     return t["ahead_title"].format(**values), t[key].format(**values)
+
+
+def evening_text(language: str, pre: dict, name: str = "") -> str:
+    """The tip when tomorrow's later trip is charged in the standing time before (vorabend.py)."""
+    from datetime import datetime as _dt
+
+    t = TEXTS["de" if (language or "").lower().startswith("de") else "en"]
+    wd = t["weekdays"]
+    by, dep = _dt.fromisoformat(pre["by"]), _dt.fromisoformat(pre["for_departure"])
+    return t["evening_before"].format(name=name, kwh=f"{float(pre['kwh']):.1f}", by_day=wd[by.weekday()], by=by.strftime("%H:%M"),
+                                      dep_day=wd[dep.weekday()], dep=dep.strftime("%H:%M"))

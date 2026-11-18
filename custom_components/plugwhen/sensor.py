@@ -15,7 +15,7 @@ from . import PlugwhenEntry
 from .charts import (chart_habit, chart_horizon, chart_learning, chart_plan, chart_plugs, chart_potential, chart_shadow,
                      chart_sun_windows)
 from .evcc_plan import evcc_plan
-from .messages import ahead_text
+from .messages import ahead_text, evening_text
 from .notice import tip_ahead
 from .sources import data_sources
 from .const import LEARNING_STATES, PLAN_STATES, POTENTIAL_STATES, READINESS_STATES, WOULD_STATES
@@ -172,6 +172,7 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             "evcc_plan": self._evcc_plan(),
             # the heads-up of the notification as text (today's sun window or tomorrow), also without a notify service
             "tip": self._tip(),
+            "evening_before": v.pre_evening,
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
             "sun_chart": chart_sun_windows(v.horizon, dt_util.now(), self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),
@@ -185,6 +186,8 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             a = tip_ahead(v.horizon, now)
             if a is None:
                 return None
+            if a.kind == "charge" and v.pre_evening:   # charged in the standing time before: nothing to do tomorrow
+                return evening_text(self.hass.config.language, v.pre_evening, v.name)
             return ahead_text(self.hass.config.language, a, v.name, float(v.cfg.get("charge_kw_pref") or 4.0), today=now.date())[1]
         except Exception:  # noqa: BLE001 - a tip must never break the plan sensor
             return None

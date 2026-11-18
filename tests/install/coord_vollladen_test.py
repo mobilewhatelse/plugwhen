@@ -133,6 +133,78 @@ class WeeklyFullTests(unittest.TestCase):
         self.assertLess(ahead["target_soc"], 100.0)
 
 
+class EveningBeforeCoordinatorTests(unittest.TestCase):
+    """Field test 18.11.2026: 81 %, everyday limit 80 %, second trip tomorrow evening needs 2.3 kWh -> charged tonight."""
+
+    def _car(self):
+        v = car(81.0, departure=datetime(2026, 11, 19, 20, 0, tzinfo=TZ))
+        v.weekly_full, v.plugged = False, True
+        v.cfg["capacity_kwh"] = 66
+        v.need = Need(km=165, kwh=0, target_soc=67.3, charge_kwh=0.0, reachable=True, source="calendar")
+        v.horizon = {"lasts_until": "2026-11-19T07:00:00+01:00",
+                     "first_need": {"departure": "2026-11-19T20:00:00+01:00", "window_start": "2026-11-19T13:27:30+01:00",
+                                    "need_kwh": 2.3, "covered_by_sun": False}}
+        return v
+
+    def test_need_raised_tonight_not_cut_by_the_limit(self):
+        v = self._car()
+        bare()._evening_before(v, datetime(2026, 11, 18, 19, 10, tzinfo=TZ))
+        self.assertEqual(v.need.source, "evening_before")
+        self.assertGreater(v.need.target_soc, 83.0)
+        self.assertAlmostEqual(v.need.charge_kwh, 2.3)
+        self.assertEqual(v.pre_evening["by"], "2026-11-19T07:00:00+01:00")
+
+    def test_nothing_when_unplugged(self):
+        v = self._car()
+        v.plugged = False
+        bare()._evening_before(v, datetime(2026, 11, 18, 19, 10, tzinfo=TZ))
+        self.assertIsNone(v.pre_evening)
+        self.assertEqual(v.need.source, "calendar")
+
+
+class WeeklyReopenTests(unittest.TestCase):
+    """Field test 18.11.2026: 'done this week' could not be opened again; ticking a day (or the main switch) does."""
+
+    def _switch(self, cls, *args):
+        from custom_components.plugwhen import switch as sw
+
+        recomputed = []
+
+        class Plug:
+            async def async_recompute(self, vehicle):
+                recomputed.append(vehicle)
+
+        s = getattr(sw, cls).__new__(getattr(sw, cls))
+        s.vehicle, s.plug = car(99.0), Plug()
+        for k, val in zip(("weekday",), args):
+            s.weekday = val
+        s.async_write_ha_state = lambda: None
+        s.vehicle.weekly_done = "2026-W47"
+        return s, recomputed
+
+    def test_ticking_a_day_reopens_the_week(self):
+        import asyncio
+
+        s, recomputed = self._switch("WeeklyDaySwitch", 2)
+        asyncio.run(s.async_turn_on())
+        self.assertIsNone(s.vehicle.weekly_done)
+        self.assertEqual(len(recomputed), 1)
+
+    def test_unticking_a_day_keeps_it_done(self):
+        import asyncio
+
+        s, _ = self._switch("WeeklyDaySwitch", 2)
+        asyncio.run(s.async_turn_off())
+        self.assertEqual(s.vehicle.weekly_done, "2026-W47")
+
+    def test_main_switch_on_reopens_the_week(self):
+        import asyncio
+
+        s, _ = self._switch("WeeklyFullSwitch")
+        asyncio.run(s.async_turn_on())
+        self.assertIsNone(s.vehicle.weekly_done)
+
+
 SUN_EVENING = datetime(2026, 11, 22, 18, 50, tzinfo=TZ)
 AFTER_MIDNIGHT = datetime(2026, 11, 23, 0, 2, tzinfo=TZ)
 

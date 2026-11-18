@@ -116,6 +116,7 @@ class WeeklyDaySwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         self._set(True)
+        self.vehicle.weekly_done = None   # the user ticks a day: "once more this week" opens the week again
         self.async_write_ha_state()
         await self.plug.async_recompute(self.vehicle)
 
@@ -197,6 +198,7 @@ class WeeklyFullSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         self.vehicle.weekly_full = True
+        self.vehicle.weekly_done = None   # switched on by the user: a done week is open again
         self.async_write_ha_state()
         await self.plug.async_recompute(self.vehicle)
 
