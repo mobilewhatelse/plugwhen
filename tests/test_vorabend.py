@@ -161,5 +161,55 @@ class WholeNightTests(unittest.TestCase):
         self.assertIsNone(e)
 
 
+class SameDayTests(unittest.TestCase):
+    """Week replay 18.11.2026, with the real look-ahead: only a later trip of the SAME day as the first one is charged ahead, all
+    of them count, and the deadline is the first departure."""
+
+    CAP, CONS, EFF = 66.0, 0.25, 0.9
+    THU7, THU20 = datetime(2026, 11, 19, 7, 0, tzinfo=TZ), datetime(2026, 11, 19, 20, 0, tzinfo=TZ)
+    FRI7 = datetime(2026, 11, 20, 7, 0, tzinfo=TZ)
+
+    def _e(self, now, soc, trips, have=0.0):
+        h = horizon.horizon_plan(now, soc / 100.0 * self.CAP, self.CAP, self.CONS, trips, None, 11.0, efficiency=self.EFF, pref_kw=4.0)
+        return vb.evening_before(now, h, soc, self.CAP, self.EFF, True, have)
+
+    def test_a_trip_of_the_next_day_is_not_charged_ahead(self):
+        # Thursday afternoon, evening trip covered, Friday morning needs more: that is the night at home, not now
+        now = datetime(2026, 11, 19, 16, 0, tzinfo=TZ)
+        self.assertIsNone(self._e(now, 70.0, [horizon.Trip(self.THU20, 65, 165), horizon.Trip(self.FRI7, 27, 200)]))
+
+    def test_no_rolling_night_after_night(self):
+        # after midnight, first trip Saturday 13:00 covered, Sunday needs more: not now
+        now = datetime(2026, 11, 21, 0, 0, tzinfo=TZ)
+        sat13, sat20 = datetime(2026, 11, 21, 13, 0, tzinfo=TZ), datetime(2026, 11, 21, 20, 0, tzinfo=TZ)
+        sun14 = datetime(2026, 11, 22, 14, 0, tzinfo=TZ)
+        e = self._e(now, 75.0, [horizon.Trip(sat13, 33.5, 133), horizon.Trip(sat20, 52.8, 152.8), horizon.Trip(sun14, 13, 200)])
+        self.assertTrue(e is None or e.for_departure.date() == sat13.date(), e)
+
+    def test_a_small_need_of_the_first_trip_does_not_hide_the_evening(self):
+        # 55 %: the morning trip needs 0.2 kWh, the evening trip much more - before, nothing was charged for the evening
+        now = datetime(2026, 11, 18, 17, 0, tzinfo=TZ)
+        e = self._e(now, 55.0, [horizon.Trip(self.THU7, 41.5, 141.5), horizon.Trip(self.THU20, 65, 165, 65)])
+        self.assertIsNotNone(e)
+        self.assertEqual(e.by, self.THU7)
+        self.assertEqual(e.for_departure, self.THU20)
+        after_morning = e.target_soc - 41.5 * self.CONS / self.CAP * 100.0
+        self.assertGreaterEqual(after_morning, 165 * self.CONS / self.CAP * 100.0 - 1.0)
+
+    def test_deadline_is_the_first_departure_also_when_two_are_covered(self):
+        now = datetime(2026, 11, 18, 22, 0, tzinfo=TZ)
+        noon = datetime(2026, 11, 19, 12, 0, tzinfo=TZ)
+        e = self._e(now, 60.0, [horizon.Trip(self.THU7, 10, 110), horizon.Trip(noon, 10, 110), horizon.Trip(self.THU20, 80, 180)])
+        self.assertIsNotNone(e)
+        self.assertEqual(e.by, self.THU7)
+
+    def test_never_more_than_the_battery_takes(self):
+        now = datetime(2026, 11, 18, 22, 0, tzinfo=TZ)
+        e = self._e(now, 90.0, [horizon.Trip(self.THU7, 40, 264), horizon.Trip(self.THU20, 60, 264)])
+        self.assertTrue(e is None or e.target_soc <= 100.0)
+        if e is not None:
+            self.assertLessEqual(e.kwh, 10.0 / 100.0 * self.CAP / self.EFF + 0.1)
+
+
 if __name__ == "__main__":
     unittest.main()

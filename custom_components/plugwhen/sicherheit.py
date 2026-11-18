@@ -21,6 +21,8 @@ from datetime import datetime, timedelta
 LEAD_H = 3.0            # the check starts this many hours before a departure
 MIN_KWH = 0.5           # less missing energy is no reason to act
 TIGHT = 0.6             # missing energy above this share of what still fits into the time left: charge now
+TIGHT_TRIP = 0.8        # ... for a wallbox that was given the departure and the energy ("next trip"): it starts late on
+                        # purpose, so the check waits longer before it takes over (18.11.2026: an alarm every such night)
 STALL_MIN = 10          # a planned window without charging this long: charge now
 DROP_PCT = 2.0          # the planned target fell this much below the promise: charge now
 DONE_MARGIN = 1.0       # the promise counts as kept this many percent below it (cars often stop at 99 %; the weekly full
@@ -70,8 +72,16 @@ def missing_kwh(target: float, soc: float | None, capacity_kwh: float, efficienc
 
 
 def check(now: datetime, promise: Promise | None, planned_target: float | None, soc: float | None, *, plugged: bool | None,
-          charging: bool, stalled_min: float, capacity_kwh: float, efficiency: float, max_kw: float | None) -> Alarm | None:
-    """None, or why the car must charge now. `stalled_min` = minutes a planned window has been running without charging."""
+          charging: bool, stalled_min: float, capacity_kwh: float, efficiency: float, max_kw: float | None,
+          can_speed_up: bool = True, trip: bool = False) -> Alarm | None:
+    """None, or why the car must charge now. `stalled_min` = minutes a planned window has been running without charging.
+
+    `can_speed_up` = switching to "charge now" would change something (False: the wallbox charges from the grid already, in its
+    grid or next-trip mode). `trip` = the wallbox was given the departure and the energy and decides itself when to charge:
+    the plan's windows are a proposal there, so a window without charging is no stall, and "tight" waits longer.
+
+    A wallbox that charges as fast as it is allowed to is left alone and nothing is told: switching would gain nothing (wish
+    of the user 18.11.2026: "if it charges, no message")."""
     if promise is None or plugged is False or soc is None:
         return None
     hours = (promise.departure - now).total_seconds() / 3600.0
@@ -88,9 +98,12 @@ def check(now: datetime, promise: Promise | None, planned_target: float | None, 
 
     if planned_target is not None and planned_target < promise.target - DROP_PCT:
         return alarm("target_fell")
-    if not charging and stalled_min >= STALL_MIN:
+    if charging and not can_speed_up:
+        return None
+    if not charging and not trip and stalled_min >= STALL_MIN:
         return alarm("stalled")
-    if max_kw and need >= TIGHT * hours * max_kw:
+    tight = TIGHT_TRIP if trip and not charging else TIGHT
+    if max_kw and need >= tight * hours * max_kw:
         return alarm("tight")
     return None
 

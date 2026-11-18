@@ -108,6 +108,31 @@ class WeeklyFullTests(unittest.TestCase):
         self.assertGreater(v.need.km, 100.0)
         self.assertAlmostEqual(v.need.kwh, 100.0 / 100.0 * float(v.cfg.get("capacity_kwh") or 60.0), places=1)
 
+    def test_only_the_first_departure_gets_the_full_target(self):
+        # 18.11.2026: full by Thu 07:00 (learned) and a calendar trip at 20:00 the same day; the full target was kept for both,
+        # so after the morning trip the evening one "needed" the battery full again: "charging needed tomorrow, 11 kWh"
+        v = car(82.0, departure=MON_MORNING)
+        v.departure_source, v.consumption = "entity", 0.2   # the morning departure (learned live; the test car has no model)
+        evening = MON_MORNING + timedelta(hours=13)
+        v.trips = [{"departure": evening.isoformat(), "km": 65.0, "range_km": 100.0}]
+        p = bare()
+        p._weekly_full(v, FRI_EVENING, None)
+        v.weekly_hold = evening   # kept for the later departure (as live: the hold came from before the departure moved)
+        trips = {t.departure: t for t in p._trips(v, FRI_EVENING, 60.0)}
+        self.assertAlmostEqual(trips[MON_MORNING].km_target, 300.0)
+        self.assertLess(trips[evening].km_target, 300.0)
+
+    def test_the_full_target_goes_to_the_calendar_trip_when_it_comes_first(self):
+        v = car(50.0)
+        v.departure_source, v.consumption = "calendar", 0.2
+        early = MON_MORNING - timedelta(hours=1)
+        v.trips = [{"departure": early.isoformat(), "km": 59.0, "range_km": 100.0}]
+        bare()._weekly_full(v, FRI_EVENING, None)
+        trips = {t.departure: t for t in bare()._trips(v, FRI_EVENING, 60.0)}
+        self.assertAlmostEqual(trips[early].km_target, 300.0)
+        later = [t for d, t in trips.items() if d > early]
+        self.assertTrue(all(t.km_target < 300.0 for t in later))
+
     def test_look_ahead_unchanged_when_off(self):
         v = car(50.0)
         v.weekly_full = False

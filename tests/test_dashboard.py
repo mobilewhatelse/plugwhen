@@ -239,5 +239,16 @@ class DashboardTest(unittest.TestCase):
             self.assertNotIn("Passt dazu", json.dumps(build_views(car, "de", waechter=state), ensure_ascii=False))
 
 
+
+class PlanProposalTests(unittest.TestCase):
+    """A wallbox with a "next trip" mode decides itself when to charge: the plan card says the windows are a proposal."""
+
+    def test_the_note_is_in_the_shipped_dashboard_in_both_languages(self):
+        for lang, word in (("de", "Vorschlag"), ("en", "proposal")):
+            text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], lang), ensure_ascii=False)
+            self.assertIn(word, text)
+            self.assertIn("'wallbox_decides'", text)   # only shown for such a wallbox (attribute of the plan sensor)
+
+
 if __name__ == "__main__":
     unittest.main()

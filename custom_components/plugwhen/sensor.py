@@ -173,6 +173,8 @@ class ChargePlanSensor(PlugwhenEntity, SensorEntity):
             # the heads-up of the notification as text (today's sun window or tomorrow), also without a notify service
             "tip": self._tip(),
             "evening_before": v.pre_evening,
+            # a wallbox with a "next trip" mode gets the departure and the energy and decides itself when to charge
+            "wallbox_decides": v.mode == "direct" and self.plug.wallbox_control(v).get("variant") == "trip",
             "horizon": v.horizon, "horizon_chart": chart_horizon(v.horizon, self.hass.config.language),
             "sun_chart": chart_sun_windows(v.horizon, dt_util.now(), self.hass.config.language),
             "chart": chart_plan(p, dt_util.now(), float(v.cfg.get("charge_kw_max") or 11.0), self.hass.config.language),

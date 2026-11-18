@@ -193,6 +193,51 @@ class SafetyCoordinatorTests(unittest.TestCase):
         self.assertIsNone(v.safety)
         self.assertEqual(p.hass.services.calls, [])
 
+    def _next_trip_night(self, mode_state: str, charging: bool, hours: float = 2.97, missing_kwh: float = 20.7):
+        soc = 100.0 - missing_kwh * 0.9 / 66.0 * 100.0
+        p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": mode_state}), car("direct", soc=soc, planned=100.0, charging=charging)
+        now = MON_7 - timedelta(hours=hours)
+        act(p, v, now)
+        return p, v
+
+    def test_night_of_17_11_wallbox_charges_in_next_trip_no_switch_no_message(self):
+        p, v = self._next_trip_night("NextTrip", charging=True)
+        self.assertIsNone(v.safety)
+        self.assertEqual(phone(p) + in_ha(p), [])
+        self.assertNotIn(("select.wb_mode", "Default"), p.written)
+
+    def test_next_trip_not_started_yet_three_hours_before_no_alarm(self):
+        p, v = self._next_trip_night("NextTrip", charging=False)
+        self.assertIsNone(v.safety)
+        self.assertEqual(phone(p) + in_ha(p), [])
+
+    def test_next_trip_never_started_charges_now_and_tells(self):
+        p, v = self._next_trip_night("NextTrip", charging=False, hours=2.2)
+        self.assertEqual(v.safety["reason"], "tight")
+        self.assertIn(("select.wb_mode", "Default"), p.written)
+        self.assertEqual(len(phone(p)), 1)
+
+    def test_charging_slowly_with_the_sun_is_taken_over(self):
+        p, v = self._next_trip_night("Eco", charging=True, hours=2.0)
+        self.assertEqual(v.safety["reason"], "tight")
+        self.assertIn(("select.wb_mode", "Default"), p.written)
+
+    def test_charging_in_the_grid_mode_already_nothing(self):
+        p, v = self._next_trip_night("Default", charging=True, hours=2.0)
+        self.assertIsNone(v.safety)
+        self.assertEqual(phone(p) + in_ha(p), [])
+
+    def test_speed_up_possible(self):
+        p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct")
+        self.assertTrue(p._speed_up_possible(v))
+        for state in ("NextTrip", "Default"):
+            p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": state}), car("direct")
+            self.assertFalse(p._speed_up_possible(v), state)
+        p, v = plugwhen({"variant": "buttons", "start": "button.start", "stop": "button.stop"}), car("direct")
+        self.assertTrue(p._speed_up_possible(v))
+        p._direct["sub"] = {"started": "2026-11-16T03:00:00+01:00"}
+        self.assertFalse(p._speed_up_possible(v))
+
     def test_all_fine_nothing_happens(self):
         p, v = plugwhen(CAPS_TRIP, {"select.wb_mode": "Eco"}), car("direct", soc=95.0, planned=100.0, charging=True)
         run(p._safety_step(v, AT_4))

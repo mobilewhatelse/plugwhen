@@ -17,9 +17,14 @@ MON_7 = datetime(2026, 11, 16, 7, 0, tzinfo=TZ)
 CAP, EFF, KW = 66.0, 0.9, 11.0
 
 
-def chk(now, promise, planned, soc, charging=False, stalled=0.0, plugged=True):
+def chk(now, promise, planned, soc, charging=False, stalled=0.0, plugged=True, **more):
     return s.check(now, promise, planned, soc, plugged=plugged, charging=charging, stalled_min=stalled,
-                   capacity_kwh=CAP, efficiency=EFF, max_kw=KW)
+                   capacity_kwh=CAP, efficiency=EFF, max_kw=KW, **more)
+
+
+def soc_missing(kwh: float, target: float = 100.0) -> float:
+    """The state of charge at which `kwh` from the wallbox are missing to `target`."""
+    return target - kwh * EFF / CAP * 100.0
 
 
 class PromiseTests(unittest.TestCase):
@@ -93,7 +98,7 @@ class CheckTests(unittest.TestCase):
     def test_tight_time(self):
         # 20 kWh missing, 2 h left at 11 kW = 22 kWh possible: tight
         a = chk(MON_7 - timedelta(hours=2), s.Promise(MON_7, 70.0), 70.0, 70.0 - 20 * EFF / CAP * 100, charging=True)
-        self.assertEqual(a.reason, "tight")
+        self.assertEqual(a.reason, "tight")   # charging, but "charge now" would be faster (e.g. the sun mode)
 
     def test_plenty_of_time_while_charging_is_fine(self):
         self.assertIsNone(chk(MON_7 - timedelta(hours=3), s.Promise(MON_7, 45.0), 45.0, 40.0, charging=True))
@@ -105,6 +110,51 @@ class CheckTests(unittest.TestCase):
 
     def test_after_the_departure_nothing(self):
         self.assertIsNone(chk(MON_7 + timedelta(minutes=5), s.Promise(MON_7, 100.0), 40.0, 28.0))
+
+
+class NextTripTests(unittest.TestCase):
+    """The night of 17./18.11.2026: Wattpilot in "Next Trip", 20.7 kWh missing, departure 07:00. The wallbox started by itself
+    at 04:02 - and 13 seconds later the check switched it to "charge now" and sent a message. It charged all along."""
+
+    AT = MON_7 - timedelta(hours=2, minutes=58)
+    P = s.Promise(MON_7, 100.0)
+
+    def test_that_night_charging_in_next_trip_nothing_happens(self):
+        self.assertIsNone(chk(self.AT, self.P, 100.0, soc_missing(20.7), charging=True, can_speed_up=False, trip=True))
+
+    def test_charging_as_fast_as_allowed_is_left_alone_however_tight(self):
+        # throttled by a peak guard to 6 kW with 25 kWh missing in 2 h: switching would gain nothing, so nothing is told
+        now = MON_7 - timedelta(hours=2)
+        for trip in (True, False):
+            self.assertIsNone(chk(now, s.Promise(MON_7, 100.0), 100.0, soc_missing(25.0), charging=True, can_speed_up=False, trip=trip))
+
+    def test_charging_slowly_in_the_sun_mode_is_still_taken_over(self):
+        now = MON_7 - timedelta(hours=2)
+        a = chk(now, s.Promise(MON_7, 100.0), 100.0, soc_missing(20.0), charging=True, can_speed_up=True, trip=True)
+        self.assertEqual(a.reason, "tight")
+
+    def test_not_started_yet_is_no_alarm_at_three_hours(self):
+        # "next trip" starts late on purpose: 20.7 kWh in 2 h 58 min at 11 kW is 63 % of the time left
+        self.assertIsNone(chk(self.AT, self.P, 100.0, soc_missing(20.7), charging=False, can_speed_up=False, trip=True))
+
+    def test_not_started_when_it_gets_really_tight_charges_now(self):
+        now = MON_7 - timedelta(hours=2, minutes=15)   # 20.7 kWh of 24.75 possible = 84 %
+        a = chk(now, self.P, 100.0, soc_missing(20.7), charging=False, can_speed_up=False, trip=True)
+        self.assertEqual(a.reason, "tight")
+
+    def test_other_wallboxes_keep_the_earlier_threshold(self):
+        a = chk(self.AT, self.P, 100.0, soc_missing(20.7), charging=False, trip=False)
+        self.assertEqual(a.reason, "tight")
+
+    def test_a_plan_window_without_charging_is_no_stall_for_next_trip(self):
+        now = MON_7 - timedelta(hours=2)
+        self.assertIsNone(chk(now, s.Promise(MON_7, 45.0), 45.0, 40.0, charging=False, stalled=30, trip=True))
+        self.assertEqual(chk(now, s.Promise(MON_7, 45.0), 45.0, 40.0, charging=False, stalled=30, trip=False).reason, "stalled")
+
+    def test_a_fallen_target_is_caught_also_while_charging(self):
+        # Plugwhen's own target fell: the wallbox was given too little energy and will stop early, charging or not
+        a = chk(self.AT, self.P, 40.0, 28.0, charging=True, can_speed_up=False, trip=True)
+        self.assertEqual(a.reason, "target_fell")
 
 
 class DoneTests(unittest.TestCase):

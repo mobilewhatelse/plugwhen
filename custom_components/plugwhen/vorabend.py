@@ -36,28 +36,57 @@ def _parse(value: Any) -> datetime | None:
         return None
 
 
+def _same_day(now: datetime, days: list[dict]) -> tuple[datetime, datetime, float] | None:
+    """From the look-ahead's rows: the first departure, the last later departure of the SAME day that needs energy, and the wallbox
+    energy for all of them (the first trip's own need included; the caller takes off what the plan charges anyway).
+
+    Only trips of the same day: the window before a trip of another day is a night at home (normal charging, or the look-ahead with
+    its everyday limit); without this the charge rolled on night after night and filled the battery to 95-100 % for trips two days
+    later (week replay 18.11.2026). All later trips of the day count, also when the first one needs a little itself: a first need of
+    0.2 kWh hid the evening trip, the car left in the evening with 40 % instead of 62 % (week replay 18.11.2026)."""
+    by = _parse(days[0].get("departure"))
+    if by is None or by <= now or by.date() > (now + timedelta(days=1)).date():
+        return None   # the first trip is past, or not tomorrow yet (that is the look-ahead's job)
+    total, grid, last = float(days[0].get("need_kwh") or 0.0), 0.0, None
+    for d in days[1:]:
+        dep = _parse(d.get("departure"))
+        if dep is None or dep.date() != by.date():
+            break
+        k = float(d.get("need_kwh") or 0.0)
+        total += k
+        grid += float(d.get("grid_kwh") if d.get("grid_kwh") is not None else k)
+        if k > 0:
+            last = dep
+    if last is None or grid < MIN_KWH:
+        return None   # nothing later that day, or the sun at home brings it
+    return by, last, total
+
+
 def evening_before(now: datetime, horizon: dict | None, soc: float | None, capacity_kwh: float, efficiency: float,
                    plugged: bool | None, have_kwh: float = 0.0) -> EveningBefore | None:
     """The charge for tomorrow's later trip, or None. `horizon` = result of horizon.horizon_plan; `have_kwh` = what the plan
     for the next trip already charges (that part is not charged twice)."""
     if not horizon or soc is None or capacity_kwh <= 0 or plugged is False:
         return None
-    need = horizon.get("first_need")
-    by = _parse(horizon.get("lasts_until"))
-    if not need or by is None or need.get("covered_by_sun"):
-        return None   # the first trip is the next one (the normal plan), or the sun at home brings it
-    start, dep = _parse(need.get("window_start")), _parse(need.get("departure"))
-    kwh = float(need.get("need_kwh") or 0.0)
-    if start is None or dep is None or kwh < MIN_KWH:
-        return None
-    if by <= now or dep <= by:
-        return None   # the first trip is past
-    # no "only from tomorrow" and no "not shortly before the first trip": what holds in the evening must hold all night, up
-    # to the departure (review 19.11.2026: after midnight the need arose "today" and the charge was dropped; two hours
-    # before the first trip the deadline jumped back to the later one)
-    if start.date() > (now + timedelta(days=1)).date():
-        return None   # only what is needed tomorrow, not the day after (that is the look-ahead's job)
-    kwh = max(0.0, kwh - max(0.0, have_kwh))
+    days = horizon.get("days") or []
+    if days:
+        found = _same_day(now, days)
+        if found is None:
+            return None
+        by, dep, kwh = found
+    else:   # an older look-ahead without its rows: the first need only
+        need = horizon.get("first_need")
+        by = _parse(horizon.get("lasts_until"))
+        if not need or by is None or need.get("covered_by_sun"):
+            return None
+        start, dep = _parse(need.get("window_start")), _parse(need.get("departure"))
+        kwh = float(need.get("need_kwh") or 0.0)
+        if (start is None or dep is None or by <= now or dep <= by or dep.date() != by.date()
+                or start.date() > (now + timedelta(days=1)).date()):
+            return None
+    # never more than the battery takes before the first trip: a later trip that needs it full again cannot be charged ahead
+    room = max(0.0, 100.0 - soc) / 100.0 * capacity_kwh / max(0.1, efficiency)
+    kwh = min(kwh, room) - max(0.0, have_kwh)
     if kwh < MIN_KWH:
         return None
     target = min(100.0, soc + kwh * max(0.1, efficiency) / capacity_kwh * 100.0)

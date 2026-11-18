@@ -1139,6 +1139,22 @@ class Plugwhen:
         variant = caps.get("variant")
         return bool((variant in ("trip", "mode") and caps.get("mode_grid")) or (variant == "buttons" and caps.get("start")))
 
+    def _speed_up_possible(self, v: Vehicle) -> bool:
+        """Would "charge now" change anything? Not if the wallbox is in its grid or next-trip mode already (it then charges as
+        fast as it is allowed to), Plugwhen pressed start, or evcc's loadpoint is on "now"."""
+        if v.mode == "evcc":
+            key = v.cfg.get(V_EVCC_VEHICLE)
+            lp = loadpoint_index(self.evcc_state, key) if key and self.evcc_state is not None else None
+            return not (lp and lp[1] == "now")
+        caps = self.wallbox_control(v)
+        variant = caps.get("variant")
+        if variant in ("trip", "mode") and caps.get("mode"):
+            st = self.hass.states.get(caps["mode"])
+            return not (st is not None and st.state in {x for x in (caps.get("mode_grid"), caps.get("mode_trip")) if x})
+        if variant == "buttons":
+            return not self._direct.get(v.sub_id, {}).get("started")
+        return True
+
     async def _safety_step(self, v: Vehicle, now: datetime) -> None:
         """Safety check before every departure: from three hours before, compare the promise with reality; if the car would not
         be charged, switch to "charge now" (when Plugwhen controls the wallbox) and tell the user why."""
@@ -1151,7 +1167,9 @@ class Plugwhen:
         alarm = sicherheit.check(
             now, v.promise, v.need.target_soc if v.need else None, v.soc, plugged=v.plugged, charging=v.charging,
             stalled_min=stalled, capacity_kwh=float(v.cfg.get(V_CAPACITY) or 60.0),
-            efficiency=self.efficiency_of(v), max_kw=float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX)))
+            efficiency=self.efficiency_of(v), max_kw=float(v.cfg.get(V_CHARGE_MAX, DEFAULT_CHARGE_MAX)),
+            can_speed_up=self._speed_up_possible(v),
+            trip=v.mode == "direct" and self.wallbox_control(v).get("variant") == "trip")
         if alarm is None:
             return
         departure = v.promise.departure
@@ -2142,8 +2160,6 @@ class Plugwhen:
             need = compute_need(p, v.reserve_km, None, capacity, v.consumption, learn_km=v.learn_km, mode=self._need_mode(v))
             km = need.km
             high = p.km_high if v.learn_km and p.samples >= MIN_SAMPLES and p.km_high is not None else None
-            if v.weekly_full and self._weekly_applies(v, now, departure):   # once a week full: the range of the full target
-                km = max(km, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
             return Trip(departure, float(p.km_typical or 0.0), km, high)
 
         out: list[Trip] = []
@@ -2168,13 +2184,21 @@ class Plugwhen:
             after = self._need_mode(v) == MODE_PLUS   # reserve left after the trip: its kilometres plus the reserve
             if t.get("km"):
                 target = max(float(t["km"]) + v.reserve_km, float(t["range_km"])) if after else float(t["range_km"])
-                if v.weekly_full and self._weekly_applies(v, now, d):   # once a week full also for a trip from the calendar
-                    target = max(target, v.weekly_target / 100.0 * capacity / max(0.05, v.consumption))
                 cal.append(Trip(d, float(t["km"]), target, float(t["km"])))
             else:
                 cal.append(trip_for(d, d.weekday()))
         # a calendar trip replaces the learned departure only when it is the same trip (within two hours); calendar trips never replace each other
-        return with_calendar(out, cal)[:HORIZON_TRIPS]
+        trips = with_calendar(out, cal)[:HORIZON_TRIPS]
+        if v.weekly_full:
+            # once a week full: the range of the full target for the FIRST departure it counts for, not for every one after it.
+            # The car is charged full once and then drives; a second trip the same day does not need the battery full again
+            # (18.11.2026: full by Thu 07:00 kept for the calendar trip at 20:00 as well -> "charging needed tomorrow, 11 kWh")
+            full_km = v.weekly_target / 100.0 * capacity / max(0.05, v.consumption)
+            for i, t in enumerate(trips):
+                if self._weekly_applies(v, now, t.departure):
+                    trips[i] = replace(t, km_target=max(t.km_target, full_km))
+                    break
+        return trips
 
     def efficiency_of(self, v: Vehicle) -> float:
         """Share of the wallbox energy that reaches the battery: learned from the own history, else the start value at the power
