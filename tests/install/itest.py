@@ -457,6 +457,19 @@ def main():
             bad.append(f"{c['content'][:50]!r}: {str(body)[-160:]}")
     log(len(cards_md) >= 12 and not bad, f"all {len(cards_md)} markdown cards of the dashboard render in Home Assistant", "; ".join(bad)[:1200])
 
+    # every chart opens full screen (zoom on the phone): a page without login, protected by the installation's random key
+    import re as _re
+    links = sorted(set(_re.findall(r"/api/plugwhen/vollbild/[A-Za-z0-9_-]+/[0-9a-f]{16}", text)))
+    pages = [api("GET", u, token=False) for u in links]
+    shown = sum(1 for sc, body in pages if sc == 200 and "data:image/svg+xml" in str(body))
+    log(len(links) >= 5 and all(sc == 200 and "user-scalable=yes" in str(body) for sc, body in pages) and shown >= 1,
+        "every chart of the dashboard links to a full-screen page that may be zoomed (no login needed)", f"{len(links)} links, {shown} with a chart")
+    if links:
+        base, cid = links[0].rsplit("/", 1)
+        wrong = api("GET", base.rsplit("/", 1)[0] + "/falsch" + "x" * 30 + "/" + cid, token=False)[0]
+        unknown = api("GET", base + "/0000000000000000", token=False)[0]
+        log(wrong == 404 and unknown == 404, "a wrong key or an unknown chart is not found", f"{wrong} {unknown}")
+
     # plug-in times are written down (short flickers under 2 minutes are dropped, the open one counts)
     ok = wait_for(lambda: ((state(rdid)["attributes"].get("plugging") or {}).get("plugged_now") is True), 30)
     plg = state(rdid)["attributes"].get("plugging") or {}
