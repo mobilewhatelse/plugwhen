@@ -457,14 +457,6 @@ def main():
             bad.append(f"{c['content'][:50]!r}: {str(body)[-160:]}")
     log(len(cards_md) >= 12 and not bad, f"all {len(cards_md)} markdown cards of the dashboard render in Home Assistant", "; ".join(bad)[:1200])
 
-    # a tap on a chart opens a subview of the dashboard with that card over the whole width (no reload of the app)
-    import re as _re
-    subs = [v for v in dash.get("views", []) if v.get("subview")]
-    paths = {v.get("path") for v in subs}
-    linked = set(_re.findall(r'href=\\"(grafik-[0-9a-f]{16})', text))
-    log(len(subs) >= 4 and linked == paths and all(v.get("type") == "panel" and len(v.get("cards", [])) == 1 for v in subs),
-        "every chart links to its own subview of the dashboard (full width)", f"{len(subs)} subviews, {len(linked)} links")
-
     # plug-in times are written down (short flickers under 2 minutes are dropped, the open one counts)
     ok = wait_for(lambda: ((state(rdid)["attributes"].get("plugging") or {}).get("plugged_now") is True), 30)
     plg = state(rdid)["attributes"].get("plugging") or {}

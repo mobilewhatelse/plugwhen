@@ -137,9 +137,6 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency,
                                    {k: v for k, v in main_ids.items() if v},
                                    waechter=bool(hass.config_entries.async_entries("viertelstunden_waechter")))}
-    from .vollbild import link_charts
-
-    link_charts(config, hass.config.language)   # a tap on a chart opens it over the whole width (held sideways: large)
     text = ha_yaml.dump(config)
     de = (hass.config.language or "").lower().startswith("de")
     hint = ("In ein neues Dashboard einfügen (drei Punkte > Bearbeiten > Raw-Konfigurationseditor):" if de
