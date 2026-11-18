@@ -250,5 +250,18 @@ class PlanProposalTests(unittest.TestCase):
             self.assertIn("'wallbox_decides'", text)   # only shown for such a wallbox (attribute of the plan sensor)
 
 
+class MissingSensorTests(unittest.TestCase):
+    """18.11.2026: right after a restart the dashboard drew before the sensors were back - 'None' has no attribute 'attributes'
+    in the log. Every attribute access must be safe while the entity does not exist."""
+
+    def test_no_bare_attribute_access(self):
+        import re
+
+        ids = {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}
+        text = json.dumps(build_views([{"name": "Car", "ids": ids}], "de"))
+        bare = [m.group(0) for m in re.finditer(r"states\.([a-z_]+\.[a-z0-9_]+)\.attributes(?! if states\.\1 else)", text)]
+        self.assertEqual(bare, [])
+
+
 if __name__ == "__main__":
     unittest.main()

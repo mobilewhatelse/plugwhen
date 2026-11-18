@@ -233,9 +233,10 @@ TEXT = {
 }
 
 
-def _s(entity_id: str) -> str:
-    """Jinja access to the state object (states.domain.object_id)."""
-    return "states." + entity_id
+def _attrs(entity_id: str) -> str:
+    """Jinja access to the attributes; an empty dict while the entity does not exist yet (right after a restart the dashboard
+    draws before the sensors are back: 'None' has no attribute 'attributes' in the log, 18.11.2026)."""
+    return "(states." + entity_id + ".attributes if states." + entity_id + " else {})"
 
 
 def _chart(entity_id: str, attribute: str = "chart") -> str:
@@ -247,7 +248,7 @@ def _chart(entity_id: str, attribute: str = "chart") -> str:
 def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: bool, calendar: str | None = None,
                      evcc: bool = False) -> dict[str, list[dict[str, Any]]]:
     """Graphics first, one short line of text where a number needs words; settings stay on the dashboard."""
-    need = _s(ids["need_charge"]) + ".attributes"
+    need = _attrs(ids["need_charge"])
     status = (
         "{% set at = " + need + " %}"
         f"**{t['soc']}:** {{{{ at.soc if at.soc is not none else '–' }}}} % · "
@@ -261,7 +262,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% set tip = state_attr('" + ids["charge_plan"] + "', 'tip') %}{% if tip %}\n\n**{{ tip }}**{% endif %}"
     )
     pot_line = (
-        "{% set a = " + _s(ids["potential"]) + ".attributes %}"
+        "{% set a = " + _attrs(ids["potential"]) + " %}"
         f"{{% if a.get('saving_spread_per_year') is not none %}}**{t['saving']}:** {{{{ a.saving_spread_per_year | int }}}} {t['per_year']}"
         f"{{% if a.get('saving_spread_vs_guard_per_year') is not none %}}, {{{{ a.saving_spread_vs_guard_per_year | int }}}} {t['vs_guard']}{{% endif %}}{{% endif %}}"
     )
@@ -274,7 +275,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "in_window", "waiting_for_window", "plan_done", "cannot_reach_target", "unknown_soc", "not_plugged", "not_needed", "no_plan")) + "}"
     would_names = "{" + ", ".join(f"'{k}': '{t['w_' + k]}'" for k in ("charge", "pause", "none", "off")) + "}"
     learn_line = (
-        "{% set a = " + _s(ids["would_switch"]) + ".attributes %}{% set st = states('" + ids["would_switch"] + "') %}"
+        "{% set a = " + _attrs(ids["would_switch"]) + " %}{% set st = states('" + ids["would_switch"] + "') %}"
         "{% set rs = " + reasons + " %}{% set wn = " + would_names + " %}"
         f"{{% if st == 'off' %}}{t['lm_off']}{{% else %}}"
         f"**{t['would']}:** {{{{ wn.get(st, st) }}}} · {{{{ rs.get(a.reason, a.reason) if a.reason is defined else '' }}}}"
@@ -283,7 +284,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
     )
     lc_id = ids["learning_check"]
     lc_line = (
-        "{% set a = " + _s(lc_id) + ".attributes %}{% set st = states('" + lc_id + "') %}"
+        "{% set a = " + _attrs(lc_id) + " %}{% set st = states('" + lc_id + "') %}"
         f"{{% if st == 'too_little_data' %}}{t['lc_few_a']} {{{{ a.days }}}} {t['lc_few_b']}{{% else %}}"
         f"**{t['lc_km']}:** {{% if st == 'learning_helps' %}}{t['lc_km_helps']} {{{{ a.gain_points }}}} {t['lc_km_helps_b']}."
         f"{{% else %}}{t['lc_km_same']} ({{{{ a.coverage_reserve_pct }}}} → {{{{ a.coverage_learned_pct }}}} %): {t['lc_km_same_b']}.{{% endif %}}\n\n"
@@ -291,7 +292,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"{{% else %}}{t['lc_dep_none']}{{% endif %}}{{% endif %}}"
     )
     calib_line = (
-        "{% set a = " + _s(ids["charge_plan"]) + ".attributes %}{% set n = " + need + " %}"
+        "{% set a = " + _attrs(ids["charge_plan"]) + " %}{% set n = " + need + " %}"
         "{% if a.solar_deduct_kw is not none %}"
         f"{t['cal_sun']}: {{% if a.solar_factor %}}{t['cal_factor']} {{{{ a.solar_factor }}}} ({t['cal_learned']}){{% else %}}{t['cal_unchecked']}{{% endif %}} · "
         f"{t['cal_deduct']} {{{{ a.solar_deduct_kw }}}} kW ({{{{ {{'learned': '{t['cal_src_learned']}', 'setting': '{t['cal_src_setting']}', 'default': '{t['cal_src_default']}'}}.get(a.solar_deduct_source, '') }}}}) · "
@@ -299,7 +300,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"{{% if a.spread_floor_kw %}} · {t['cal_floor']} {{{{ a.spread_floor_kw }}}} kW{{% endif %}}{{% endif %}}"
     )
     hz_tpl = (
-        "{% set wd = " + t["wd"] + " %}{% set a = " + _s(ids["charge_plan"]) + ".attributes %}{% set h = a.horizon %}"
+        "{% set wd = " + t["wd"] + " %}{% set a = " + _attrs(ids["charge_plan"]) + " %}{% set h = a.horizon %}"
         "{% if h and h.status == 'ok' %}"
         "{% set fn = h.first_need %}"
         "{% if fn %}"
@@ -319,7 +320,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         hz_tpl = hz_tpl.replace(key, text)
     hb_id = ids["habit"]
     habit_line = (
-        "{% set a = " + _s(hb_id) + ".attributes %}"
+        "{% set a = " + _attrs(hb_id) + " %}"
         f"{{% if a.status == 'ok' %}}{t['hb_a']} **{{{{ a.night_share_pct }}}}** {t['hb_b']} **{{{{ a.day_share_pct }}}}**"
         f" {t['hb_c']} **{{{{ a.weekend_share_pct }}}}** {t['hb_d']} **{{{{ a.weekdays_night_share_pct }}}} %**."
         f"{{% else %}}{t['hb_few']}{{% endif %}}"
@@ -367,7 +368,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% else %}" + t["ep_no_evcc"] + "{% endif %}"
     )
     trips_md = (
-        "{% set wd = " + t["wd"] + " %}{% set a = " + _s(ids["charge_plan"]) + ".attributes %}"
+        "{% set wd = " + t["wd"] + " %}{% set a = " + _attrs(ids["charge_plan"]) + " %}"
         "{% if not a.trip_calendar %}" + t["tr_nocal"] + "{% elif a.trips_error %}" + t["tr_err"] + ": {{ a.trips_error }}"
         "{% elif not a.trips %}" + t["tr_none"] + "{% else %}"
         "{% for x in a.trips[:6] %}{% set d = x.departure | as_datetime | as_local %}"
@@ -377,7 +378,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         "{% else %} · " + t["tr_km_none"] + "{% endif %}\n{% endfor %}{% endif %}"
     )
     rd = (
-        "{% set a = " + _s(ids["switch_ready"]) + ".attributes %}{% set checks = a.checks or [] %}"
+        "{% set a = " + _attrs(ids["switch_ready"]) + " %}{% set checks = a.checks or [] %}"
         "{% macro row(checks, key, label, unit) %}{% set x = checks | selectattr('key', 'eq', key) | list | first %}"
         "{% if x %}{{ '✅' if x.ok else '⏳' }} {{ label }}: {{ x.value if x.value is not none else '–' }}"
         "{% if x.need %} / {{ x.need }}{% endif %} {{ unit }}\n\n{% endif %}{% endmacro %}"
