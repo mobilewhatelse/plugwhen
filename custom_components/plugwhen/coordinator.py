@@ -174,6 +174,7 @@ class Plugwhen:
         self.feedback_text = ""
         self._usage: dict[str, Any] = {}
         self._usage_busy = False
+        self._katalog_asked = False   # the note "confirm once" (share_usage_check) is open under Repairs
         # fleet values (flotte.py): {"autos": {sub_id: {"bis", "gemeldet"}}, "schluessel", "gueltig_bis", "modelle", "at"}
         self._fleet: dict[str, Any] = {}
         self._fleet_busy = False
@@ -520,6 +521,10 @@ class Plugwhen:
         Repairs. Not again after an answer or after "ignore"."""
         from homeassistant.helpers import issue_registry as ir
 
+        if rm.katalog_fassung(self.entry.options) > rm.katalog_fassung(self._usage):
+            # agreed in the set-up: kept here as well (the options are only what the set-up and the settings dialog wrote)
+            self._usage["katalog"] = rm.katalog_fassung(self.entry.options)
+            self._evcc_store.async_delay_save(self._evcc_data, 1)
         if "share_usage" in self.entry.options:
             self._usage["gefragt"] = True   # answered in the set-up; a later change of the settings must not ask again
             return
@@ -528,16 +533,58 @@ class Plugwhen:
         ir.async_create_issue(self.hass, DOMAIN, "share_usage_question", is_fixable=True, is_persistent=False,
                               severity=ir.IssueSeverity.WARNING, translation_key="share_usage_question")
 
+    def katalog_ok(self) -> bool:
+        """Was the consent given with the short text and the list of version KATALOG (set-up, question, switch turned on from
+        0.10.1 on, or the note under Repairs confirmed)? Nothing sent depends on it yet; later fields will."""
+        return rm.katalog_fassung(self.entry.options, self._usage) >= rm.KATALOG
+
+    def agree_katalog(self) -> None:
+        """Yes to the text with the list (set-up is kept by ask_usage_once; here the question, the switch, the note)."""
+        if rm.katalog_fassung(self._usage) < rm.KATALOG:
+            self._usage["katalog"] = rm.KATALOG
+            self._evcc_store.async_delay_save(self._evcc_data, 1)
+
+    def _ask_katalog(self) -> None:
+        """Shared already before 0.10.1 (switch on, no version of the list kept): one quiet note under Repairs (no message, no
+        pop-up). Until it is answered nothing changes in what is sent."""
+        from homeassistant.helpers import issue_registry as ir
+
+        want = rm.katalog_fehlt(self.share_usage, self.entry.options, self._usage)
+        if want == self._katalog_asked:
+            return
+        self._katalog_asked = want
+        if want:
+            ir.async_create_issue(self.hass, DOMAIN, "share_usage_check", is_fixable=True, is_persistent=False,
+                                  severity=ir.IssueSeverity.WARNING, translation_key="share_usage_check")
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, "share_usage_check")
+
+    def confirm_katalog(self, share: bool) -> None:
+        """Answer to the note under Repairs: keep sharing (version KATALOG agreed) or switch sharing off (the weekly data are then
+        deleted like after switching off)."""
+        if share:
+            self.agree_katalog()
+            self._ask_katalog()
+            from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+            async_dispatcher_send(self.hass, self.signal)
+        else:
+            self.answer_usage(False)
+
     def answer_usage(self, share: bool) -> None:
         self.share_usage = bool(share)
         self._usage["gefragt"] = True
+        if share:
+            self._usage["katalog"] = rm.KATALOG   # the question shows the short text with the list
         self._evcc_store.async_delay_save(self._evcc_data, 1)
+        self._ask_katalog()
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
         async_dispatcher_send(self.hass, self.signal)
 
     def _usage_step(self, now: datetime) -> None:
         """Weekly while the switch is on; once 'delete' after it was switched off. Runs in the background, never blocks."""
+        self._ask_katalog()   # also while a report is under way: the note does not depend on it
         if self._usage_busy:
             return
         if not self.share_usage:
@@ -637,7 +684,12 @@ class Plugwhen:
                     st = self.hass.states.get(eid)
                     if st is not None:
                         opts = st.attributes.get("options")
-                        a[f"wallbox_{role}_jetzt"] = fb.state_text(eid, st, now) + (f" (Liste: {', '.join(map(str, opts))[:200]})" if opts else "")
+                        now_text = fb.state_text(eid, st, now)
+                        if opts:   # the options are free texts the names do not cover: in full only numbers and known words
+                            words = ["Plugwhen", "wallbox", "evcc", *([ent.platform] if ent else []),
+                                     *[p for p in str(self._wallbox_key_any(eid) or "").split("|") if p]]
+                            now_text = fb.select_text(now_text, opts, words)
+                        a[f"wallbox_{role}_jetzt"] = now_text
                     if "wallbox_geraet" not in a:
                         a["wallbox_geraet"] = self._wallbox_key_any(eid)
             if v.direct_last:

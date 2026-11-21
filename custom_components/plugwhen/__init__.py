@@ -112,7 +112,7 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
     from homeassistant.helpers import entity_registry as er
     from homeassistant.util import yaml as ha_yaml
 
-    from .dashboard import ENTITY_KEYS, build_views
+    from .dashboard import ENTITY_KEYS, build_views, is_installed
 
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
@@ -136,7 +136,7 @@ async def _create_dashboard(hass: HomeAssistant) -> dict[str, Any]:
                              ("feedback_report", "button"))}
     config = {"views": build_views(vehicles, hass.config.language, hass.config.currency,
                                    {k: v for k, v in main_ids.items() if v},
-                                   waechter=bool(hass.config_entries.async_entries("viertelstunden_waechter")))}
+                                   waechter=is_installed(hass.config_entries.async_entries("viertelstunden_waechter")))}
     text = ha_yaml.dump(config)
     de = (hass.config.language or "").lower().startswith("de")
     hint = ("In ein neues Dashboard einfügen (drei Punkte > Bearbeiten > Raw-Konfigurationseditor):" if de

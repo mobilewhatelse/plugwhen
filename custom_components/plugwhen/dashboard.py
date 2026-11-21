@@ -53,6 +53,10 @@ TEXT = {
         hz_sun_ok="die Sonne kann es decken", hz_forecast="Die Sonnenprognose reicht nur so weit, wie Ihr Anbieter sie liefert.",
         hz_h="Die nächsten Abfahrten", hz_next="Nächstes nötiges Laden", hz_for="für", hz_latest="spätestens ab", hz_at="bei", hz_pre="Mit Sonne vorladen",
         hz_replaces="ersetzt Netzstrom vor", hz_note="Eine Empfehlung: Plugwhen schaltet nichts. Ohne Solaranlage zeigt die Grafik nur den Bedarf je Abfahrt.",
+        wk_title="Wochenvorschau", wk_day="Tag", wk_dep="Abfahrt", wk_need="Bedarf kWh", wk_plug="Anstecken ab", wk_latest="Spätestens laden ab",
+        wk_sungrid="Sonne/Netz", wk_sun="Sonne", wk_grid="Netz", wk_pre_in="vorgeladen", wk_not_needed="nicht nötig",
+        wk_none="Noch keine Vorschau: Ladestand oder Abfahrten fehlen.", wk_no_need="Für die nächsten Abfahrten ist kein Laden nötig.",
+        wk_note="Anstecken ab: ab dann ist das Auto zu Hause. Spätestens laden ab: mit der bevorzugten Leistung, sonst mit voller Leistung.",
         learn_h="Lernmodus", mode_name="Betriebsart", would="Würde schalten",
         msg_h="Letzte Hinweise", msg_none="Noch keine Hinweise. Hier stehen die Meldungen ans Handy, auch wenn sie dort weggeklickt wurden.",
         w_charge="Laden", w_pause="Pausieren", w_none="Keine Entscheidung", w_off="Aus",
@@ -158,6 +162,10 @@ TEXT = {
         hz_sun_ok="the sun can cover it", hz_forecast="The solar forecast only reaches as far as your provider delivers it.",
         hz_h="The next departures", hz_next="Next charging needed", hz_for="for", hz_latest="latest start", hz_at="at", hz_pre="Charge ahead with the sun",
         hz_replaces="replaces grid energy before", hz_note="A recommendation: Plugwhen switches nothing. Without a solar plant the chart only shows the need per departure.",
+        wk_title="Week preview", wk_day="Day", wk_dep="Departure", wk_need="Need kWh", wk_plug="Plug in from", wk_latest="Start charging by",
+        wk_sungrid="Sun/grid", wk_sun="sun", wk_grid="grid", wk_pre_in="charged ahead", wk_not_needed="not needed",
+        wk_none="No preview yet: the state of charge or the departures are missing.", wk_no_need="No charging is needed for the next departures.",
+        wk_note="Plug in from: the car is at home from then on. Start charging by: at the preferred power, otherwise at full power.",
         learn_h="Learn mode", mode_name="Mode", would="Would switch",
         msg_h="Latest messages", msg_none="No messages yet. The messages to the phone appear here, even when swiped away there.",
         w_charge="Charge", w_pause="Pause", w_none="No decision", w_off="Off",
@@ -283,21 +291,24 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         f"{{% if a.summary is defined and a.summary and a.summary.kwh_needless %}}\n\n{t['lm_needless']}: **{{{{ a.summary.kwh_needless }}}}** {t['lm_needless_in']}{{% endif %}}"
     )
     lc_id = ids["learning_check"]
+    # 'unavailable' right after a restart: the entity is there, its attributes are not - then nothing is shown instead of
+    # a template error in the log (every value through a.get)
     lc_line = (
         "{% set a = " + _attrs(lc_id) + " %}{% set st = states('" + lc_id + "') %}"
-        f"{{% if st == 'too_little_data' %}}{t['lc_few_a']} {{{{ a.days }}}} {t['lc_few_b']}{{% else %}}"
-        f"**{t['lc_km']}:** {{% if st == 'learning_helps' %}}{t['lc_km_helps']} {{{{ a.gain_points }}}} {t['lc_km_helps_b']}."
-        f"{{% else %}}{t['lc_km_same']} ({{{{ a.coverage_reserve_pct }}}} → {{{{ a.coverage_learned_pct }}}} %): {t['lc_km_same_b']}.{{% endif %}}\n\n"
-        f"**{t['lc_depl']}:** {{% if a.ready_early_pct is not none %}}{t['lc_dep_good']} {{{{ a.ready_early_pct }}}} {t['lc_dep_good_b']} {{{{ a.ready_median_pct }}}} %."
+        f"{{% if st == 'too_little_data' %}}{{% if a.get('days') is not none %}}{t['lc_few_a']} {{{{ a.get('days') }}}} {t['lc_few_b']}{{% endif %}}"
+        "{% elif a.get('coverage_reserve_pct') is not none and a.get('coverage_learned_pct') is not none %}"
+        f"**{t['lc_km']}:** {{% if st == 'learning_helps' and a.get('gain_points') is not none %}}{t['lc_km_helps']} {{{{ a.get('gain_points') }}}} {t['lc_km_helps_b']}."
+        f"{{% else %}}{t['lc_km_same']} ({{{{ a.get('coverage_reserve_pct') }}}} → {{{{ a.get('coverage_learned_pct') }}}} %): {t['lc_km_same_b']}.{{% endif %}}\n\n"
+        f"**{t['lc_depl']}:** {{% if a.get('ready_early_pct') is not none and a.get('ready_median_pct') is not none %}}{t['lc_dep_good']} {{{{ a.get('ready_early_pct') }}}} {t['lc_dep_good_b']} {{{{ a.get('ready_median_pct') }}}} %."
         f"{{% else %}}{t['lc_dep_none']}{{% endif %}}{{% endif %}}"
     )
     calib_line = (
         "{% set a = " + _attrs(ids["charge_plan"]) + " %}{% set n = " + need + " %}"
-        "{% if a.solar_deduct_kw is not none %}"
-        f"{t['cal_sun']}: {{% if a.solar_factor %}}{t['cal_factor']} {{{{ a.solar_factor }}}} ({t['cal_learned']}){{% else %}}{t['cal_unchecked']}{{% endif %}} · "
-        f"{t['cal_deduct']} {{{{ a.solar_deduct_kw }}}} kW ({{{{ {{'learned': '{t['cal_src_learned']}', 'setting': '{t['cal_src_setting']}', 'default': '{t['cal_src_default']}'}}.get(a.solar_deduct_source, '') }}}}) · "
-        f"{t['cal_loss']} {{{{ ((1 - (n.efficiency or 0.89)) * 100) | round(0) | int }}}} % ({{{{ '{t['cal_src_learned']}' if n.efficiency_learned else '{t['cal_src_default']}' }}}})"
-        f"{{% if a.spread_floor_kw %}} · {t['cal_floor']} {{{{ a.spread_floor_kw }}}} kW{{% endif %}}{{% endif %}}"
+        "{% if a.get('solar_deduct_kw') is not none %}"
+        f"{t['cal_sun']}: {{% if a.get('solar_factor') %}}{t['cal_factor']} {{{{ a.get('solar_factor') }}}} ({t['cal_learned']}){{% else %}}{t['cal_unchecked']}{{% endif %}} · "
+        f"{t['cal_deduct']} {{{{ a.get('solar_deduct_kw') }}}} kW ({{{{ {{'learned': '{t['cal_src_learned']}', 'setting': '{t['cal_src_setting']}', 'default': '{t['cal_src_default']}'}}.get(a.get('solar_deduct_source'), '') }}}}) · "
+        f"{t['cal_loss']} {{{{ ((1 - (n.get('efficiency') or 0.89)) * 100) | round(0) | int }}}} % ({{{{ '{t['cal_src_learned']}' if n.get('efficiency_learned') else '{t['cal_src_default']}' }}}})"
+        f"{{% if a.get('spread_floor_kw') %}} · {t['cal_floor']} {{{{ a.get('spread_floor_kw') }}}} kW{{% endif %}}{{% endif %}}"
     )
     hz_tpl = (
         "{% set wd = " + t["wd"] + " %}{% set a = " + _attrs(ids["charge_plan"]) + " %}{% set h = a.horizon %}"
@@ -318,11 +329,38 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
     )
     for key, text in (("@COVERED@", t["hz_covered"]), ("@MUST@", t["hz_must"]), ("@ALL@", t["hz_all"]), ("@DAYS@", t["hz_days"]), ("@SUNOK@", t["hz_sun_ok"]), ("@NEXT@", t["hz_next"]), ("@FOR@", t["hz_for"]), ("@LATEST@", t["hz_latest"]), ("@AT@", t["hz_at"]), ("@PRE@", t["hz_pre"]), ("@REPL@", t["hz_replaces"])):
         hz_tpl = hz_tpl.replace(key, text)
+    # week preview: one row per departure of the look-ahead (horizon.days); every value through .get, the card shows a short note
+    # while there is no look-ahead (status not 'ok')
+    wk_tpl = (
+        "{% set wd = " + t["wd"] + " %}{% set a = " + _attrs(ids["charge_plan"]) + " %}{% set h = a.get('horizon') or {} %}"
+        "{% set days = h.get('days') or [] %}**@TITLE@**\n\n"
+        "{% if h.get('status') == 'ok' and days %}"
+        "| @DAY@ | @DEP@ | @NEED@ | @PLUG@ | @LATEST@ | @SUNGRID@ |\n|---|---|---:|---|---|---|\n"
+        "{% for d in days if d.get('departure') %}{% set dp = d.get('departure') | as_datetime | as_local %}{% set need = d.get('need_kwh') or 0 %}"
+        "| {{ wd[dp.weekday()] }} {{ dp.strftime('%d.%m.') }} | {{ dp.strftime('%H:%M') }} | {{ need }} | "
+        "{% if d.get('window_start') %}{% set ws = d.get('window_start') | as_datetime | as_local %}{{ wd[ws.weekday()] }} {{ ws.strftime('%H:%M') }}{% else %}–{% endif %} | "
+        "{% set ls = d.get('latest_start_pref') or d.get('latest_start') %}"
+        "{% if need > 0 and ls %}{% set l = ls | as_datetime | as_local %}{{ wd[l.weekday()] }} {{ l.strftime('%H:%M') }}{% else %}– @NOTNEEDED@{% endif %} | "
+        "{% if need > 0 %}@SUN@ {{ d.get('sun_direct_kwh') or 0 }} · @GRID@ {{ d.get('grid_kwh') or 0 }}"
+        "{% if (d.get('precharge_kwh') or 0) > 0 %} · @PREIN@ {{ d.get('precharge_kwh') }}{% endif %}{% endif %}"
+        # charging ahead with the sun in this window for a later departure (horizon.precharge, same window start)
+        "{% for p in h.get('precharge') or [] if p.get('window_start') == d.get('window_start') and p.get('for_departure') and p.get('kwh') %}"
+        "{% set fd = p.get('for_departure') | as_datetime | as_local %}{% if need > 0 or not loop.first %} · {% endif %}"
+        "@PRE@ {{ p.get('kwh') }} kWh @FOR@ {{ wd[fd.weekday()] }} {{ fd.strftime('%H:%M') }}"
+        "{% else %}{% if not need > 0 %}–{% endif %}{% endfor %} |\n"
+        "{% endfor %}\n_@NOTE@_"
+        "{% elif h.get('status') == 'no_need' %}@NONEED@{% else %}@NONE@{% endif %}"
+    )
+    for key, text in (("@TITLE@", t["wk_title"]), ("@DAY@", t["wk_day"]), ("@DEP@", t["wk_dep"]), ("@NEED@", t["wk_need"]),
+                      ("@PLUG@", t["wk_plug"]), ("@LATEST@", t["wk_latest"]), ("@SUNGRID@", t["wk_sungrid"]), ("@SUN@", t["wk_sun"]),
+                      ("@GRID@", t["wk_grid"]), ("@PREIN@", t["wk_pre_in"]), ("@NOTNEEDED@", t["wk_not_needed"]), ("@PRE@", t["hz_pre"]),
+                      ("@FOR@", t["hz_for"]), ("@NOTE@", t["wk_note"]), ("@NONEED@", t["wk_no_need"]), ("@NONE@", t["wk_none"])):
+        wk_tpl = wk_tpl.replace(key, text)
     hb_id = ids["habit"]
     habit_line = (
         "{% set a = " + _attrs(hb_id) + " %}"
-        f"{{% if a.status == 'ok' %}}{t['hb_a']} **{{{{ a.night_share_pct }}}}** {t['hb_b']} **{{{{ a.day_share_pct }}}}**"
-        f" {t['hb_c']} **{{{{ a.weekend_share_pct }}}}** {t['hb_d']} **{{{{ a.weekdays_night_share_pct }}}} %**."
+        f"{{% if a.get('status') == 'ok' %}}{t['hb_a']} **{{{{ a.get('night_share_pct') }}}}** {t['hb_b']} **{{{{ a.get('day_share_pct') }}}}**"
+        f" {t['hb_c']} **{{{{ a.get('weekend_share_pct') }}}}** {t['hb_d']} **{{{{ a.get('weekdays_night_share_pct') }}}} %**."
         f"{{% else %}}{t['hb_few']}{{% endif %}}"
     )
     src = (
@@ -425,6 +463,7 @@ def _vehicle_section(ids: dict[str, str], t: dict[str, str], name: str, multi: b
         {"type": "grid", "cards": [
             {"type": "heading", "heading": head(t["hz_h"]), "icon": "mdi:calendar-arrow-right"},
             {"type": "markdown", "content": _chart(ids["charge_plan"], "horizon_chart")},
+            {"type": "markdown", "content": wk_tpl},
             {"type": "markdown", "content": hz_tpl},
         ]},
         {"type": "grid", "cards": [
@@ -546,7 +585,9 @@ def _wait_for_sensors(node: Any) -> None:
         if node.get("type") == "markdown" and isinstance(content, str):
             ids = sorted(set(re.findall(r"\(states\.([a-z_]+\.[a-z0-9_]+)\.attributes if states\.", content)))
             if ids:
-                node["content"] = "{% if " + " and ".join(f"states.{i}" for i in ids) + " %}" + content + "{% endif %}"
+                # 'unavailable' (right after a restart) has no attributes of its own either: the card waits for that too
+                node["content"] = ("{% if " + " and ".join(f"states.{i} and states.{i}.state != 'unavailable'" for i in ids) + " %}"
+                                   + content + "{% endif %}")
         for x in node.values():
             if isinstance(x, (list, dict)):
                 _wait_for_sensors(x)
@@ -608,6 +649,12 @@ WAECHTER_TEXT = {
            f"Free in the [HACS marketplace]({WAECHTER_LINK}) · more at [aiwhatelse.eu/spitzenwaechter](https://www.aiwhatelse.eu/spitzenwaechter/?lang=en)\n\n"
            "*After installing it: create the dashboard again, then this card disappears.*"),
 }
+
+
+def is_installed(entries: Any) -> bool:
+    """Does the other integration run here? Only a loaded config entry counts (state ConfigEntryState.LOADED, value 'loaded'): a
+    disabled entry or one that failed to set up does nothing, then the card 'Goes well with' stays."""
+    return any(getattr(getattr(e, "state", None), "value", getattr(e, "state", None)) == "loaded" for e in entries or ())
 
 
 def waechter_section(lang: str | None) -> dict:

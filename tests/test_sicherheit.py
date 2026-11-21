@@ -156,6 +156,13 @@ class NextTripTests(unittest.TestCase):
         a = chk(self.AT, self.P, 40.0, 28.0, charging=True, can_speed_up=False, trip=True)
         self.assertEqual(a.reason, "target_fell")
 
+    def test_a_fallen_target_while_charging_in_the_grid_mode_is_left_alone(self):
+        # wish of the user 18.11.2026 "if it charges, no message": the grid mode charges at full power, switching gains nothing
+        planned = self.P.target - s.DROP_PCT - 1.0
+        self.assertIsNone(chk(self.AT, self.P, planned, 28.0, charging=True, can_speed_up=False, trip=False))
+        self.assertEqual(chk(self.AT, self.P, planned, 28.0, charging=True, can_speed_up=True, trip=False).reason, "target_fell")
+        self.assertEqual(chk(self.AT, self.P, planned, 28.0, charging=True, can_speed_up=False, trip=True).reason, "target_fell")
+
 
 class DoneTests(unittest.TestCase):
     def test_ends(self):

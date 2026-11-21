@@ -166,5 +166,39 @@ class GenericNameTests(unittest.TestCase):
         self.assertEqual(t, "wallbox: mbapi2020, Mercedes-Benz, EQB 250")
 
 
+class SelectOptionsTests(unittest.TestCase):
+    """Review 20.11.2026: the options of the wallbox selects went into the report as they are ('Liste: ...'). They are free texts
+    and the anonymiser only knows the names it was given. In full only numbers and the allowed words, otherwise their number."""
+
+    KEEP = ["Plugwhen", "wallbox", "evcc", "go-e", "Fronius"]
+    CARS = ["Max Mustermann Auto", "Zweitwagen", "Gast"]
+
+    def test_free_texts_only_as_a_number(self):
+        t = fb.select_text("Max Mustermann Auto", self.CARS, self.KEEP)
+        self.assertEqual(t, "Option 1 von 3 Optionen")
+        self.assertEqual(fb.select_text("Eco", ["Default", "Eco", "NextTrip"], self.KEEP), "Option 2 von 3 Optionen")
+        self.assertEqual(fb.select_text("unavailable", self.CARS, self.KEEP), "unavailable von 3 Optionen")
+
+    def test_numbers_and_allowed_words_in_full(self):
+        self.assertEqual(fb.select_text("16", ["6", "10", "16"], self.KEEP), "16 von ['6', '10', '16']")
+        self.assertEqual(fb.select_text("1,5 kW", ["1,5 kW", "11 kW"]), "1,5 kW von ['1,5 kW', '11 kW']")
+        self.assertEqual(fb.select_text("evcc", ["go-e", "evcc"], self.KEEP), "evcc von ['go-e', 'evcc']")
+
+    def test_not_in_the_report(self):
+        autos = [{"betriebsart": "direct", "wallbox_mode_jetzt": fb.select_text("Max Mustermann Auto", self.CARS, self.KEEP),
+                  "wallbox_trip_energy_jetzt": fb.select_text("10", ["6", "10", "16"], self.KEEP)}]
+        b = fb.bericht("0.9.2", "2026.11.1", {}, autos, [], {}, ["Familie Huber"], self.KEEP)
+        s = json.dumps(b, ensure_ascii=False)
+        for bad in ("Max", "Mustermann", "Zweitwagen", "Gast"):
+            self.assertNotIn(bad, s)
+        self.assertIn("Option 1 von 3 Optionen", s)
+        self.assertIn("10 von ['6', '10', '16']", s)
+
+    def test_the_coordinator_uses_it(self):
+        src = (Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen" / "coordinator.py").read_text(encoding="utf-8")
+        self.assertIn("fb.select_text(now_text, opts, words)", src)
+        self.assertNotIn("(Liste: ", src)
+
+
 if __name__ == "__main__":
     unittest.main()

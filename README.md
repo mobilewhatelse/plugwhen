@@ -44,8 +44,7 @@ A solar plant is optional. [All entities](docs/MANUAL.md#what-it-needs)
 
 ## Installation
 
-1. **Settings → Marketplace** (HACS before Home Assistant 2026.11): search for **Plugwhen** and download it.
-   Not listed yet? Three dots → *Custom repositories* → `mobilewhatelse/plugwhen`, type *Integration*.
+1. **Settings → Marketplace** (HACS before Home Assistant 2026.11): search for **Plugwhen** and download it, or [install it with one click](https://my.home-assistant.io/redirect/hacs_repository/?owner=mobilewhatelse&repository=plugwhen&category=integration).
 2. Restart Home Assistant, then **Settings → Devices & services → Add integration → Plugwhen**.
 3. The set-up finds evcc and the Viertelstunden-Wächter by itself and proposes your car. Check it and save.
 4. Leave the car in **Learn** for about two weeks and look at the plans.
@@ -56,8 +55,8 @@ The action `plugwhen.create_dashboard` builds a ready-made dashboard.
 
 - **[evcc](https://evcc.io):** Plugwhen writes its plan into evcc, evcc charges.
   [Details](docs/MANUAL.md#with-evcc-optional)
-- **[Viertelstunden-Wächter](https://github.com/mobilewhatelse/viertelstunden-waechter):** the guard keeps the
-  quarter-hour peak below your limit, Plugwhen plans below it.
+- **[Viertelstunden-Wächter](https://github.com/mobilewhatelse/viertelstunden-waechter)** (quarter-hour peak guard, free in the Marketplace, [install it with one click](https://my.home-assistant.io/redirect/hacs_repository/?owner=mobilewhatelse&repository=viertelstunden-waechter&category=integration)): the guard keeps the
+  quarter-hour peak below your limit, Plugwhen plans below it and the guard no longer counts the car as load.
   [Details](docs/MANUAL.md#together-with-the-quarter-hour-peak-guard)
 
 ## Anonymous data (voluntary)

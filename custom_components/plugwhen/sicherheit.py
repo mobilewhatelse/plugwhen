@@ -96,8 +96,10 @@ def check(now: datetime, promise: Promise | None, planned_target: float | None, 
     def alarm(reason: str) -> Alarm:
         return Alarm(reason, round(need, 1), promise.target, soc, round(hours, 2))
 
+    if charging and not can_speed_up and not trip:
+        return None   # the wallbox charges from the grid at full power already: switching changes nothing, also for a fallen target
     if planned_target is not None and planned_target < promise.target - DROP_PCT:
-        return alarm("target_fell")
+        return alarm("target_fell")   # next trip: the wallbox was given too little energy and stops early, charging or not
     if charging and not can_speed_up:
         return None
     if not charging and not trip and stalled_min >= STALL_MIN:

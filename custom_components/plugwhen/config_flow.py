@@ -23,6 +23,7 @@ from .const import (
     O_OUTDOOR_TEMP, O_WEATHER,
 )
 from .voraus import DEFAULT_CAP as DEFAULT_DAILY_CAP, DEFAULT_DAYS as DEFAULT_DAYS_AHEAD, MAX_DAYS as MAX_DAYS_AHEAD
+from .rueckmeldung import KATALOG, privacy_url
 from .evcc import LOCAL_URLS, PROBE_TIMEOUT_S, EvccAuthError, EvccClient, EvccError, connection, without_secrets, loadpoint_of, match_vehicle, parse_vehicles, vehicle_from_evcc
 from .takeover import guard_wallbox, next_vehicle, pick_by_unit, sensor_by_value, vehicle_from_guard
 from .units import DISTANCE_UNITS, ENERGY_UNITS, PERCENT_UNITS, unit_errors
@@ -214,8 +215,11 @@ class PlugwhenConfigFlow(ConfigFlow, domain=DOMAIN):
         """Last step: the voluntary, anonymous usage statistics (off unless ticked), then the entry is created."""
         if user_input is None:
             return self.async_show_form(step_id="finish", data_schema=vol.Schema(
-                {vol.Required("share_usage", default=False): BooleanSelector()}))
+                {vol.Required("share_usage", default=False): BooleanSelector()}),
+                description_placeholders={"privacy_url": privacy_url(self.hass.config.language)})
         self._options["share_usage"] = bool(user_input.get("share_usage"))
+        if self._options["share_usage"]:
+            self._options["katalog"] = KATALOG   # agreed to the short text with the list of this version
         subentries = [{"subentry_type": SUBENTRY_VEHICLE, "title": vehicle_title(c), "data": c, "unique_id": None} for c in self._cars]
         return self.async_create_entry(title="Plugwhen", data={}, options=self._options, subentries=subentries)
 
@@ -235,6 +239,16 @@ VEHICLE_UNITS = {V_ODOMETER: (DISTANCE_UNITS, "not_distance"), V_SOC: (PERCENT_U
                  V_WALLBOX_ENERGY: (ENERGY_UNITS, "not_energy"), V_WALLBOX_MORE: (ENERGY_UNITS, "not_energy")}
 
 
+# Answers from the set-up that the settings dialog does not show: saving the settings must not drop them (the consent to share
+# anonymous data and the version of the list it was given for).
+KEPT_OPTIONS = ("share_usage", "katalog")
+
+
+def options_to_save(old: dict[str, Any], user_input: dict[str, Any]) -> dict[str, Any]:
+    kept = {k: old[k] for k in KEPT_OPTIONS if k in old}
+    return {**kept, **{k: v for k, v in user_input.items() if v not in (None, "")}}
+
+
 class PlugwhenOptionsFlow(OptionsFlow):
     """Connections to other integrations. Everything is optional: Plugwhen also works alone."""
 
@@ -251,7 +265,7 @@ class PlugwhenOptionsFlow(OptionsFlow):
                 except EvccError:
                     errors[O_EVCC_URL] = "evcc_unreachable"
             if not errors:
-                return self.async_create_entry(data={k: v for k, v in user_input.items() if v not in (None, "")})
+                return self.async_create_entry(data=options_to_save(self.config_entry.options, user_input))
         current = dict(self.config_entry.options) if user_input is None else dict(user_input)
         if not current.get(O_WAECHTER) and not current.get(O_LOAD):
             found = find_waechter_entry(self.hass)  # offered, not forced

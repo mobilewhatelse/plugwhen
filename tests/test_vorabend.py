@@ -211,5 +211,43 @@ class SameDayTests(unittest.TestCase):
             self.assertLessEqual(e.kwh, 10.0 / 100.0 * self.CAP / self.EFF + 0.1)
 
 
+class SunShareTests(unittest.TestCase):
+    """Review 20.11.2026: the gate looked at the grid share of the later trips, the amount at their whole need. A later trip covered
+    mostly by the sun at home was charged in full from the grid the evening before."""
+
+    @staticmethod
+    def _h(first_need: float, later: dict) -> dict:
+        return {"days": [{"departure": "2026-11-19T07:00:00+01:00", "need_kwh": first_need, "grid_kwh": first_need, "sun_direct_kwh": 0.0},
+                         {"departure": "2026-11-19T20:00:00+01:00", **later}]}
+
+    SUNNY = {"need_kwh": 6.0, "grid_kwh": 0.6, "sun_direct_kwh": 5.4}
+
+    def test_only_the_grid_share_of_a_later_trip_is_charged_ahead(self):
+        e = vb.evening_before(NOW, self._h(0.0, self.SUNNY), 60.0, 66.0, 0.9, True)
+        self.assertIsNotNone(e)
+        self.assertLessEqual(e.kwh, 0.6)
+        self.assertEqual(e.for_departure, datetime(2026, 11, 19, 20, 0, tzinfo=TZ))
+
+    def test_the_first_trips_own_need_still_counts_in_full(self):
+        e = vb.evening_before(NOW, self._h(1.5, self.SUNNY), 60.0, 66.0, 0.9, True)
+        self.assertLessEqual(e.kwh, 1.5 + 0.6)
+        self.assertEqual(e.kwh, 2.1)
+
+    def test_an_older_look_ahead_without_the_grid_share_charges_the_whole_need(self):
+        e = vb.evening_before(NOW, self._h(0.0, {"need_kwh": 6.0}), 60.0, 66.0, 0.9, True)
+        self.assertEqual(e.kwh, 6.0)
+
+    def test_the_sun_alone_brings_it(self):
+        self.assertIsNone(vb.evening_before(NOW, self._h(0.0, {**self.SUNNY, "grid_kwh": 0.4, "sun_direct_kwh": 5.6}),
+                                            60.0, 66.0, 0.9, True))
+
+
+class SameTripWindowTests(unittest.TestCase):
+    def test_one_rule_with_the_look_ahead(self):
+        """What is one trip and what are two: the window of the look-ahead, not a copy of it."""
+        self.assertIs(vb.SAME_TRIP_WINDOW, horizon.SAME_TRIP_WINDOW)
+        self.assertFalse(hasattr(vb, "SAME_TRIP"))
+
+
 if __name__ == "__main__":
     unittest.main()

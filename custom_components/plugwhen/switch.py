@@ -51,6 +51,7 @@ class LearnKmSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
 class NoticeSwitch(PlugwhenEntity, SwitchEntity, RestoreEntity):
     """Off: no warning is sent that the car will not be ready (the readiness sensor still shows it)."""
 
+    _unrecorded_attributes = frozenset({"recent"})   # up to 10 message texts: not into the database with every change
     _attr_icon = "mdi:bell-ring-outline"
 
     def __init__(self, plug, vehicle) -> None:
@@ -148,6 +149,7 @@ class ShareSwitch(PlugwhenMainEntity, SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         self.plug.share_usage = True
+        self.plug.agree_katalog()   # turned on with the short text and the list: no extra question under Repairs
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:

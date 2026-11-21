@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from enum import Enum
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen"))
 
-from dashboard import ENTITY_KEYS, build_views  # noqa: E402
+from dashboard import ENTITY_KEYS, build_views, is_installed  # noqa: E402
 
 
 def ids(prefix):
@@ -164,6 +166,7 @@ class DashboardTest(unittest.TestCase):
 
         class Ent:
             attributes = {"friendly_name": "x"}
+            state = "off"
 
         class States:
             def __call__(self, eid):
@@ -190,7 +193,7 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual(len(md), 1)
 
         def render(attrs: dict) -> str:
-            ent = type("E", (), {"attributes": attrs})()
+            ent = type("E", (), {"attributes": attrs, "state": "charge"})()
 
             class States:
                 def __getattr__(self, domain):
@@ -239,6 +242,35 @@ class DashboardTest(unittest.TestCase):
             self.assertNotIn("Passt dazu", json.dumps(build_views(car, "de", waechter=state), ensure_ascii=False))
 
 
+class InstalledTests(unittest.TestCase):
+    """'Goes well with': the peak guard counts as installed only with a loaded config entry. A disabled entry or one that failed
+    to set up does nothing, so the card stays."""
+
+    class State(Enum):   # like homeassistant.config_entries.ConfigEntryState
+        LOADED = "loaded"
+        NOT_LOADED = "not_loaded"
+        SETUP_ERROR = "setup_error"
+        SETUP_RETRY = "setup_retry"
+
+    def entries(self, *states):
+        return [SimpleNamespace(state=s) for s in states]
+
+    def test_only_a_loaded_entry_counts(self):
+        S = self.State
+        self.assertFalse(is_installed([]))
+        self.assertFalse(is_installed(None))
+        self.assertFalse(is_installed(self.entries(S.NOT_LOADED)))          # disabled
+        self.assertFalse(is_installed(self.entries(S.SETUP_ERROR, S.SETUP_RETRY)))
+        self.assertTrue(is_installed(self.entries(S.NOT_LOADED, S.LOADED)))
+        self.assertTrue(is_installed(self.entries("loaded")))
+        self.assertFalse(is_installed([SimpleNamespace()]))                   # no state at all
+
+    def test_the_dashboard_service_uses_it(self):
+        src = (Path(__file__).resolve().parents[1] / "custom_components" / "plugwhen" / "__init__.py").read_text(encoding="utf-8")
+        self.assertIn('waechter=is_installed(hass.config_entries.async_entries("viertelstunden_waechter"))', src)
+        self.assertNotIn('bool(hass.config_entries.async_entries("viertelstunden_waechter"))', src)
+
+
 
 class PlanProposalTests(unittest.TestCase):
     """A wallbox with a "next trip" mode decides itself when to charge: the plan card says the windows are a proposal."""
@@ -248,6 +280,80 @@ class PlanProposalTests(unittest.TestCase):
             text = json.dumps(build_views([{"name": "Car", "ids": ids("car")}], lang), ensure_ascii=False)
             self.assertIn(word, text)
             self.assertIn("'wallbox_decides'", text)   # only shown for such a wallbox (attribute of the plan sensor)
+
+
+class WeekPreviewTests(unittest.TestCase):
+    """The card 'Week preview' next to the look-ahead chart: one table row per departure from horizon.days, rendered strictly."""
+
+    HORIZON = {"status": "ok", "days": [
+        {"departure": "2026-11-23T07:30:00+01:00", "window_start": "2026-11-22T17:00:00+01:00", "need_kwh": 0.0,
+         "latest_start": None, "latest_start_pref": None, "sun_direct_kwh": 0.0, "precharge_kwh": 0.0, "grid_kwh": 0.0},
+        {"departure": "2026-11-24T07:30:00+01:00", "window_start": "2026-11-23T17:30:00+01:00", "need_kwh": 8.4,
+         "latest_start": "2026-11-24T06:43:00+01:00", "latest_start_pref": "2026-11-24T05:10:00+01:00",
+         "sun_direct_kwh": 0.0, "precharge_kwh": 2.0, "grid_kwh": 6.4},
+        {"departure": "2026-11-25T07:30:00+01:00", "window_start": "2026-11-24T16:00:00+01:00", "need_kwh": 3.1,
+         "latest_start": "2026-11-25T07:13:00+01:00", "latest_start_pref": None, "sun_direct_kwh": 3.1, "precharge_kwh": 0.0, "grid_kwh": 0.0},
+    ], "precharge": [{"window_start": "2026-11-22T17:00:00+01:00", "sun_from": "2026-11-23T10:00:00+01:00",
+                      "sun_to": "2026-11-23T13:00:00+01:00", "kwh": 2.0, "for_departure": "2026-11-24T07:30:00+01:00"}]}
+
+    @staticmethod
+    def _card(lang: str) -> str:
+        views = build_views([{"name": "Car", "ids": ids("car")}], lang)
+        md = [c["content"] for s in views[0]["sections"] for c in s["cards"] if c["type"] == "markdown" and "'horizon'" in c["content"]]
+        return md
+
+    @staticmethod
+    def _render(content: str, attrs: dict, state: str = "charge") -> str:
+        import jinja2
+        from datetime import datetime
+
+        ent = type("E", (), {"attributes": attrs, "state": state})()
+
+        class States:
+            def __call__(self, eid):
+                return state
+
+            def __getattr__(self, domain):
+                return type("D", (), {"__getattr__": lambda self, name: ent})()
+
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+        env.filters.update(as_datetime=datetime.fromisoformat, as_local=lambda v: v)
+        return env.from_string(content).render(states=States(), state_attr=lambda e, a: None)
+
+    def test_the_table_sits_next_to_the_look_ahead_chart(self):
+        views = build_views([{"name": "Car", "ids": ids("car")}], "de")
+        section = [s for s in views[0]["sections"] if s["cards"][0].get("heading") == "Die nächsten Abfahrten"][0]
+        contents = [c.get("content", "") for c in section["cards"]]
+        chart = [i for i, c in enumerate(contents) if "horizon_chart" in c][0]
+        self.assertIn("**Wochenvorschau**", contents[chart + 1])
+        self.assertEqual(len(self._card("de")), 1)
+
+    def test_german_table(self):
+        text = self._render(self._card("de")[0], {"horizon": self.HORIZON, "pref_kw": 3.7})
+        self.assertIn("| Tag | Abfahrt | Bedarf kWh | Anstecken ab | Spätestens laden ab | Sonne/Netz |", text)
+        self.assertIn("| Mo 23.11. | 07:30 | 0 | So 17:00 | – nicht nötig | Mit Sonne vorladen 2.0 kWh für Di 07:30 |", text)
+        self.assertIn("| Di 24.11. | 07:30 | 8.4 | Mo 17:30 | Di 05:10 | Sonne 0 · Netz 6.4 · vorgeladen 2.0 |", text)
+        self.assertIn("| Mi 25.11. | 07:30 | 3.1 | Di 16:00 | Mi 07:13 | Sonne 3.1 · Netz 0 |", text)   # no preferred power: full power
+        self.assertIn("_Anstecken ab: ab dann ist das Auto zu Hause.", text)
+
+    def test_english_table(self):
+        text = self._render(self._card("en")[0], {"horizon": self.HORIZON})
+        self.assertIn("**Week preview**", text)
+        self.assertIn("| Day | Departure | Need kWh | Plug in from | Start charging by | Sun/grid |", text)
+        self.assertIn("| Mon 23.11. | 07:30 | 0 | Sun 17:00 | – not needed | Charge ahead with the sun 2.0 kWh for Tue 07:30 |", text)
+        self.assertIn("| Tue 24.11. | 07:30 | 8.4 | Mon 17:30 | Tue 05:10 | sun 0 · grid 6.4 · charged ahead 2.0 |", text)
+
+    def test_without_a_look_ahead_a_short_note(self):
+        for lang, none, no_need in (("de", "Noch keine Vorschau", "kein Laden nötig"), ("en", "No preview yet", "No charging is needed")):
+            card = self._card(lang)[0]
+            for attrs in ({}, {"horizon": None}, {"horizon": {"status": "unknown_soc", "days": []}}, {"horizon": {"status": "ok"}}):
+                text = self._render(card, attrs)
+                self.assertIn(none, text, attrs)
+                self.assertNotIn("|", text)
+            self.assertIn(no_need, self._render(card, {"horizon": {"status": "no_need", "days": self.HORIZON["days"][:1]}}))
+            self.assertEqual(self._render(card, {}, "unavailable"), "")   # right after a restart: nothing at all
+        old = {"status": "ok", "days": [{"departure": "2026-11-23T07:30:00+01:00"}]}   # an older look-ahead without the new fields
+        self.assertIn("| Mo 23.11. | 07:30 | 0 | – | – nicht nötig | – |", self._render(self._card("de")[0], {"horizon": old}))
 
 
 class MissingSensorTests(unittest.TestCase):
@@ -266,6 +372,104 @@ class MissingSensorTests(unittest.TestCase):
     def test_cards_wait_for_their_sensors(self):
         text = json.dumps(build_views([{"name": "Car", "ids": {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}}], "de"))
         self.assertIn("{% if states.sensor.car_charge_plan", text)
+
+    @staticmethod
+    def _cards():
+        out = []
+
+        def walk(x):
+            if isinstance(x, dict):
+                if x.get("type") == "markdown":
+                    out.append(x["content"])
+                for v in x.values():
+                    walk(v)
+            elif isinstance(x, list):
+                for v in x:
+                    walk(v)
+        walk(build_views([{"name": "Car", "ids": {k: f"{d}.car_{k}" for k, d in ENTITY_KEYS.items()}}], "de"))
+        return out
+
+    @staticmethod
+    def _render(content: str, state: str, attrs: dict) -> str:
+        """Strictly, like the frontend: every entity has `state` and `attrs`."""
+        import jinja2
+
+        ent = type("E", (), {"attributes": attrs, "state": state})()
+
+        class States:
+            def __call__(self, eid):
+                return state
+
+            def __getattr__(self, domain):
+                return type("D", (), {"__getattr__": lambda self, name: ent})()
+
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+        env.filters.update(as_datetime=lambda v: v, as_local=lambda v: v)
+        return env.from_string(content).render(states=States(), state_attr=lambda e, a: None)
+
+    def test_learning_cards_render_while_the_sensors_are_unavailable(self):
+        """Right after a restart a sensor is 'unavailable': the entity exists, its own attributes do not. The learning check
+        (coverage, gain points, days, departure), the charging habit, the calibration line and the would-switch line render
+        strictly without an UndefinedError; numbers only appear once the attributes are there."""
+        cards = self._cards()
+        picks = {name: [c for c in cards if word in c] for name, word in (
+            ("learning_check", "**Kilometer:**"), ("habit", "Ladegewohnheit"), ("calibration", "Ladeverluste"),
+            ("would_switch", "Probelauf aus"))}
+        for name, found in picks.items():
+            self.assertEqual(len(found), 1, name)
+        restored = {"restored": True, "friendly_name": "Car"}   # what Home Assistant keeps of an entity that is not back yet
+        # 'unavailable' is held back by the gate of _wait_for_sensors; 'unknown' with attributes missing reaches the template itself
+        for state in ("unavailable", "unknown"):
+            for attrs in (restored, {}):
+                for name, (content,) in picks.items():
+                    try:
+                        text = self._render(content, state, attrs)
+                    except Exception as e:  # noqa: BLE001 - jinja2.UndefinedError and anything else the template raises
+                        self.fail(f"{name} ({state}): {type(e).__name__}: {e}")
+                    if name in ("learning_check", "calibration") or state == "unavailable":
+                        self.assertEqual(text, "", f"{name} ({state})")
+                if state == "unknown":
+                    self.assertEqual(self._render(picks["habit"][0], state, attrs),
+                                     "Noch zu wenig Daten für die Ladegewohnheit (28 Tage nötig).")
+
+    def test_every_card_waits_while_its_sensors_are_unavailable(self):
+        """Review 20.11.2026: the status line (soc), readiness (checks), trips (trip_calendar), look-ahead (horizon) and sources
+        read attributes without a guard. Every card that reads attributes renders nothing while a sensor is 'unavailable'."""
+        gated = [c for c in self._cards() if c.startswith("{% if states.")]
+        for word in ("at.soc", "a.checks", "a.trip_calendar", "a.horizon", ".sources"):   # the five are all behind the gate
+            self.assertTrue([c for c in gated if word in c], word)
+        self.assertGreaterEqual(len(gated), 9)
+        for attrs in ({}, {"restored": True, "friendly_name": "Car"}):
+            for content in gated:
+                try:
+                    self.assertEqual(self._render(content, "unavailable", attrs), "", content[:100])
+                except Exception as e:  # noqa: BLE001 - jinja2.UndefinedError and anything else the template raises
+                    self.fail(f"{type(e).__name__}: {e} | {content[:100]}")
+
+    def test_an_available_sensor_shows_the_card_as_before(self):
+        cards = self._cards()
+        for word, state, attrs in (
+                ("**Kilometer:**", "reserve_enough", {"days": 40, "coverage_reserve_pct": 80, "coverage_learned_pct": 82,
+                                                      "gain_points": 2, "ready_early_pct": 90, "ready_median_pct": 70}),
+                ("**Ziel bei Abfahrt:**", "charge", {"soc": 30, "plugged": True, "target_soc": 75.7, "range_km": 146.0,
+                                                     "reachable": True})):
+            content = [c for c in cards if word in c][0]
+            inner = content[content.index("%}") + 2:-len("{% endif %}")]   # the card without the gate
+            text = self._render(content, state, attrs)
+            self.assertIn(word, text)
+            self.assertEqual(text, self._render(inner, state, attrs))
+
+    def test_learning_check_still_shows_its_numbers(self):
+        lc = [c for c in self._cards() if "**Kilometer:**" in c][0]
+        full = {"days": 40, "coverage_reserve_pct": 80, "coverage_learned_pct": 82, "gain_points": 2,
+                "ready_early_pct": 90, "ready_median_pct": 70}
+        same = self._render(lc, "reserve_enough", full)
+        self.assertIn("(80 → 82 %)", same)
+        self.assertIn("an 90 Prozent der Tage rechtzeitig fertig gewesen, bis zur üblichen nur an 70 %.", same)
+        self.assertIn("wären 12 Prozentpunkte", self._render(lc, "learning_helps", {**full, "gain_points": 12}))
+        self.assertIn("Zur Abfahrt gibt es noch keine Aussage.",
+                      self._render(lc, "little", {**full, "ready_early_pct": None, "ready_median_pct": None}))
+        self.assertIn("geprüft wurden 5 Tage, nötig sind 21.", self._render(lc, "too_little_data", {"days": 5}))
 
 
 if __name__ == "__main__":

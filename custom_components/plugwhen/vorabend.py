@@ -13,8 +13,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+try:  # inside Home Assistant the module lives in a package, the tests import it flat
+    from .horizon import SAME_TRIP_WINDOW   # an expected departure this close before the plan's is the same trip
+except ImportError:  # pragma: no cover
+    from horizon import SAME_TRIP_WINDOW
+
 MIN_KWH = 0.5           # smaller gaps are not worth a charge
-SAME_TRIP = timedelta(hours=2)   # an expected departure this close before the plan's is the same trip (horizon.SAME_TRIP_WINDOW)
 
 
 @dataclass(frozen=True)
@@ -38,7 +42,9 @@ def _parse(value: Any) -> datetime | None:
 
 def _same_day(now: datetime, days: list[dict]) -> tuple[datetime, datetime, float] | None:
     """From the look-ahead's rows: the first departure, the last later departure of the SAME day that needs energy, and the wallbox
-    energy for all of them (the first trip's own need included; the caller takes off what the plan charges anyway).
+    energy for them: the first trip's own need and the grid share of the later ones (the caller takes off what the plan charges
+    anyway). The sun share of a later trip comes in its own window at home, as the gate below assumes: before, a later trip
+    covered mostly by the sun was charged in full from the grid the evening before (review 20.11.2026).
 
     Only trips of the same day: the window before a trip of another day is a night at home (normal charging, or the look-ahead with
     its everyday limit); without this the charge rolled on night after night and filled the battery to 95-100 % for trips two days
@@ -47,19 +53,18 @@ def _same_day(now: datetime, days: list[dict]) -> tuple[datetime, datetime, floa
     by = _parse(days[0].get("departure"))
     if by is None or by <= now or by.date() > (now + timedelta(days=1)).date():
         return None   # the first trip is past, or not tomorrow yet (that is the look-ahead's job)
-    total, grid, last = float(days[0].get("need_kwh") or 0.0), 0.0, None
+    first, grid, last = float(days[0].get("need_kwh") or 0.0), 0.0, None
     for d in days[1:]:
         dep = _parse(d.get("departure"))
         if dep is None or dep.date() != by.date():
             break
         k = float(d.get("need_kwh") or 0.0)
-        total += k
-        grid += float(d.get("grid_kwh") if d.get("grid_kwh") is not None else k)
+        grid += float(d.get("grid_kwh") if d.get("grid_kwh") is not None else k)   # an older look-ahead without it: all from the grid
         if k > 0:
             last = dep
     if last is None or grid < MIN_KWH:
         return None   # nothing later that day, or the sun at home brings it
-    return by, last, total
+    return by, last, first + grid
 
 
 def evening_before(now: datetime, horizon: dict | None, soc: float | None, capacity_kwh: float, efficiency: float,
@@ -108,7 +113,7 @@ def earlier_departure(now: datetime, horizon: dict | None, departure: datetime |
     dep, kwh = _parse(need.get("departure")), float(need.get("need_kwh") or 0.0)
     if dep is None or kwh < MIN_KWH or dep <= now:
         return None   # kept until that departure itself: a deadline that jumps back shortly before it moves the charge away
-    if departure - dep < SAME_TRIP or dep.date() > (now + timedelta(days=1)).date():
+    if departure - dep < SAME_TRIP_WINDOW or dep.date() > (now + timedelta(days=1)).date():
         return None
     target = min(100.0, soc + kwh * max(0.1, efficiency) / capacity_kwh * 100.0)
     if target <= soc + 0.05:

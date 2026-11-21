@@ -109,7 +109,7 @@
       },
       "finish": {
         "title": "Darf ich Sie um etwas bitten?",
-        "description": "Anonyme Daten helfen mir, Plugwhen zu verbessern, und Ihnen beim Start: Solange Ihr Auto noch lernt, rechnet Plugwhen mit den Verbrauchswerten gleicher Automodelle.\n\n**Gesendet:** einmal pro Woche eine Übersicht der Einrichtung mit einer Kennung, die jeden Monat wechselt; täglich Fahrt-, Lade- und Standtage ohne Datum, Ort oder Kennung.\n**Nie:** Namen, Adressen, Orte oder Kennwörter.\n**Wofür:** Verbrauchswerte je Automodell, sehen, welche Geräte gut funktionieren, und Zusammenfassungen, die veröffentlicht oder an Forschung und Partner weitergegeben werden. Immer aus mindestens 10 Installationen, nie einzelne Autos oder Haushalte.\n**Löschen:** die Wochendaten beim Ausschalten, sonst nach 60 Tagen. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nAlles im Detail: aiwhatelse.eu/datenschutz. Freiwillig und jederzeit abschaltbar. Danke!",
+        "description": "Anonyme Daten helfen beim Start: Solange Ihr Auto noch lernt, rechnet Plugwhen mit den Verbrauchswerten gleicher Automodelle.\n\n**Gesendet** werden Auto-, Lade- und Einrichtungswerte ohne Datum, Ort oder Namen: wöchentlich eine Übersicht mit einer Kennung, die jeden Monat wechselt, täglich Fahrt-, Lade- und Standtage; später einzelne weitere Ladekennzahlen, die die Liste mit „ab Version“ nennt.\n**Wofür:** Verbrauchs- und Ladewerte je Auto- und Wallbox-Modell, Zusammenfassungen aus mindestens 10 Installationen, auch für Forschung und Partner.\n**Nie:** Namen, Adressen, Orte genauer als das Land, Abfahrts- und Ladezeiten, Kalendertexte, Fahrziele, Kennwörter.\nFreiwillig und jederzeit abschaltbar; beim Ausschalten werden die Wochendaten gelöscht, Tageswerte ohne Kennung lassen sich nicht löschen. Verantwortlich: Betreiber von aiwhatelse.eu.\n\n[Was wann gesendet wird und warum]({privacy_url})",
         "data": {
           "share_usage": "Ja, ich bin einverstanden"
         }
@@ -465,9 +465,23 @@
         "step": {
           "confirm": {
             "title": "Darf ich Sie um etwas bitten?",
-            "description": "Anonyme Daten helfen mir, Plugwhen zu verbessern, und Ihnen beim Start: Solange Ihr Auto noch lernt, rechnet Plugwhen mit den Verbrauchswerten gleicher Automodelle.\n\n**Gesendet:** einmal pro Woche eine Übersicht der Einrichtung mit einer Kennung, die jeden Monat wechselt; täglich Fahrt-, Lade- und Standtage ohne Datum, Ort oder Kennung.\n**Nie:** Namen, Adressen, Orte oder Kennwörter.\n**Wofür:** Verbrauchswerte je Automodell, sehen, welche Geräte gut funktionieren, und Zusammenfassungen, die veröffentlicht oder an Forschung und Partner weitergegeben werden. Immer aus mindestens 10 Installationen, nie einzelne Autos oder Haushalte.\n**Löschen:** die Wochendaten beim Ausschalten, sonst nach 60 Tagen. Fahrtage lassen sich keinem Auto zuordnen und daher nicht löschen.\n\nAlles im Detail: aiwhatelse.eu/datenschutz. Freiwillig und jederzeit abschaltbar. Danke!",
+            "description": "Anonyme Daten helfen beim Start: Solange Ihr Auto noch lernt, rechnet Plugwhen mit den Verbrauchswerten gleicher Automodelle.\n\n**Gesendet** werden Auto-, Lade- und Einrichtungswerte ohne Datum, Ort oder Namen: wöchentlich eine Übersicht mit einer Kennung, die jeden Monat wechselt, täglich Fahrt-, Lade- und Standtage; später einzelne weitere Ladekennzahlen, die die Liste mit „ab Version“ nennt.\n**Wofür:** Verbrauchs- und Ladewerte je Auto- und Wallbox-Modell, Zusammenfassungen aus mindestens 10 Installationen, auch für Forschung und Partner.\n**Nie:** Namen, Adressen, Orte genauer als das Land, Abfahrts- und Ladezeiten, Kalendertexte, Fahrziele, Kennwörter.\nFreiwillig und jederzeit abschaltbar; beim Ausschalten werden die Wochendaten gelöscht, Tageswerte ohne Kennung lassen sich nicht löschen. Verantwortlich: Betreiber von aiwhatelse.eu.\n\n[Was wann gesendet wird und warum]({privacy_url})",
             "data": {
               "share_usage": "Ja, ich bin einverstanden"
+            }
+          }
+        }
+      }
+    },
+    "share_usage_check": {
+      "title": "Plugwhen: Zustimmung zum Datenteilen erneuern",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Plugwhen: Zustimmung zum Datenteilen erneuern",
+            "description": "Sie teilen schon anonyme Daten, danke. Bitte einmal bestätigen: Es wird nichts Neues gesendet, neu ist nur die Liste, was wann gesendet wird und warum. Schalter an und bestätigen: weiter teilen. Schalter aus und bestätigen: Das Teilen wird ausgeschaltet.\n\n**Gesendet** werden Auto-, Lade- und Einrichtungswerte ohne Datum, Ort oder Namen: wöchentlich eine Übersicht mit einer Kennung, die jeden Monat wechselt, täglich Fahrt-, Lade- und Standtage; später einzelne weitere Ladekennzahlen, die die Liste mit „ab Version“ nennt.\n**Wofür:** Verbrauchs- und Ladewerte je Auto- und Wallbox-Modell, Zusammenfassungen aus mindestens 10 Installationen, auch für Forschung und Partner.\n**Nie:** Namen, Adressen, Orte genauer als das Land, Abfahrts- und Ladezeiten, Kalendertexte, Fahrziele, Kennwörter.\nFreiwillig und jederzeit abschaltbar; beim Ausschalten werden die Wochendaten gelöscht, Tageswerte ohne Kennung lassen sich nicht löschen. Verantwortlich: Betreiber von aiwhatelse.eu.\n\n[Was wann gesendet wird und warum]({privacy_url})",
+            "data": {
+              "share_usage": "Weiter teilen"
             }
           }
         }

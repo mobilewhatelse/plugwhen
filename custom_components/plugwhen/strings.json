@@ -109,7 +109,7 @@
       },
       "finish": {
         "title": "May I ask a favour?",
-        "description": "Anonymous data helps me improve Plugwhen, and helps you at the start: while your car is still learning, Plugwhen uses the consumption of the same car models.\n\n**Sent:** once a week an overview of the set-up with an id that changes every month; daily trip, charging and parked days without date, place or id.\n**Never:** names, addresses, places or passwords.\n**For:** consumption values per car model, seeing which devices work well, and summaries that are published or passed on to research and partners. Always from at least 10 installations, never single cars or households.\n**Deleting:** weekly data when you switch off, otherwise after 60 days. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nAll details: aiwhatelse.eu/datenschutz. Voluntary, and you can switch it off any time. Thank you!",
+        "description": "Anonymous data helps at the start: while your car is still learning, Plugwhen uses the consumption of the same car models.\n\n**Sent** are car, charging and set-up values without date, place or names: weekly an overview with an id that changes every month, daily trip, charging and parked days; later a few more charging figures that the list names with \"from version\".\n**For:** consumption and charging values per car and wallbox model, summaries from at least 10 installations, also for research and partners.\n**Never:** names, addresses, places more precise than the country, departure and charging times, calendar texts, destinations, passwords.\nVoluntary, switch it off any time; switching off deletes the weekly data, daily values without an id cannot be deleted. Responsible: operator of aiwhatelse.eu.\n\n[What is sent when, and why]({privacy_url})",
         "data": {
           "share_usage": "Yes, I agree"
         }
@@ -465,9 +465,23 @@
         "step": {
           "confirm": {
             "title": "May I ask a favour?",
-            "description": "Anonymous data helps me improve Plugwhen, and helps you at the start: while your car is still learning, Plugwhen uses the consumption of the same car models.\n\n**Sent:** once a week an overview of the set-up with an id that changes every month; daily trip, charging and parked days without date, place or id.\n**Never:** names, addresses, places or passwords.\n**For:** consumption values per car model, seeing which devices work well, and summaries that are published or passed on to research and partners. Always from at least 10 installations, never single cars or households.\n**Deleting:** weekly data when you switch off, otherwise after 60 days. Trip days cannot be traced to a car and therefore cannot be deleted.\n\nAll details: aiwhatelse.eu/datenschutz. Voluntary, and you can switch it off any time. Thank you!",
+            "description": "Anonymous data helps at the start: while your car is still learning, Plugwhen uses the consumption of the same car models.\n\n**Sent** are car, charging and set-up values without date, place or names: weekly an overview with an id that changes every month, daily trip, charging and parked days; later a few more charging figures that the list names with \"from version\".\n**For:** consumption and charging values per car and wallbox model, summaries from at least 10 installations, also for research and partners.\n**Never:** names, addresses, places more precise than the country, departure and charging times, calendar texts, destinations, passwords.\nVoluntary, switch it off any time; switching off deletes the weekly data, daily values without an id cannot be deleted. Responsible: operator of aiwhatelse.eu.\n\n[What is sent when, and why]({privacy_url})",
             "data": {
               "share_usage": "Yes, I agree"
+            }
+          }
+        }
+      }
+    },
+    "share_usage_check": {
+      "title": "Plugwhen: renew your consent to share data",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Plugwhen: renew your consent to share data",
+            "description": "You already share anonymous data, thank you. Please confirm once: nothing new is sent, only the list of what is sent when and why is new. Switch on and confirm: keep sharing. Switch off and confirm: sharing is switched off.\n\n**Sent** are car, charging and set-up values without date, place or names: weekly an overview with an id that changes every month, daily trip, charging and parked days; later a few more charging figures that the list names with \"from version\".\n**For:** consumption and charging values per car and wallbox model, summaries from at least 10 installations, also for research and partners.\n**Never:** names, addresses, places more precise than the country, departure and charging times, calendar texts, destinations, passwords.\nVoluntary, switch it off any time; switching off deletes the weekly data, daily values without an id cannot be deleted. Responsible: operator of aiwhatelse.eu.\n\n[What is sent when, and why]({privacy_url})",
+            "data": {
+              "share_usage": "Keep sharing"
             }
           }
         }

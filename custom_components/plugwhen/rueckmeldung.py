@@ -26,8 +26,33 @@ MAX_KONTAKT = 200
 
 
 ZUSTIMMUNG = 2      # Version des Zustimmungstexts: 2 = Monatskennung, Zusatzwerte, alle Zwecke genannt
+KATALOG = 1         # Fassung des Datenkatalogs (Datenschutzseite, Abschnitt "daten-teilen"), der zugestimmt wurde; gemerkt als "katalog"
+DATENSCHUTZ = "https://www.aiwhatelse.eu/datenschutz/?lang={lang}#daten-teilen"   # was wann gesendet wird und warum
 MAX_KENNUNGEN = 3   # laufender Monat und die zwei davor: der Dienst hält eine Kennung bis 60 Tage nach ihrer letzten Meldung
 SEIT_KLASSEN = ((1, "0-1"), (3, "1-3"), (6, "3-6"))   # Monate -> Klasse, darüber ">6"
+
+
+def privacy_url(lang: str | None) -> str:
+    """Die Adresse der Liste, was wann gesendet wird (Link im Text der Zustimmung), in der Sprache von Home Assistant:
+    Deutsch für "de" und "de-AT" usw., sonst Englisch."""
+    return DATENSCHUTZ.format(lang="de" if str(lang or "").lower()[:2] == "de" else "en")
+
+
+def katalog_fassung(*quellen: Any) -> int:
+    """Die höchste gemerkte Fassung des Katalogs aus Einträgen/Optionen/Speicher (je ein dict mit "katalog"); 0 = keine.
+    Ein fehlender oder unlesbarer Wert zählt als 0 (bisherige Teilnehmer)."""
+    best = 0
+    for q in quellen:
+        try:
+            best = max(best, int((q or {}).get("katalog") or 0))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return best
+
+
+def katalog_fehlt(teilen: bool, *quellen: Any) -> bool:
+    """Teilt jemand schon, hat aber der aktuellen Fassung des Katalogs noch nicht zugestimmt? Dann einmal unter Reparaturen fragen."""
+    return bool(teilen) and katalog_fassung(*quellen) < KATALOG
 
 
 def neue_kennung() -> str:
